@@ -34,12 +34,12 @@
                         (click)="openMatchScoreModal(match)">
                         <div class="match-teams">
                             <div class="team" [ngClass]="getMatchWinnerClass(match, match.team1Id)">
-                                <span class="team-name">{{ match.team1?.player1Name }} & {{ match.team1?.player2Name
+                                <span class="team-name">{{ match.team1?.player1?.name }} & {{ match.team1?.player2?.name
                                     }}</span>
                             </div>
                             <div class="vs">vs</div>
                             <div class="team" [ngClass]="getMatchWinnerClass(match, match.team2Id)">
-                                <span class="team-name">{{ match.team2?.player1Name }} & {{ match.team2?.player2Name
+                                <span class="team-name">{{ match.team2?.player1?.name }} & {{ match.team2?.player2?.name
                                     }}</span>
                             </div>
                         </div>
@@ -111,23 +111,37 @@
 <div *ngIf="selectedMatch" class="modal-overlay" (click)="closeModal()">
     <div class="modal-content" (click)="$event.stopPropagation()">
         <h2>Ingresar Resultado</h2>
-        <div class="match-info">
-            <div><strong>{{ selectedMatch.team1?.player1Name }} & {{ selectedMatch.team1?.player2Name }}</strong></div>
-            <div>vs</div>
-            <div><strong>{{ selectedMatch.team2?.player1Name }} & {{ selectedMatch.team2?.player2Name }}</strong></div>
+        <div class="match-info mb-2 text-center text-muted">
+            Ingresa el resultado por sets
         </div>
 
         <form [formGroup]="scoreForm" (ngSubmit)="saveScore()">
             <div formArrayName="sets">
-                <div *ngFor="let set of sets.controls; let i = index" [formGroupName]="i" class="set-input"> <label
-                        class="label">Set {{ i + 1 }}</label>
-                    <div class="flex gap-2">
-                        <input type="number" class="input" formControlName="team1Games" placeholder="Juegos equipo 1"
-                            min="0" style="flex: 1;" />
-                        <span style="align-self: center; color: var(--text-muted);">-</span>
-                        <input type="number" class="input" formControlName="team2Games" placeholder="Juegos equipo 2"
-                            min="0" style="flex: 1;" />
-                        <button type="button" class="btn btn-danger" (click)="removeSet(i)" *ngIf="sets.length > 1">
+                <div *ngFor="let set of sets.controls; let i = index" [formGroupName]="i" class="set-input mb-3">
+                    <label class="label text-center mb-2">Set {{ i + 1 }}</label>
+                    <div class="flex gap-2 align-items-center">
+                        <!-- Team 1 Input Group -->
+                        <div style="flex: 1; text-align: center;">
+                            <label class="label" style="font-size: 0.8rem; margin-bottom: 4px;">
+                                {{ selectedMatch.team1?.player1?.name }} & {{ selectedMatch.team1?.player2?.name }}
+                            </label>
+                            <input type="number" class="input text-center" formControlName="team1Games" placeholder="0"
+                                min="0" />
+                        </div>
+
+                        <span style="font-weight: bold; font-size: 1.2rem;">-</span>
+
+                        <!-- Team 2 Input Group -->
+                        <div style="flex: 1; text-align: center;">
+                            <label class="label" style="font-size: 0.8rem; margin-bottom: 4px;">
+                                {{ selectedMatch.team2?.player1?.name }} & {{ selectedMatch.team2?.player2?.name }}
+                            </label>
+                            <input type="number" class="input text-center" formControlName="team2Games" placeholder="0"
+                                min="0" />
+                        </div>
+
+                        <button type="button" class="btn btn-danger" (click)="removeSet(i)" *ngIf="sets.length > 1"
+                            style="margin-top: 24px;">
                             ✕
                         </button>
                     </div>

@@ -16,8 +16,8 @@ export interface Tournament {
 
 export interface Team {
     id: string;
-    player1Name: string;
-    player2Name: string;
+    player1: { id: string; name: string };
+    player2: { id: string; name: string };
     tournamentId: string;
 }
 
@@ -45,8 +45,8 @@ export interface SetResult {
 
 export interface Standing {
     teamId: string;
-    player1Name: string;
-    player2Name: string;
+    player1Name: string; // Backend might still return this flattened in getStandings custom query? Let's check backend service.
+    player2Name: string; // Checked backend TournamentsService.getStandings: it manually constructs the object.
     matchesWon: number;
     matchesLost: number;
     setsWon: number;

@@ -1,0 +1,60 @@
+<div class="container fade-in">
+    <div class="flex-between mb-4">
+        <h1>👥 Gestión de Jugadores</h1>
+    </div>
+
+    <!-- Create Player Form -->
+    <div class="card mb-4">
+        <h3>Nuevo Jugador</h3>
+        <form [formGroup]="playerForm" (ngSubmit)="onSubmit()" class="flex gap-2">
+            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                <input type="text" formControlName="name" class="input" placeholder="Nombre del jugador" />
+            </div>
+            <button type="submit" class="btn btn-primary" [disabled]="playerForm.invalid">
+                ➕ Agregar
+            </button>
+        </form>
+    </div>
+
+    <!-- Player List -->
+    <div *ngIf="loading" class="flex-center" style="min-height: 200px;">
+        <div class="spinner"></div>
+    </div>
+
+    <div *ngIf="!loading && players.length === 0" class="card text-center">
+        <h3>No hay jugadores registrados</h3>
+        <p style="color: var(--text-muted); margin-top: var(--spacing-md);">
+            Agrega jugadores para comenzar.
+        </p>
+    </div>
+
+    <div *ngIf="!loading && players.length > 0" class="card">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">#</th>
+                        <th>Nombre</th>
+                        <th class="text-center">Torneos</th>
+                        <th class="text-center">Puntos</th>
+                        <th style="width: 80px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let player of players; let i = index">
+                        <td class="text-secondary">{{ i + 1 }}</td>
+                        <td class="text-bold">{{ player.name }}</td>
+                        <td class="text-center">{{ player.tournamentsPlayed }}</td>
+                        <td class="text-center text-accent">{{ player.totalPoints }}</td>
+                        <td class="text-right">
+                            <button class="btn btn-sm btn-danger btn-icon" (click)="deletePlayer(player)"
+                                title="Eliminar jugador">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

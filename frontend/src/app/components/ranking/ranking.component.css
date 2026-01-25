@@ -1,0 +1,25 @@
+.leader {
+    background-color: rgba(var(--primary-rgb), 0.05);
+}
+
+.leader:nth-child(1) {
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.1) 0%, transparent 100%);
+    border-left: 4px solid gold;
+}
+
+.leader:nth-child(2) {
+    border-left: 4px solid silver;
+}
+
+.leader:nth-child(3) {
+    border-left: 4px solid #cd7f32;
+}
+
+.text-accent {
+    color: var(--primary);
+    font-weight: 800;
+}
+
+.font-lg {
+    font-size: 1.2rem;
+}

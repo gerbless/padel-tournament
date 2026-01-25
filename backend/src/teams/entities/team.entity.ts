@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { Tournament } from '../../tournaments/entities/tournament.entity';
 import { Match } from '../../matches/entities/match.entity';
+import { Player } from '../../players/entities/player.entity';
 
 @Entity('teams')
 export class Team {
@@ -8,10 +9,27 @@ export class Team {
     id: string;
 
     @Column()
-    player1Name: string;
+    player1Id: string;
 
     @Column()
-    player2Name: string;
+    player2Id: string;
+
+    @ManyToOne(() => Player, player => player.teamsAsPlayer1)
+    @JoinColumn({ name: 'player1Id' })
+    player1: Player;
+
+    @ManyToOne(() => Player, player => player.teamsAsPlayer2)
+    @JoinColumn({ name: 'player2Id' })
+    player2: Player;
+
+    // Computed properties for backward compatibility
+    get player1Name(): string {
+        return this.player1?.name || '';
+    }
+
+    get player2Name(): string {
+        return this.player2?.name || '';
+    }
 
     @Column()
     tournamentId: string;

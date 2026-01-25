@@ -34,14 +34,16 @@ export class MatchesService {
         // Calculate winner
         const winnerId = this.calculateMatchWinner(sets, match.team1Id, match.team2Id);
 
-        // Update match
-        match.sets = sets;
-        match.winnerId = winnerId;
-        match.status = MatchStatus.COMPLETED;
+        // Update match using direct update to avoid relation conflicts with save()
+        await this.matchRepository.update(id, {
+            sets: sets,
+            winnerId: winnerId,
+            status: MatchStatus.COMPLETED
+        });
 
-        console.log(`[DEBUG] Saving match ${id} to DB with sets:`, JSON.stringify(match.sets, null, 2));
+        console.log(`[DEBUG] Updated match ${id} with winner ${winnerId}`);
 
-        return this.matchRepository.save(match);
+        return this.findOne(id);
     }
 
     private validateSets(sets: SetResult[]): void {

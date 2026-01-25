@@ -160,7 +160,7 @@ export class TournamentDetailComponent implements OnInit {
     getTeamPairName(teamId: string): string {
         const team = this.tournament?.teams.find(t => t.id === teamId);
         if (!team) return 'Desconocido';
-        return `${team.player1Name} & ${team.player2Name}`;
+        return `${team.player1?.name} & ${team.player2?.name}`;
     }
 
     canCloseTournament(): boolean {

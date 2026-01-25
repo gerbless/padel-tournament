@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TournamentsModule } from './tournaments/tournaments.module';
 import { MatchesModule } from './matches/matches.module';
 import { TeamsModule } from './teams/teams.module';
+import { PlayersModule } from './players/players.module';
 
 @Module({
     imports: [
@@ -27,6 +28,7 @@ import { TeamsModule } from './teams/teams.module';
         TournamentsModule,
         MatchesModule,
         TeamsModule,
+        PlayersModule,
     ],
 })
 export class AppModule { }

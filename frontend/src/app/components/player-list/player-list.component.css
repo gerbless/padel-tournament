@@ -1,0 +1,20 @@
+/* Inherits global styles */
+.table-container {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.text-accent {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.btn-icon {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}

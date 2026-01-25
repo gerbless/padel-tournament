@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TournamentService } from '../../services/tournament.service';
+import { PlayerService, Player } from '../../services/player.service';
 
 @Component({
     selector: 'app-tournament-create',
@@ -14,10 +15,12 @@ import { TournamentService } from '../../services/tournament.service';
 export class TournamentCreateComponent {
     tournamentForm: FormGroup;
     submitting = false;
+    existingPlayers: Player[] = [];
 
     constructor(
         private fb: FormBuilder,
         private tournamentService: TournamentService,
+        private playerService: PlayerService,
         private router: Router
     ) {
         this.tournamentForm = this.fb.group({
@@ -26,8 +29,17 @@ export class TournamentCreateComponent {
             teams: this.fb.array([])
         });
 
+        this.loadPlayers();
+
         // Initialize with 4 teams for cuadrangular
         this.onTypeChange();
+    }
+
+    loadPlayers() {
+        this.playerService.findAll().subscribe({
+            next: (players) => this.existingPlayers = players,
+            error: (err) => console.error('Error loading players for autocomplete:', err)
+        });
     }
 
     get teams(): FormArray {
@@ -62,10 +74,10 @@ export class TournamentCreateComponent {
 
         this.submitting = true;
         this.tournamentService.createTournament(this.tournamentForm.value).subscribe({
-            next: (tournament) => {
+            next: (tournament: any) => {
                 this.router.navigate(['/tournaments', tournament.id]);
             },
-            error: (error) => {
+            error: (error: any) => {
                 console.error('Error creating tournament:', error);
                 alert('Error al crear el torneo: ' + (error.error?.message || 'Error desconocido'));
                 this.submitting = false;

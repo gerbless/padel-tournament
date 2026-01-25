@@ -5,6 +5,7 @@ import { Tournament, TournamentType, TournamentStatus } from './entities/tournam
 import { Team } from '../teams/entities/team.entity';
 import { Match, MatchStatus } from '../matches/entities/match.entity';
 import { CreateTournamentDto } from './dto/create-tournament.dto';
+import { PlayersService } from '../players/players.service';
 
 export interface Standing {
     teamId: string;
@@ -30,6 +31,7 @@ export class TournamentsService {
         private teamRepository: Repository<Team>,
         @InjectRepository(Match)
         private matchRepository: Repository<Match>,
+        private playersService: PlayersService,
     ) { }
 
     async create(createTournamentDto: CreateTournamentDto): Promise<Tournament> {
@@ -54,12 +56,16 @@ export class TournamentsService {
 
         // Create teams
         const teams = await Promise.all(
-            teamsData.map(teamData =>
-                this.teamRepository.save({
-                    ...teamData,
+            teamsData.map(async teamData => {
+                const p1 = await this.playersService.findOrCreateByName(teamData.player1Name);
+                const p2 = await this.playersService.findOrCreateByName(teamData.player2Name);
+
+                return this.teamRepository.save({
+                    player1: p1,
+                    player2: p2,
                     tournamentId: savedTournament.id,
-                })
-            )
+                });
+            })
         );
 
         // Generate round-robin matches
@@ -82,7 +88,7 @@ export class TournamentsService {
 
     async findAll(): Promise<Tournament[]> {
         return this.tournamentRepository.find({
-            relations: ['teams', 'matches'],
+            relations: ['teams', 'teams.player1', 'teams.player2', 'matches'],
             order: { createdAt: 'DESC' },
         });
     }
@@ -90,7 +96,19 @@ export class TournamentsService {
     async findOne(id: string): Promise<Tournament> {
         const tournament = await this.tournamentRepository.findOne({
             where: { id },
-            relations: ['teams', 'matches', 'matches.team1', 'matches.team2', 'matches.winner'],
+            relations: [
+                'teams',
+                'teams.player1',
+                'teams.player2',
+                'matches',
+                'matches.team1',
+                'matches.team1.player1',
+                'matches.team1.player2',
+                'matches.team2',
+                'matches.team2.player1',
+                'matches.team2.player2',
+                'matches.winner'
+            ],
         });
 
         if (!tournament) {
@@ -218,6 +236,11 @@ export class TournamentsService {
         }
 
         tournament.status = TournamentStatus.COMPLETED;
-        return this.tournamentRepository.save(tournament);
+        const savedTournament = await this.tournamentRepository.save(tournament);
+
+        // Update global player stats
+        await this.playersService.processTournamentResults(savedTournament);
+
+        return savedTournament;
     }
 }

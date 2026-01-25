@@ -27,6 +27,11 @@
                 </select>
             </div>
 
+            <!-- Player Datalist for Autocomplete -->
+            <datalist id="playerList">
+                <option *ngFor="let player of existingPlayers" [value]="player.name"></option>
+            </datalist>
+
             <!-- Teams -->
             <div class="form-group">
                 <label class="label">Parejas</label>
@@ -38,12 +43,12 @@
                         </h3>
                         <div style="margin-bottom: var(--spacing-md);">
                             <label class="label" style="font-size: 0.75rem;">Jugador 1</label>
-                            <input type="text" class="input" formControlName="player1Name"
+                            <input type="text" class="input" formControlName="player1Name" list="playerList"
                                 placeholder="Nombre del jugador 1" />
                         </div>
                         <div>
                             <label class="label" style="font-size: 0.75rem;">Jugador 2</label>
-                            <input type="text" class="input" formControlName="player2Name"
+                            <input type="text" class="input" formControlName="player2Name" list="playerList"
                                 placeholder="Nombre del jugador 2" />
                         </div>
                     </div>
