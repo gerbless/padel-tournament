@@ -1,0 +1,52 @@
+<div class="container fade-in">
+  <div class="flex-between mb-4">
+    <h1>🎾 Torneos de Pádel</h1>
+    <a routerLink="/tournaments/create" class="btn btn-primary">
+      ➕ Crear Torneo
+    </a>
+  </div>
+
+  <div *ngIf="loading" class="flex-center" style="min-height: 400px;">
+    <div class="spinner"></div>
+  </div>
+
+  <div *ngIf="!loading && tournaments.length === 0" class="card text-center">
+    <h3>No hay torneos creados</h3>
+    <p style="color: var(--text-muted); margin-top: var(--spacing-md);">
+      Crea tu primer torneo para comenzar
+    </p>
+  </div>
+
+  <div *ngIf="!loading && tournaments.length > 0" class="grid grid-2">
+    <div *ngFor="let tournament of tournaments" class="card slide-up">
+      <div class="flex-between mb-2">
+        <h3>{{ tournament.name }}</h3>
+        <span class="badge" [ngClass]="getStatusBadgeClass(tournament.status)">
+          {{ getStatusText(tournament.status) }}
+        </span>
+      </div>
+      
+      <div style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
+        <p>
+          <strong>Tipo:</strong> 
+          {{ tournament.type === 'cuadrangular' ? 'Cuadrangular' : 'Hexagonal' }}
+          ({{ getTeamCount(tournament.type) }} parejas)
+        </p>
+        <p>
+          <strong>Partidos:</strong> {{ tournament.matches?.length || 0 }}
+        </p>
+      </div>
+
+      <div class="flex gap-2 mt-3">
+        <a [routerLink]="['/tournaments', tournament.id]" class="btn btn-primary" style="flex: 1;">
+          Ver Torneo
+        </a>
+        <button 
+          (click)="deleteTournament(tournament.id, $event)" 
+          class="btn btn-danger">
+          🗑️
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

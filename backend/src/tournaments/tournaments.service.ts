@@ -1,0 +1,223 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Tournament, TournamentType, TournamentStatus } from './entities/tournament.entity';
+import { Team } from '../teams/entities/team.entity';
+import { Match, MatchStatus } from '../matches/entities/match.entity';
+import { CreateTournamentDto } from './dto/create-tournament.dto';
+
+export interface Standing {
+    teamId: string;
+    player1Name: string;
+    player2Name: string;
+    matchesWon: number;
+    matchesLost: number;
+    setsWon: number;
+    setsLost: number;
+    setDifference: number;
+    gamesWon: number;
+    gamesLost: number;
+    gameDifference: number;
+    position: number;
+}
+
+@Injectable()
+export class TournamentsService {
+    constructor(
+        @InjectRepository(Tournament)
+        private tournamentRepository: Repository<Tournament>,
+        @InjectRepository(Team)
+        private teamRepository: Repository<Team>,
+        @InjectRepository(Match)
+        private matchRepository: Repository<Match>,
+    ) { }
+
+    async create(createTournamentDto: CreateTournamentDto): Promise<Tournament> {
+        const { name, type, teams: teamsData } = createTournamentDto;
+
+        // Validate team count
+        const expectedTeamCount = type === TournamentType.CUADRANGULAR ? 4 : 6;
+        if (teamsData.length !== expectedTeamCount) {
+            throw new BadRequestException(
+                `${type} tournament requires exactly ${expectedTeamCount} teams`
+            );
+        }
+
+        // Create tournament
+        const tournament = this.tournamentRepository.create({
+            name,
+            type,
+            status: TournamentStatus.IN_PROGRESS,
+        });
+
+        const savedTournament = await this.tournamentRepository.save(tournament);
+
+        // Create teams
+        const teams = await Promise.all(
+            teamsData.map(teamData =>
+                this.teamRepository.save({
+                    ...teamData,
+                    tournamentId: savedTournament.id,
+                })
+            )
+        );
+
+        // Generate round-robin matches
+        const matches = [];
+        for (let i = 0; i < teams.length; i++) {
+            for (let j = i + 1; j < teams.length; j++) {
+                matches.push({
+                    tournamentId: savedTournament.id,
+                    team1Id: teams[i].id,
+                    team2Id: teams[j].id,
+                    status: MatchStatus.PENDING,
+                });
+            }
+        }
+
+        await this.matchRepository.save(matches);
+
+        return this.findOne(savedTournament.id);
+    }
+
+    async findAll(): Promise<Tournament[]> {
+        return this.tournamentRepository.find({
+            relations: ['teams', 'matches'],
+            order: { createdAt: 'DESC' },
+        });
+    }
+
+    async findOne(id: string): Promise<Tournament> {
+        const tournament = await this.tournamentRepository.findOne({
+            where: { id },
+            relations: ['teams', 'matches', 'matches.team1', 'matches.team2', 'matches.winner'],
+        });
+
+        if (!tournament) {
+            throw new NotFoundException(`Tournament with ID ${id} not found`);
+        }
+
+        return tournament;
+    }
+
+    async getStandings(tournamentId: string): Promise<Standing[]> {
+        const tournament = await this.findOne(tournamentId);
+        const teams = tournament.teams;
+        const matches = tournament.matches.filter(m => m.status === MatchStatus.COMPLETED);
+
+        // Initialize standings
+        const standingsMap = new Map<string, Standing>();
+        teams.forEach(team => {
+            standingsMap.set(team.id, {
+                teamId: team.id,
+                player1Name: team.player1Name,
+                player2Name: team.player2Name,
+                matchesWon: 0,
+                matchesLost: 0,
+                setsWon: 0,
+                setsLost: 0,
+                setDifference: 0,
+                gamesWon: 0,
+                gamesLost: 0,
+                gameDifference: 0,
+                position: 0,
+            });
+        });
+
+        // Calculate stats from matches
+        matches.forEach(match => {
+            if (!match.sets || match.sets.length === 0) return;
+
+            const team1Stats = standingsMap.get(match.team1Id);
+            const team2Stats = standingsMap.get(match.team2Id);
+
+            let team1SetsWon = 0;
+            let team2SetsWon = 0;
+            let team1GamesTotal = 0;
+            let team2GamesTotal = 0;
+
+            match.sets.forEach(set => {
+                const t1Games = parseInt(set.team1Games as any, 10) || 0;
+                const t2Games = parseInt(set.team2Games as any, 10) || 0;
+
+                if (t1Games > t2Games) {
+                    team1SetsWon++;
+                } else {
+                    team2SetsWon++;
+                }
+                team1GamesTotal += t1Games;
+                team2GamesTotal += t2Games;
+            });
+
+            team1Stats.setsWon += team1SetsWon;
+            team1Stats.setsLost += team2SetsWon;
+            team1Stats.gamesWon += team1GamesTotal;
+            team1Stats.gamesLost += team2GamesTotal;
+
+            team2Stats.setsWon += team2SetsWon;
+            team2Stats.setsLost += team1SetsWon;
+            team2Stats.gamesWon += team2GamesTotal;
+            team2Stats.gamesLost += team1GamesTotal;
+
+            if (match.winnerId === match.team1Id) {
+                team1Stats.matchesWon++;
+                team2Stats.matchesLost++;
+            } else if (match.winnerId === match.team2Id) {
+                team2Stats.matchesWon++;
+                team1Stats.matchesLost++;
+            }
+        });
+
+        // Calculate differences
+        standingsMap.forEach(standing => {
+            standing.setDifference = standing.setsWon - standing.setsLost;
+            standing.gameDifference = standing.gamesWon - standing.gamesLost;
+        });
+
+        // Sort standings
+        const standings = Array.from(standingsMap.values()).sort((a, b) => {
+            // 1. Matches won (descending)
+            if (b.matchesWon !== a.matchesWon) {
+                return b.matchesWon - a.matchesWon;
+            }
+            // 2. Set difference (descending)
+            if (b.setDifference !== a.setDifference) {
+                return b.setDifference - a.setDifference;
+            }
+            // 3. Game difference (descending)
+            if (b.gameDifference !== a.gameDifference) {
+                return b.gameDifference - a.gameDifference;
+            }
+            // 4. Head-to-head (would need additional logic)
+            return 0;
+        });
+
+        // Assign positions
+        standings.forEach((standing, index) => {
+            standing.position = index + 1;
+        });
+
+        return standings;
+    }
+
+    async remove(id: string): Promise<void> {
+        const tournament = await this.findOne(id);
+        await this.tournamentRepository.remove(tournament);
+    }
+
+    async closeTournament(id: string): Promise<Tournament> {
+        const tournament = await this.findOne(id);
+
+        // Verify all matches have sets
+        const allMatchesCompleted = tournament.matches.every(
+            match => match.sets && match.sets.length > 0
+        );
+
+        if (!allMatchesCompleted) {
+            throw new BadRequestException('Cannot close tournament: All matches must have at least one set played');
+        }
+
+        tournament.status = TournamentStatus.COMPLETED;
+        return this.tournamentRepository.save(tournament);
+    }
+}

@@ -1,0 +1,64 @@
+<div class="container fade-in">
+    <div class="flex-between mb-4">
+        <h1>Crear Nuevo Torneo</h1>
+        <a routerLink="/tournaments" class="btn btn-secondary">
+            ← Volver
+        </a>
+    </div>
+
+    <div class="card">
+        <form [formGroup]="tournamentForm" (ngSubmit)="onSubmit()">
+            <!-- Tournament Name -->
+            <div class="form-group">
+                <label class="label">Nombre del Torneo</label>
+                <input type="text" class="input" formControlName="name" placeholder="Ej: Torneo de Verano 2026" />
+                <div *ngIf="tournamentForm.get('name')?.invalid && tournamentForm.get('name')?.touched"
+                    style="color: var(--error); margin-top: var(--spacing-sm); font-size: 0.875rem;">
+                    El nombre es requerido (mínimo 3 caracteres)
+                </div>
+            </div>
+
+            <!-- Tournament Type -->
+            <div class="form-group">
+                <label class="label">Tipo de Torneo</label>
+                <select class="input" formControlName="type" (change)="onTypeChange()">
+                    <option value="cuadrangular">Cuadrangular (4 parejas)</option>
+                    <option value="hexagonal">Hexagonal (6 parejas)</option>
+                </select>
+            </div>
+
+            <!-- Teams -->
+            <div class="form-group">
+                <label class="label">Parejas</label>
+                <div class="grid grid-2">
+                    <div *ngFor="let team of teams.controls; let i = index" [formGroup]="$any(team)" class="card"
+                        style="padding: var(--spacing-lg);">
+                        <h3 style="font-size: 1.125rem; margin-bottom: var(--spacing-md);">
+                            Pareja {{ i + 1 }}
+                        </h3>
+                        <div style="margin-bottom: var(--spacing-md);">
+                            <label class="label" style="font-size: 0.75rem;">Jugador 1</label>
+                            <input type="text" class="input" formControlName="player1Name"
+                                placeholder="Nombre del jugador 1" />
+                        </div>
+                        <div>
+                            <label class="label" style="font-size: 0.75rem;">Jugador 2</label>
+                            <input type="text" class="input" formControlName="player2Name"
+                                placeholder="Nombre del jugador 2" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary" [disabled]="submitting" style="flex: 1;">
+                    {{ submitting ? '⏳ Creando...' : '✅ Crear Torneo' }}
+                </button>
+                <a routerLink="/tournaments" class="btn btn-secondary">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
