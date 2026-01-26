@@ -1,0 +1,49 @@
+<div class="container fade-in">
+    <div class="flex-between mb-4">
+        <h1>📊 Dashboard</h1>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-3 mb-4">
+        <div class="card kpi-card">
+            <div class="kpi-icon">👥</div>
+            <div class="kpi-info">
+                <h3>Jugadores</h3>
+                <div class="kpi-value">{{ totalPlayers }}</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon">🏆</div>
+            <div class="kpi-info">
+                <h3>Torneos</h3>
+                <div class="kpi-value">{{ totalTournaments }}</div>
+                <div class="kpi-sub">{{ activeTournaments }} activos</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon">🎾</div>
+            <div class="kpi-info">
+                <h3>Partidos Jugados</h3>
+                <div class="kpi-value">{{ totalMatches }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-2">
+        <div class="card">
+            <h3>🏆 Top 5 Ranking</h3>
+            <div style="display: block;">
+                <canvas baseChart [data]="barChartData" [options]="barChartOptions" [type]="'bar'">
+                </canvas>
+            </div>
+        </div>
+        <div class="card">
+            <h3>📈 Distribución</h3>
+            <div style="display: block;">
+                <canvas baseChart [data]="pieChartData" [options]="pieChartOptions" [type]="'pie'">
+                </canvas>
+            </div>
+        </div>
+    </div>
+</div>

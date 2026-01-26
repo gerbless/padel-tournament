@@ -220,7 +220,19 @@ export class TournamentsService {
 
     async remove(id: string): Promise<void> {
         const tournament = await this.findOne(id);
+
+        // Collect involved players BEFORE deleting
+        const playerIds = new Set<string>();
+        tournament.teams.forEach(t => {
+            playerIds.add(t.player1Id);
+            playerIds.add(t.player2Id);
+        });
+
+        // 1. Delete tournament
         await this.tournamentRepository.remove(tournament);
+
+        // 2. Recalculate stats for involved players & cleanup (since tournament is gone, stats will adjust downwards)
+        await this.playersService.cleanupOrphanedPlayers(Array.from(playerIds));
     }
 
     async closeTournament(id: string): Promise<Tournament> {
@@ -238,8 +250,15 @@ export class TournamentsService {
         tournament.status = TournamentStatus.COMPLETED;
         const savedTournament = await this.tournamentRepository.save(tournament);
 
-        // Update global player stats
-        await this.playersService.processTournamentResults(savedTournament);
+        // Collect all players to update their stats
+        const playerIds = new Set<string>();
+        savedTournament.teams.forEach(t => {
+            playerIds.add(t.player1Id);
+            playerIds.add(t.player2Id);
+        });
+
+        // Recalculate global stats
+        await this.playersService.recalculateStats(Array.from(playerIds));
 
         return savedTournament;
     }

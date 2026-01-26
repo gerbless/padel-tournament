@@ -1,0 +1,48 @@
+<div class="container fade-in" *ngIf="player; else loadingTpl">
+    <div class="mb-4">
+        <a routerLink="/players" class="btn btn-secondary">← Volver a la lista</a>
+    </div>
+
+    <!-- Header -->
+    <div class="profile-header">
+        <div class="avatar-large">
+            {{ getInitials(player.name) }}
+        </div>
+        <div>
+            <h1 style="margin: 0; color: white;">{{ player.name }}</h1>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
+                Miembro del Club
+            </p>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-3">
+        <div class="stat-box">
+            <div class="stat-label">Puntos Ranking</div>
+            <div class="stat-value">{{ player.totalPoints }}</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Partidos Ganados</div>
+            <div class="stat-value">{{ player.matchesWon }}</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Torneos Jugados</div>
+            <div class="stat-value">{{ player.tournamentsPlayed }}</div>
+        </div>
+    </div>
+
+    <!-- History (Placeholder for now) -->
+    <div class="card mt-4">
+        <h3>📜 Historial de Torneos</h3>
+        <p style="color: var(--text-muted);">
+            El historial detallado de partidos estará disponible próximamente.
+        </p>
+    </div>
+</div>
+
+<ng-template #loadingTpl>
+    <div class="flex-center" style="min-height: 400px;">
+        <div class="spinner"></div>
+    </div>
+</ng-template>

@@ -7,7 +7,7 @@ async function bootstrap() {
 
     // Enable CORS for frontend (development and Docker)
     app.enableCors({
-        origin: ['http://localhost:4200', 'http://localhost'],
+        origin: ['http://localhost:4200', 'http://localhost', 'https://limier-stubbornly-dania.ngrok-free.dev'],
         credentials: true,
     });
 

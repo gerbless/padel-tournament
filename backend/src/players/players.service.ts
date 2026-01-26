@@ -80,58 +80,79 @@ export class PlayersService {
         await this.playerRepository.delete(id);
     }
 
-    async processTournamentResults(tournament: any): Promise<void> {
-        // Iterate through all matches to calculate points
-        // Win = 3 points, Loss = 1 point
-        // Tournament Played = +1
-
-        const playerStats = new Map<string, { points: number, matchesWon: number, matchesPlayed: number }>();
-
-        // Initialize players from teams
-        tournament.teams.forEach(team => {
-            [team.player1Id, team.player2Id].forEach(pid => {
-                if (!playerStats.has(pid)) {
-                    playerStats.set(pid, { points: 0, matchesWon: 0, matchesPlayed: 0 });
-                }
-            });
-        });
-
-        // Calculate match points
-        tournament.matches.forEach(match => {
-            if (match.status !== 'completed' || !match.winnerId) return;
-
-            const winnerTeam = match.winnerId === match.team1Id ? match.team1 : match.team2;
-            const loserTeam = match.winnerId === match.team1Id ? match.team2 : match.team1;
-
-            // Winner points (+3)
-            [winnerTeam.player1Id, winnerTeam.player2Id].forEach(pid => {
-                const stats = playerStats.get(pid);
-                if (stats) {
-                    stats.points += 3;
-                    stats.matchesWon += 1;
-                    stats.matchesPlayed += 1;
-                }
+    async recalculateStats(playerIds: string[]) {
+        for (const playerId of new Set(playerIds)) {
+            // 1. Get all teams for this player
+            const player = await this.playerRepository.findOne({
+                where: { id: playerId },
+                relations: [
+                    'teamsAsPlayer1', 'teamsAsPlayer1.matchesAsTeam1', 'teamsAsPlayer1.matchesAsTeam1.winner',
+                    'teamsAsPlayer1.matchesAsTeam2', 'teamsAsPlayer1.matchesAsTeam2.winner',
+                    'teamsAsPlayer2', 'teamsAsPlayer2.matchesAsTeam1', 'teamsAsPlayer2.matchesAsTeam1.winner',
+                    'teamsAsPlayer2', 'teamsAsPlayer2.matchesAsTeam2', 'teamsAsPlayer2.matchesAsTeam2.winner'
+                ]
             });
 
-            // Loser points (+1)
-            [loserTeam.player1Id, loserTeam.player2Id].forEach(pid => {
-                const stats = playerStats.get(pid);
-                if (stats) {
-                    stats.points += 1;
-                    stats.matchesPlayed += 1;
-                }
-            });
-        });
+            if (!player) continue;
 
-        // Update database
-        for (const [playerId, stats] of playerStats.entries()) {
-            const player = await this.findOne(playerId);
-            player.totalPoints += stats.points;
-            player.matchesWon += stats.matchesWon;
-            player.tournamentsPlayed += 1;
-            // Note: gamesWon is not calculated here for simplicity, but could be added
+            let totalPoints = 0;
+            let matchesWon = 0;
+            const tournamentIds = new Set<string>();
+
+            // Helper to process teams
+            const processTeams = (teams: any[]) => {
+                teams.forEach(team => {
+                    if (team.tournamentId) {
+                        tournamentIds.add(team.tournamentId);
+                    }
+
+                    // Process matches where team was Team 1
+                    team.matchesAsTeam1?.forEach(match => {
+                        if (match.status === 'completed') {
+                            if (match.winner?.id === team.id) {
+                                totalPoints += 3;
+                                matchesWon++;
+                            } else {
+                                totalPoints += 1;
+                            }
+                        }
+                    });
+
+                    // Process matches where team was Team 2
+                    team.matchesAsTeam2?.forEach(match => {
+                        if (match.status === 'completed') {
+                            if (match.winner?.id === team.id) {
+                                totalPoints += 3;
+                                matchesWon++;
+                            } else {
+                                totalPoints += 1;
+                            }
+                        }
+                    });
+                });
+            };
+
+            processTeams(player.teamsAsPlayer1 || []);
+            processTeams(player.teamsAsPlayer2 || []);
+
+            // Update Player
+            player.totalPoints = totalPoints;
+            player.matchesWon = matchesWon;
+            player.tournamentsPlayed = tournamentIds.size;
 
             await this.playerRepository.save(player);
+        }
+    }
+
+    async cleanupOrphanedPlayers(playerIds: string[]): Promise<void> {
+        // First recalculate to ensure stats are accurate (e.g. tournamentsPlayed = 0)
+        await this.recalculateStats(playerIds);
+
+        for (const id of playerIds) {
+            const player = await this.findOne(id);
+            if (player.tournamentsPlayed <= 0) {
+                await this.playerRepository.delete(id);
+            }
         }
     }
 }

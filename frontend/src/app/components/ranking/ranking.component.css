@@ -1,25 +1,77 @@
-.leader {
-    background-color: rgba(var(--primary-rgb), 0.05);
+/* CSS for Ranking */
+.search-input {
+    width: 250px;
+    padding: 0.75rem 1rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
 }
 
-.leader:nth-child(1) {
-    background: linear-gradient(90deg, rgba(255, 215, 0, 0.1) 0%, transparent 100%);
-    border-left: 4px solid gold;
+.search-input:focus {
+    width: 300px;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
 }
 
-.leader:nth-child(2) {
-    border-left: 4px solid silver;
+.table-ranking {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 0.5rem;
 }
 
-.leader:nth-child(3) {
-    border-left: 4px solid #cd7f32;
+.table-ranking th {
+    padding: 1rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+}
+
+.table-ranking td {
+    background: var(--bg-card);
+    padding: 1rem;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.table-ranking tr td:first-child {
+    border-left: 1px solid var(--border);
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+}
+
+.table-ranking tr td:last-child {
+    border-right: 1px solid var(--border);
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+}
+
+.rank-cell {
+    font-weight: 800;
+    color: var(--text-secondary);
+}
+
+.leader .rank-cell {
+    font-size: 1.25rem;
+}
+
+.leader td {
+    background: linear-gradient(90deg, rgba(var(--primary-rgb), 0.05) 0%, transparent 100%);
+    border-color: rgba(var(--primary-rgb), 0.2);
+}
+
+.player-cell {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.font-bold {
+    font-weight: 800;
 }
 
 .text-accent {
     color: var(--primary);
-    font-weight: 800;
-}
-
-.font-lg {
-    font-size: 1.2rem;
 }

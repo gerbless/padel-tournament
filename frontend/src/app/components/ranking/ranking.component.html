@@ -1,25 +1,29 @@
 <div class="container fade-in">
     <div class="flex-between mb-4">
-        <h1>🏆 Ranking Global de Jugadores</h1>
+        <h1>🏆 Ranking Global</h1>
+        <div class="search-box">
+            <input type="text" [(ngModel)]="searchTerm" (input)="filterPlayers()" placeholder="🔍 Buscar jugador..."
+                class="input search-input">
+        </div>
     </div>
 
     <div *ngIf="loading" class="flex-center" style="min-height: 400px;">
         <div class="spinner"></div>
     </div>
 
-    <div *ngIf="!loading && players.length === 0" class="card text-center">
-        <h3>Aún no hay jugadores clasificados</h3>
+    <div *ngIf="!loading && filteredPlayers.length === 0" class="card text-center">
+        <h3>No se encontraron jugadores</h3>
         <p style="color: var(--text-muted); margin-top: var(--spacing-md);">
-            Completa torneos para generar el ranking.
+            Intenta con otro nombre o completa torneos para generar el ranking.
         </p>
     </div>
 
-    <div *ngIf="!loading && players.length > 0" class="card fade-in">
+    <div *ngIf="!loading && filteredPlayers.length > 0" class="card fade-in">
         <div class="table-container">
-            <table>
+            <table class="table-ranking">
                 <thead>
                     <tr>
-                        <th style="width: 60px;">#</th>
+                        <th style="width: 80px;">Pos</th>
                         <th>Jugador</th>
                         <th class="text-center">Puntos</th>
                         <th class="text-center">Torneos</th>
@@ -27,15 +31,17 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr *ngFor="let player of players; let i = index" [class.leader]="i < 3">
-                        <td class="text-bold">
-                            <span *ngIf="i === 0">🥇</span>
-                            <span *ngIf="i === 1">🥈</span>
-                            <span *ngIf="i === 2">🥉</span>
-                            <span *ngIf="i > 2">{{ i + 1 }}</span>
+                    <tr *ngFor="let player of filteredPlayers; let i = index" [class.leader]="i < 3">
+                        <td class="rank-cell">
+                            <div class="rank-badge" [attr.data-rank]="i + 1">
+                                <span *ngIf="i === 0">🥇</span>
+                                <span *ngIf="i === 1">🥈</span>
+                                <span *ngIf="i === 2">🥉</span>
+                                <span *ngIf="i > 2">{{ i + 1 }}</span>
+                            </div>
                         </td>
-                        <td class="text-bold">{{ player.name }}</td>
-                        <td class="text-center text-accent font-lg">{{ player.totalPoints }}</td>
+                        <td class="player-cell">{{ player.name }}</td>
+                        <td class="text-center font-bold text-accent">{{ player.totalPoints }}</td>
                         <td class="text-center">{{ player.tournamentsPlayed }}</td>
                         <td class="text-center">{{ player.matchesWon }}</td>
                     </tr>
