@@ -1,0 +1,17 @@
+- [x] Scaffold new `league` feature module (folders, routing, components)
+  - [x] Create `LeagueListComponent`
+  - [x] Create `LeagueCreateComponent`
+  - [x] Create `LeagueDashboardComponent`
+  - [x] Create `LeagueTableComponent` (integrated into dashboard)
+  - [x] Add `LeagueService` and models
+- [x] Fix league module critical issues
+  - [x] Fix calendar generation error (backend now supports pairs)
+  - [x] Add player management from league dashboard
+  - [x] Implement manual pair configuration UI
+- [/] Implement sidebar collapse functionality and persistence
+- [ ] Update tournament deletion endpoint and frontend handling
+- [ ] Redesign ranking table component with search & sorting
+- [ ] Implement match‑suggestion algorithm in `LeagueService`
+- [ ] Add unit tests for league service and components
+- [ ] Add e2e test for league creation flow
+- [ ] Update documentation and walkthrough

@@ -1,0 +1,78 @@
+<div class="container fade-in">
+    <div class="flex-between mb-4">
+        <div>
+            <h1>Ligas</h1>
+            <p style="color: var(--text-secondary); margin-top: -1rem;">
+                Gestiona tus ligas y torneos de larga duración
+            </p>
+        </div>
+        <a routerLink="/leagues/create" class="btn btn-primary">+ Nueva Liga</a>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!loading && leagues.length === 0" class="card text-center" style="padding: 3rem;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🏆</div>
+        <h3>No hay ligas activas</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+            Comienza creando tu primera liga para gestionar una temporada completa de competición.
+        </p>
+        <a routerLink="/leagues/create" class="btn btn-primary">Crear Liga</a>
+    </div>
+
+    <!-- Loading State -->
+    <div *ngIf="loading" class="flex-center" style="padding: 3rem;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- League Grid -->
+    <div *ngIf="!loading && leagues.length > 0" class="grid grid-3">
+        <div *ngFor="let league of leagues" class="card hover-lift" style="position: relative;">
+            <!-- Status Badge -->
+            <div class="flex-between" style="margin-bottom: 1rem;">
+                <span class="badge" [ngClass]="{
+                    'badge-success': league.status === 'active',
+                    'badge-warning': league.status === 'draft',
+                    'badge-info': league.status === 'completed'
+                }">
+                    {{ getStatusLabel(league.status) }}
+                </span>
+                <button (click)="deleteLeague(league.id); $event.stopPropagation()" class="btn-icon btn-danger"
+                    title="Eliminar liga">
+                    🗑️
+                </button>
+            </div>
+
+            <!-- League Info -->
+            <a [routerLink]="['/leagues', league.id]" style="text-decoration: none; color: inherit;">
+                <h3 style="margin-bottom: 0.5rem;">{{ league.name }}</h3>
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem;">
+                    🏷️ {{ getTypeLabel(league.type) }}
+                </p>
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                    📅 {{ league.startDate | date:'mediumDate' }}
+                </p>
+            </a>
+
+            <!-- Stats -->
+            <div class="stats-row" style="padding-top: 1rem; border-top: 1px solid var(--border);">
+                <div class="stat">
+                    <span class="stat-label">Parejas</span>
+                    <span class="stat-value">{{ league.pairs?.length || 0 }}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Partidos</span>
+                    <span class="stat-value">{{ league.matches?.length || 0 }}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Ronda</span>
+                    <span class="stat-value">{{ league.currentRound || 1 }}</span>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <a [routerLink]="['/leagues', league.id]" class="btn btn-secondary btn-block" style="margin-top: 1rem;">
+                Ver Detalles →
+            </a>
+        </div>
+    </div>
+</div>

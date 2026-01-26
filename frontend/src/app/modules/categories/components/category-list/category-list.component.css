@@ -1,0 +1,40 @@
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+
+.category-card {
+    border-left: 4px solid var(--primary);
+    transition: transform 0.2s;
+}
+
+.category-card:hover {
+    transform: translateY(-2px);
+}
+
+.level-badge {
+    background: var(--bg-secondary);
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.points-range {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: var(--bg-secondary);
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    margin-top: 1rem;
+    font-family: monospace;
+    font-size: 1.1rem;
+}
+
+.range-arrow {
+    margin: 0 1rem;
+    color: var(--text-muted);
+}

@@ -1,0 +1,228 @@
+<div class="container fade-in" *ngIf="!loading && league">
+    <!-- Header -->
+    <div style="margin-bottom: 2rem;">
+        <a routerLink="/leagues"
+            style="color: var(--text-secondary); text-decoration: none; font-size: 0.875rem; display: inline-block; margin-bottom: 1rem;">
+            ← Volver a Ligas
+        </a>
+        <div class="flex-between">
+            <div>
+                <h1>{{ league.name }}</h1>
+                <div style="margin-top: -1rem; display: flex; gap: 1rem; align-items: center;">
+                    <span class="badge badge-info">{{ league.type === 'round_robin' ? 'Round Robin' : 'Grupos +
+                        Playoffs' }}</span>
+                    <span style="color: var(--text-secondary); font-size: 0.875rem;">📅 Temporada 2026</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <button class="btn"
+                    style="background: transparent; color: var(--primary); border: 1px solid var(--primary);"
+                    (click)="openaddTeamModal()">+ Equipo</button>
+                <button *ngIf="fixtures.length === 0" class="btn btn-primary" (click)="loadData()">Generar
+                    Fixture</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-3" style="margin-bottom: 2rem;">
+        <div class="card">
+            <div
+                style="color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;">
+                👥 Equipos</div>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">{{ league.teams?.length || 0 }}</div>
+        </div>
+        <div class="card">
+            <div
+                style="color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;">
+                ⚽ Partidos</div>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--secondary);">{{ league.matches?.length || 0 }}
+            </div>
+        </div>
+        <div class="card">
+            <div
+                style="color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;">
+                📊 Estado</div>
+            <div style="font-size: 1rem; font-weight: 600; color: var(--success);">● En Curso</div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 2px solid var(--border);">
+        <button (click)="activeTab = 'standings'"
+            [style.color]="activeTab === 'standings' ? 'var(--primary)' : 'var(--text-secondary)'"
+            [style.border-bottom]="activeTab === 'standings' ? '2px solid var(--primary)' : 'none'"
+            style="background: transparent; border: none; padding: 1rem; font-weight: 600; cursor: pointer; margin-bottom: -2px;">
+            📋 Clasificación
+        </button>
+        <button (click)="activeTab = 'fixtures'"
+            [style.color]="activeTab === 'fixtures' ? 'var(--primary)' : 'var(--text-secondary)'"
+            [style.border-bottom]="activeTab === 'fixtures' ? '2px solid var(--primary)' : 'none'"
+            style="background: transparent; border: none; padding: 1rem; font-weight: 600; cursor: pointer; margin-bottom: -2px;">
+            📅 Resultados & Calendario
+        </button>
+    </div>
+
+    <!-- Standings View -->
+    <div *ngIf="activeTab === 'standings'">
+        <div *ngFor="let group of groupedStandings | keyvalue" style="margin-bottom: 2rem;">
+            <h3 *ngIf="group.key !== 'General'" style="margin-bottom: 1rem;">Grupo {{ group.key }}</h3>
+
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center;">Pos</th>
+                            <th>Equipo</th>
+                            <th style="text-align: center;">PTS</th>
+                            <th style="text-align: center;">PJ</th>
+                            <th style="text-align: center; color: var(--success);">PG</th>
+                            <th style="text-align: center; color: var(--error);">PP</th>
+                            <th style="text-align: center;">Dif Sets</th>
+                            <th style="text-align: center;">Dif Juegos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let team of group.value; let i = index">
+                            <td style="text-align: center; font-weight: 700;">
+                                <span *ngIf="i < 2" style="color: var(--primary);">🏆</span>
+                                <span *ngIf="i >= 2">{{ i + 1 }}</span>
+                            </td>
+                            <td style="font-weight: 600;">{{ team.teamName }}</td>
+                            <td
+                                style="text-align: center; font-weight: 800; color: var(--primary); font-size: 1.125rem;">
+                                {{ team.points }}</td>
+                            <td style="text-align: center;">{{ team.matchesPlayed }}</td>
+                            <td style="text-align: center; color: var(--success);">{{ team.matchesWon }}</td>
+                            <td style="text-align: center; color: var(--error);">{{ team.matchesLost }}</td>
+                            <td style="text-align: center;">{{ team.setsWon - team.setsLost }}</td>
+                            <td style="text-align: center;">{{ team.gamesWon - team.gamesLost }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fixtures View -->
+    <div *ngIf="activeTab === 'fixtures'">
+        <div *ngFor="let round of groupedFixtures | keyvalue" class="card" style="margin-bottom: 1.5rem;">
+            <div class="flex-between"
+                style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                <h3 style="margin: 0;">Ronda {{ round.key }}</h3>
+                <span style="color: var(--text-secondary); font-size: 0.875rem;">Fase de Grupos</span>
+            </div>
+
+            <div *ngFor="let match of round.value"
+                style="padding: 1rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <!-- Teams -->
+                <div style="flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 2rem;">
+                    <div style="text-align: right; flex: 1; font-weight: 600;"
+                        [style.color]="match.winnerId === match.team1Id ? 'var(--primary)' : 'inherit'">
+                        {{ match.team1?.teamName || 'Equipo 1' }}
+                    </div>
+                    <div style="color: var(--text-muted); font-size: 0.75rem; font-weight: 700;">VS</div>
+                    <div style="text-align: left; flex: 1; font-weight: 600;"
+                        [style.color]="match.winnerId === match.team2Id ? 'var(--primary)' : 'inherit'">
+                        {{ match.team2?.teamName || 'Equipo 2' }}
+                    </div>
+                </div>
+
+                <!-- Score / Action -->
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div *ngIf="match.status === 'completed'" style="display: flex; gap: 0.5rem;">
+                        <div *ngFor="let set of match.sets"
+                            style="background: var(--bg-tertiary); padding: 0.5rem; border-radius: var(--radius-sm); min-width: 2rem; text-align: center;">
+                            <div [style.color]="set.team1Games > set.team2Games ? 'var(--primary)' : 'inherit'"
+                                style="font-weight: 700;">{{ set.team1Games }}</div>
+                            <div [style.color]="set.team2Games > set.team1Games ? 'var(--primary)' : 'inherit'"
+                                style="font-weight: 700;">{{ set.team2Games }}</div>
+                        </div>
+                    </div>
+
+                    <button *ngIf="match.status !== 'completed'" (click)="openResultModal(match)"
+                        class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        Jugar
+                    </button>
+                    <button *ngIf="match.status === 'completed'" (click)="openResultModal(match)" class="btn"
+                        style="padding: 0.5rem; font-size: 0.875rem; background: transparent; color: var(--text-secondary); border: none; cursor: pointer;">
+                        ✏️
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Match Result Modal -->
+<div *ngIf="selectedMatch"
+    style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;"
+    (click)="closeResultModal()">
+    <div class="card" style="max-width: 500px; width: 90%;" (click)="$event.stopPropagation()">
+        <h3 style="margin-bottom: 1rem;">⚽ Resultado del Partido</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+            {{ selectedMatch?.team1?.teamName }} vs {{ selectedMatch?.team2?.teamName }}
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
+            <!-- Set 1 -->
+            <div
+                style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; align-items: center; background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-md);">
+                <div style="text-align: center; font-weight: 700;">Set 1</div>
+                <input type="number" [(ngModel)]="resultForm.set1Home" min="0" max="7" class="input"
+                    style="text-align: center;">
+                <input type="number" [(ngModel)]="resultForm.set1Away" min="0" max="7" class="input"
+                    style="text-align: center;">
+            </div>
+            <!-- Set 2 -->
+            <div
+                style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; align-items: center; background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-md);">
+                <div style="text-align: center; font-weight: 700;">Set 2</div>
+                <input type="number" [(ngModel)]="resultForm.set2Home" min="0" max="7" class="input"
+                    style="text-align: center;">
+                <input type="number" [(ngModel)]="resultForm.set2Away" min="0" max="7" class="input"
+                    style="text-align: center;">
+            </div>
+            <!-- Set 3 -->
+            <div
+                style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; align-items: center; background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-md);">
+                <div style="text-align: center; font-weight: 700;">Set 3</div>
+                <input type="number" [(ngModel)]="resultForm.set3Home" min="0" max="7" class="input"
+                    style="text-align: center;" placeholder="-">
+                <input type="number" [(ngModel)]="resultForm.set3Away" min="0" max="7" class="input"
+                    style="text-align: center;" placeholder="-">
+            </div>
+        </div>
+
+        <div class="flex-between">
+            <button (click)="closeResultModal()" class="btn"
+                style="background: transparent; color: var(--text-secondary);">Cancelar</button>
+            <button (click)="saveResult()" class="btn btn-primary">Guardar Resultado ✓</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Team Modal -->
+<div *ngIf="showAddTeamModal"
+    style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;"
+    (click)="closeAddTeamModal()">
+    <div class="card" style="max-width: 500px; width: 90%;" (click)="$event.stopPropagation()">
+        <h3 style="margin-bottom: 1.5rem;">➕ Añadir Equipo</h3>
+
+        <div class="form-group">
+            <label class="label">Jugador 1 ID</label>
+            <input type="text" [(ngModel)]="selectedPlayer1" placeholder="ID Jugador 1" class="input">
+        </div>
+
+        <div class="form-group">
+            <label class="label">Jugador 2 ID</label>
+            <input type="text" [(ngModel)]="selectedPlayer2" placeholder="ID Jugador 2" class="input">
+        </div>
+
+        <div class="flex-between" style="margin-top: 1.5rem;">
+            <button (click)="closeAddTeamModal()" class="btn"
+                style="background: transparent; color: var(--text-secondary);">Cancelar</button>
+            <button (click)="addTeam()" class="btn btn-primary">Añadir ✓</button>
+        </div>
+    </div>
+</div>

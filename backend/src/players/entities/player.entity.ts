@@ -1,5 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Team } from '../../teams/entities/team.entity';
+import { LeagueTeam } from '../../leagues/entities/league-team.entity';
+import { Category } from '../../categories/entities/category.entity';
+import { ManyToOne } from 'typeorm';
 
 @Entity('players')
 export class Player {
@@ -11,6 +14,12 @@ export class Player {
 
     @Column({ default: 0 })
     totalPoints: number;
+
+    @Column({ default: 0 })
+    leaguePoints: number;
+
+    @Column({ default: 0 })
+    tournamentPoints: number;
 
     @Column({ default: 0 })
     matchesWon: number;
@@ -26,6 +35,25 @@ export class Player {
 
     @OneToMany(() => Team, team => team.player2)
     teamsAsPlayer2: Team[];
+
+    @OneToMany(() => LeagueTeam, team => team.player1)
+    leagueTeamsAsPlayer1: LeagueTeam[];
+
+    @OneToMany(() => LeagueTeam, team => team.player2)
+    leagueTeamsAsPlayer2: LeagueTeam[];
+
+    @Column({ default: 0 })
+    leaguesPlayed: number;
+
+    @ManyToOne(() => Category, category => category.players, { nullable: true })
+    category: Category;
+
+    @Column({ 
+        type: 'enum',
+        enum: ['reves', 'drive', 'mixto'],
+        nullable: true 
+    })
+    position: 'reves' | 'drive' | 'mixto';
 
     @CreateDateColumn()
     createdAt: string;

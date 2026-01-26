@@ -258,7 +258,7 @@ export class TournamentsService {
         });
 
         // Recalculate global stats
-        await this.playersService.recalculateStats(Array.from(playerIds));
+        await this.playersService.recalculateTotalPoints(Array.from(playerIds));
 
         return savedTournament;
     }

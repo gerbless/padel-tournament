@@ -1,10 +1,32 @@
 <div class="container fade-in">
     <div class="flex-between mb-4">
         <h1>📊 Dashboard</h1>
+
+        <div class="flex-end gap-2">
+            <!-- Category Filter -->
+            <select class="form-select" [(ngModel)]="selectedCategoryId"
+                (change)="onCategoryChange(selectedCategoryId)">
+                <option value="">Todas las Categorías</option>
+                <option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option>
+            </select>
+            <small *ngIf="categories.length === 0" style="color: red; margin-left: 5px;">! Sin datos
+                ({{categories.length}})</small>
+
+            <div class="toggle-group">
+                <button class="btn" [class.btn-primary]="viewMode === 'players'"
+                    [class.btn-secondary]="viewMode !== 'players'" (click)="toggleView('players')">
+                    👤 Jugadores
+                </button>
+                <button class="btn" [class.btn-primary]="viewMode === 'pairs'"
+                    [class.btn-secondary]="viewMode !== 'pairs'" (click)="toggleView('pairs')">
+                    👥 Parejas
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- KPI Cards -->
-    <div class="grid grid-3 mb-4">
+    <div class="grid grid-4 mb-4">
         <div class="card kpi-card">
             <div class="kpi-icon">👥</div>
             <div class="kpi-info">
@@ -21,6 +43,14 @@
             </div>
         </div>
         <div class="card kpi-card">
+            <div class="kpi-icon">📋</div>
+            <div class="kpi-info">
+                <h3>Ligas</h3>
+                <div class="kpi-value">{{ totalLeagues }}</div>
+                <div class="kpi-sub">{{ activeLeagues }} activas</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
             <div class="kpi-icon">🎾</div>
             <div class="kpi-info">
                 <h3>Partidos Jugados</h3>
@@ -30,19 +60,96 @@
     </div>
 
     <!-- Charts -->
-    <div class="grid grid-2">
-        <div class="card">
-            <h3>🏆 Top 5 Ranking</h3>
-            <div style="display: block;">
-                <canvas baseChart [data]="barChartData" [options]="barChartOptions" [type]="'bar'">
-                </canvas>
+    <!-- Charts and Recommendations -->
+    <div class="dashboard-grid">
+        <!-- Ranking Charts (Left Column) -->
+        <div class="ranking-column">
+            <div class="card mb-4">
+                <h3>🏆 Top 10 Global</h3>
+                <div style="display: block;">
+                    <canvas baseChart [data]="globalRankingData" [options]="barChartOptions" [type]="'bar'">
+                    </canvas>
+                </div>
+            </div>
+            <div class="card mb-4">
+                <h3>📊 Top 5 Ligas</h3>
+                <div style="display: block;">
+                    <canvas baseChart [data]="leagueRankingData" [options]="leagueChartOptions" [type]="'bar'">
+                    </canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h3>🏅 Top 5 Torneos</h3>
+                <div style="display: block;">
+                    <canvas baseChart [data]="tournamentRankingData" [options]="tournamentChartOptions" [type]="'bar'">
+                    </canvas>
+                </div>
             </div>
         </div>
-        <div class="card">
-            <h3>📈 Distribución</h3>
-            <div style="display: block;">
-                <canvas baseChart [data]="pieChartData" [options]="pieChartOptions" [type]="'pie'">
-                </canvas>
+
+        <!-- Recommendations (Right Column) -->
+        <div class="recommendations-column">
+            <!-- Match Recommendations -->
+            <div class="card sticky-card mb-4">
+                <h3>💡 Partidos Recomendados</h3>
+                <p class="text-muted mb-4">Basado en el nivel de las parejas</p>
+
+                <div *ngIf="recommendedMatches.length === 0" class="text-center p-4">
+                    <p>No hay suficientes datos para recomendar partidos aún.</p>
+                </div>
+
+                <div class="match-list">
+                    <div class="match-item fade-in" *ngFor="let match of recommendedMatches">
+                        <div class="match-pair">
+                            <span class="pair-names">{{ match.pair1.p1.name }} / {{ match.pair1.p2.name }}</span>
+                            <span class="pair-score">{{ match.pair1.points }} pts</span>
+                        </div>
+                        <div class="vs-badge">VS</div>
+                        <div class="match-pair">
+                            <span class="pair-names">{{ match.pair2.p1.name }} / {{ match.pair2.p2.name }}</span>
+                            <span class="pair-score">{{ match.pair2.points }} pts</span>
+                        </div>
+                        <div class="match-diff" title="Diferencia de puntos">
+                            ⚡ {{ match.pointDiff }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Partner Recommendations -->
+            <div class="card sticky-card">
+                <h3>🤝 Parejas Recomendadas</h3>
+                <p class="text-muted mb-4">Jugadores compatibles para formar equipos</p>
+
+                <div *ngIf="partnerRecommendations.length === 0" class="text-center p-4">
+                    <p>No hay suficientes jugadores con posición y categoría definidas.</p>
+                </div>
+
+                <div class="match-list">
+                    <div class="match-item fade-in" *ngFor="let rec of partnerRecommendations" style="padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem;">
+                                    {{ rec.player1.name }} & {{ rec.player2.name }}
+                                </div>
+                                <div style="display: flex; gap: 1rem; font-size: 0.85rem; color: var(--text-muted);">
+                                    <span>📍 {{ getPositionLabel(rec.player1.position) }} + {{
+                                        getPositionLabel(rec.player2.position) }}</span>
+                                    <span>🏆 {{ rec.category }}</span>
+                                    <span>⭐ {{ rec.averagePoints }} pts promedio</span>
+                                </div>
+                            </div>
+                            <div style="text-align: right; min-width: 80px;">
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">
+                                    Compatibilidad
+                                </div>
+                                <div style="font-size: 1.3rem; font-weight: 600; color: var(--primary);">
+                                    {{ rec.compatibility }}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

@@ -27,6 +27,10 @@ import { LayoutService } from '../../../services/layout.service';
                 <span class="icon">🏆</span>
                 <span class="label" *ngIf="!isCollapsed">Torneos</span>
             </a>
+            <a routerLink="/leagues" routerLinkActive="active" class="nav-item">
+                <span class="icon">🏆</span>
+                <span class="label" *ngIf="!isCollapsed">Ligas</span>
+            </a>
             <a routerLink="/players" routerLinkActive="active" class="nav-item">
                 <span class="icon">👥</span>
                 <span class="label" *ngIf="!isCollapsed">Jugadores</span>

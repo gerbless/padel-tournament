@@ -1,0 +1,377 @@
+<div class="container fade-in" *ngIf="league">
+    <!-- Header -->
+    <div class="league-header">
+        <div class="header-content">
+            <a routerLink="/leagues" class="back-link">← Volver a Ligas</a>
+            <h1>{{ league.name }}</h1>
+            <div class="league-meta">
+                <span class="badge" [ngClass]="{
+                    'badge-success': league.status === 'active',
+                    'badge-warning': league.status === 'draft',
+                    'badge-info': league.status === 'completed'
+                }">
+                    {{ league.status === 'active' ? 'Activa' : league.status === 'draft' ? 'Borrador' : 'Finalizada' }}
+                </span>
+                <span class="meta-item">🏷️ {{ league.type === 'round_robin' ? 'Round Robin' : 'Grupos + Playoffs'
+                    }}</span>
+                <span class="meta-item">📅 {{ league.startDate | date:'mediumDate' }}</span>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button (click)="generateSchedule()" class="btn btn-secondary"
+                *ngIf="league.status === 'draft' || !league.matches || league.matches.length === 0">
+                📅 Generar Calendario
+            </button>
+            <button (click)="suggestNextMatch()" class="btn btn-primary"
+                *ngIf="league.status !== 'completed' && league.matches && league.matches.length > 0">
+                💡 Sugerir Partido
+            </button>
+            <button (click)="generateTieBreaker()" class="btn btn-warning" *ngIf="hasTies">
+                ⚖️ Resolución de Empate
+            </button>
+            <button (click)="confirmCompleteLeague()" class="btn btn-danger"
+                *ngIf="league.status !== 'completed' && league.matches && league.matches.length > 0">
+                🏁 Finalizar Liga
+            </button>
+        </div>
+    </div>
+
+    <!-- Champions Podium -->
+    <div class="champions-podium fade-in" *ngIf="champions && (champions.gold || champions.silver || champions.bronze)">
+        <h2 class="podium-title">🏆 Campeones del Torneo</h2>
+        <div class="podium-cards">
+            <!-- Gold Champion -->
+            <div class="champion-card gold-champion" *ngIf="champions.gold">
+                <div class="cup-icon">🥇</div>
+                <div class="cup-name">Copa Oro</div>
+                <div class="champion-names">{{ getPairName(champions.gold) }}</div>
+            </div>
+
+            <!-- Silver Champion -->
+            <div class="champion-card silver-champion" *ngIf="champions.silver">
+                <div class="cup-icon">🥈</div>
+                <div class="cup-name">Copa Plata</div>
+                <div class="champion-names">{{ getPairName(champions.silver) }}</div>
+            </div>
+
+            <!-- Bronze Champion -->
+            <div class="champion-card bronze-champion" *ngIf="champions.bronze">
+                <div class="cup-icon">🥉</div>
+                <div class="cup-name">Copa Bronce</div>
+                <div class="champion-names">{{ getPairName(champions.bronze) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="stats-overview">
+        <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-info">
+                <span class="stat-value">{{ league.pairs?.length || 0 }}</span>
+                <span class="stat-label">Parejas</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">🎾</div>
+            <div class="stat-info">
+                <span class="stat-value">{{ league.matches?.length || 0 }}</span>
+                <span class="stat-label">Partidos</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+                <span class="stat-value">{{ completedMatchesCount }}</span>
+                <span class="stat-label">Completados</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">🔄</div>
+            <div class="stat-info">
+                <span class="stat-value">{{ league.currentRound || 1 }}</span>
+                <span class="stat-label">Ronda Actual</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab" [class.active]="activeTab === 'matches'" (click)="activeTab = 'matches'">
+            🎾 Partidos
+        </button>
+        <button class="tab" [class.active]="activeTab === 'standings'" (click)="activeTab = 'standings'">
+            🏆 Clasificación
+        </button>
+        <button class="tab" [class.active]="activeTab === 'config'" (click)="activeTab = 'config'">
+            ⚙️ Configuración
+        </button>
+    </div>
+
+    <!-- Tab Content: Matches -->
+    <div class="tab-content" *ngIf="activeTab === 'matches'">
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>Ronda:</label>
+                <select [(ngModel)]="selectedRound" class="filter-select">
+                    <option [value]="0">Todas las rondas</option>
+                    <option *ngFor="let r of availableRounds" [value]="r">Ronda {{ r }}</option>
+                </select>
+            </div>
+
+            <div class="filter-group" *ngIf="league.type === 'groups_playoff'">
+                <label>Fase:</label>
+                <select [(ngModel)]="selectedPhase" class="filter-select">
+                    <option value="all">Todas las fases</option>
+                    <option value="group">Fase de Grupos</option>
+                    <option value="gold">Copa Oro</option>
+                    <option value="silver">Copa Plata</option>
+                    <option value="bronze">Copa Bronce</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Matches List -->
+        <div class="matches-list">
+            <div *ngFor="let match of filteredMatches" class="match-card">
+                <div class="match-header" [ngClass]="{
+                    'header-gold': match.group?.includes('Gold'),
+                    'header-silver': match.group?.includes('Silver'),
+                    'header-bronze': match.group?.includes('Bronze')
+                }">
+                    <span class="match-round">{{ getPhaseLabel(match.group || match.phase) }}</span>
+                    <span class="match-status" [ngClass]="{
+                        'status-completed': match.status === 'completed',
+                        'status-scheduled': match.status === 'scheduled'
+                    }">
+                        {{ getMatchStatus(match.status) }}
+                    </span>
+                </div>
+
+                <div class="match-body">
+                    <!-- Pair A -->
+                    <div class="pair-info"
+                        [class.winner]="match.result && match.result.winnerPairId === match.pairA.id">
+                        <div class="team-players">
+                            <div class="player-pill">
+                                <div class="avatar-circle">{{ getInitials(match.pairA?.playerA) }}</div>
+                                <span class="player-name">{{ getName(match.pairA?.playerA) }}</span>
+                            </div>
+                            <div class="player-pill">
+                                <div class="avatar-circle">{{ getInitials(match.pairA?.playerB) }}</div>
+                                <span class="player-name">{{ getName(match.pairA?.playerB) }}</span>
+                            </div>
+                        </div>
+                        <div class="pair-score" *ngIf="match.result">
+                            <span *ngFor="let set of match.result.sets" class="set-score"
+                                [class.won-set]="set.pairAGames > set.pairBGames">
+                                {{ set.pairAGames }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="match-vs">
+                        <span class="vs-badge">VS</span>
+                    </div>
+
+                    <!-- Pair B -->
+                    <div class="pair-info"
+                        [class.winner]="match.result && match.result.winnerPairId === match.pairB.id">
+                        <div class="team-players">
+                            <div class="player-pill">
+                                <div class="avatar-circle">{{ getInitials(match.pairB?.playerA) }}</div>
+                                <span class="player-name">{{ getName(match.pairB?.playerA) }}</span>
+                            </div>
+                            <div class="player-pill">
+                                <div class="avatar-circle">{{ getInitials(match.pairB?.playerB) }}</div>
+                                <span class="player-name">{{ getName(match.pairB?.playerB) }}</span>
+                            </div>
+                        </div>
+                        <div class="pair-score" *ngIf="match.result">
+                            <span *ngFor="let set of match.result.sets" class="set-score"
+                                [class.won-set]="set.pairBGames > set.pairAGames">
+                                {{ set.pairBGames }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="match-footer">
+                    <span *ngIf="match.scheduledAt" class="match-date">
+                        📅 {{ match.scheduledAt | date:'short' }}
+                    </span>
+                    <button *ngIf="match.status !== 'completed'" (click)="openResultModal(match)"
+                        class="btn btn-sm btn-primary">
+                        Ingresar Resultado
+                    </button>
+                </div>
+            </div>
+
+            <div *ngIf="filteredMatches.length === 0" class="empty-state">
+                <p>No hay partidos para mostrar</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Content: Standings -->
+    <div class="tab-content" *ngIf="activeTab === 'standings'">
+        <div class="standings-table-container">
+            <div *ngFor="let section of standingSections" class="standings-section mb-6">
+                <h3 *ngIf="section.title" class="text-xl font-bold mb-3 text-primary">{{ section.title }}</h3>
+
+                <div class="standings-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Pareja</th>
+                                <th>PJ</th>
+                                <th>G</th>
+                                <th>E</th>
+                                <th>P</th>
+                                <th>Sets</th>
+                                <th>Games</th>
+                                <th class="pts-column">Pts</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let pair of section.pairs; let i = index"
+                                [class.top-pair]="i === 0 && !section.title">
+                                <td class="rank-cell">
+                                    <span class="rank">{{ i + 1 }}</span>
+                                    <span *ngIf="i === 0 && !section.title" class="trophy" title="Campeón">🥇</span>
+                                    <span *ngIf="i === 1 && !section.title" class="trophy" title="Subcampeón">🥈</span>
+                                    <span *ngIf="i === 2 && !section.title" class="trophy"
+                                        title="Tercer Lugar">🥉</span>
+                                </td>
+                                <td class="pair-cell">{{ getPairName(pair) }}</td>
+                                <td>{{ pair.wins + pair.draws + pair.losses }}</td>
+                                <td>{{ pair.wins }}</td>
+                                <td>{{ pair.draws }}</td>
+                                <td>{{ pair.losses }}</td>
+                                <td>{{ pair.setsWon }}-{{ pair.setsLost }}</td>
+                                <td>{{ pair.gamesWon }}-{{ pair.gamesLost }}</td>
+                                <td class="pts-cell">{{ pair.points }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div *ngIf="section.pairs.length === 0" class="empty-state">
+                        <p>No hay datos en este grupo</p>
+                    </div>
+                </div>
+            </div>
+
+            <div *ngIf="standingSections.length === 0" class="empty-state">
+                <p>No hay datos de clasificación aún</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Content: Config -->
+    <div class="tab-content" *ngIf="activeTab === 'config'">
+        <div class="config-display">
+            <div class="config-section">
+                <h3>Sistema de Puntuación</h3>
+                <div class="config-row">
+                    <span class="config-label">Victoria:</span>
+                    <span class="config-value">{{ league.config.pointsWin }} puntos</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Empate:</span>
+                    <span class="config-value">{{ league.config.pointsDraw }} puntos</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Derrota:</span>
+                    <span class="config-value">{{ league.config.pointsLoss }} puntos</span>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>Reglas de Juego</h3>
+                <div class="config-row">
+                    <span class="config-label">Sets para ganar:</span>
+                    <span class="config-value">{{ league.config.setsToWin }}</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Games por set:</span>
+                    <span class="config-value">{{ league.config.gamesPerSet }}</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Tie-break en:</span>
+                    <span class="config-value">{{ league.config.tiebreakAt }}-{{ league.config.tiebreakAt }}</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Tie-break en 3er set:</span>
+                    <span class="config-value">{{ league.config.tiebreakInThirdSet ? 'Sí' : 'No' }}</span>
+                </div>
+            </div>
+
+            <div class="config-section" *ngIf="league.type === 'round_robin'">
+                <h3>Configuración de Liga</h3>
+                <div class="config-row">
+                    <span class="config-label">Rondas totales:</span>
+                    <span class="config-value">{{ league.config.rounds }}</span>
+                </div>
+            </div>
+
+            <div class="config-section" *ngIf="league.type === 'groups_playoff'">
+                <h3>Configuración de Grupos</h3>
+                <div class="config-row">
+                    <span class="config-label">Número de grupos:</span>
+                    <span class="config-value">{{ league.config.numberOfGroups }}</span>
+                </div>
+                <div class="config-row">
+                    <span class="config-label">Clasifican por grupo:</span>
+                    <span class="config-value">{{ league.config.teamsAdvancePerGroup }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading State -->
+<div *ngIf="loading" class="loading-container">
+    <div class="spinner"></div>
+</div>
+
+<!-- Match Result Modal -->
+<div class="modal-overlay" *ngIf="showResultModal" (click)="closeResultModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>Ingresar Resultado</h2>
+            <button class="modal-close" (click)="closeResultModal()">×</button>
+        </div>
+
+        <div class="modal-body" *ngIf="selectedMatch">
+            <div class="match-teams">
+                <div class="team">{{ getPairName(selectedMatch.pairA) }}</div>
+                <div class="vs">VS</div>
+                <div class="team">{{ getPairName(selectedMatch.pairB) }}</div>
+            </div>
+
+            <div class="sets-input">
+                <div *ngFor="let set of matchResult.sets; let i = index" class="set-row">
+                    <span class="set-label">Set {{ i + 1 }}</span>
+                    <input type="number" [(ngModel)]="set.pairAGames" min="0" max="7" class="score-input">
+                    <span class="separator">-</span>
+                    <input type="number" [(ngModel)]="set.pairBGames" min="0" max="7" class="score-input">
+                    <button *ngIf="i > 1" (click)="removeSet(i)" class="btn-icon btn-danger" title="Eliminar set">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+
+            <button *ngIf="matchResult.sets.length < 3" (click)="addSet()" class="btn btn-secondary btn-sm">
+                + Agregar Set
+            </button>
+        </div>
+
+        <div class="modal-footer">
+            <button (click)="closeResultModal()" class="btn btn-secondary">Cancelar</button>
+            <button (click)="saveMatchResult()" class="btn btn-success">Guardar Resultado</button>
+        </div>
+    </div>
+</div>

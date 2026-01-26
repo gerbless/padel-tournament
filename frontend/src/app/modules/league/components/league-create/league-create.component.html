@@ -1,0 +1,339 @@
+<div class="container fade-in">
+    <div class="wizard-header">
+        <h1>Nueva Liga</h1>
+        <p style="color: var(--text-secondary);">Configura tu liga paso a paso</p>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+            <div class="progress-step" [class.active]="currentStep >= 1" [class.completed]="currentStep > 1">
+                <div class="step-number">1</div>
+                <div class="step-label">Tipo</div>
+            </div>
+            <div class="progress-line" [class.active]="currentStep > 1"></div>
+            <div class="progress-step" [class.active]="currentStep >= 2" [class.completed]="currentStep > 2">
+                <div class="step-number">2</div>
+                <div class="step-label">Configuración</div>
+            </div>
+            <div class="progress-line" [class.active]="currentStep > 2"></div>
+            <div class="progress-step" [class.active]="currentStep >= 3" [class.completed]="currentStep > 3">
+                <div class="step-number">3</div>
+                <div class="step-label">Jugadores</div>
+            </div>
+            <div class="progress-line" [class.active]="currentStep > 3"></div>
+            <div class="progress-step" [class.active]="currentStep >= 4" [class.completed]="currentStep > 4">
+                <div class="step-number">4</div>
+                <div class="step-label">Parejas</div>
+            </div>
+            <div class="progress-line" [class.active]="currentStep > 4"></div>
+            <div class="progress-step" [class.active]="currentStep >= 5" [class.completed]="currentStep > 5">
+                <div class="step-number">5</div>
+                <div class="step-label">Confirmación</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="wizard-content">
+        <!-- Step 1: Basic Info & Type Selection -->
+        <div class="wizard-step" *ngIf="currentStep === 1">
+            <h2>Información Básica</h2>
+
+            <div class="form-group">
+                <label>Nombre de la Liga</label>
+                <input type="text" [(ngModel)]="leagueName" placeholder="Ej: Liga Primavera 2024" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label>Categoría (Opcional)</label>
+                <input type="text" [(ngModel)]="category" placeholder="Ej: Primera, Segunda, Mixta"
+                    class="form-control">
+            </div>
+
+            <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Tipo de Liga</h3>
+
+            <div class="type-selection">
+                <div class="type-card" [class.selected]="leagueType === 'round_robin'"
+                    (click)="leagueType = 'round_robin'">
+                    <div class="type-icon">🔄</div>
+                    <h4>Todos contra Todos</h4>
+                    <p>Cada pareja juega contra todas las demás. Sistema Round-Robin clásico.</p>
+                    <ul>
+                        <li>✓ Número de rondas configurables</li>
+                        <li>✓ Sugerencias de partidos equilibrados</li>
+                        <li>✓ Ranking dinámico</li>
+                    </ul>
+                </div>
+
+                <div class="type-card" [class.selected]="leagueType === 'groups_playoff'"
+                    (click)="leagueType = 'groups_playoff'">
+                    <div class="type-icon">🏅</div>
+                    <h4>Grupos + Playoffs</h4>
+                    <p>Fase de grupos seguida de eliminatorias (cuartos, semis, final).</p>
+                    <ul>
+                        <li>✓ Grupos aleatorios equilibrados</li>
+                        <li>✓ Los mejores avanzan a playoffs</li>
+                        <li>✓ Emoción de eliminación directa</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Configuration -->
+        <div class="wizard-step" *ngIf="currentStep === 2">
+            <h2>Configuración de Partidos y Puntuación</h2>
+
+            <div class="config-grid">
+                <div class="form-group">
+                    <label>Fecha de Inicio</label>
+                    <input type="date" [(ngModel)]="startDate" class="form-control">
+                </div>
+
+                <div class="form-group" *ngIf="leagueType === 'round_robin'">
+                    <label>Número de Rondas</label>
+                    <input type="number" [(ngModel)]="config.rounds" min="1" max="5" class="form-control">
+                    <small>Cada pareja jugará {{ config.rounds }} vez(veces) contra cada rival</small>
+                </div>
+
+                <div class="form-group" *ngIf="leagueType === 'groups_playoff'">
+                    <label>Número de Grupos</label>
+                    <input type="number" [(ngModel)]="config.numberOfGroups" min="2" max="4" class="form-control">
+                </div>
+
+                <div class="form-group" *ngIf="leagueType === 'groups_playoff'">
+                    <label>Parejas que avanzan por grupo</label>
+                    <input type="number" [(ngModel)]="config.teamsAdvancePerGroup" min="1" max="4" class="form-control">
+                </div>
+
+                <div class="form-group full-width" *ngIf="leagueType === 'groups_playoff'">
+                    <label class="checkbox-label"
+                        style="margin-top: 1rem; background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                        <input type="checkbox" [(ngModel)]="config.enableMultiTierPlayoffs">
+                        <div>
+                            <span style="font-weight: 600; font-size: 1rem;">🏆 Activar Multi-Copas (Oro, Plata,
+                                Bronce)</span>
+                            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.8;">
+                                Divide a los clasificados en copas según su posición en el grupo (ej: 1º y 2º a Oro, 3º
+                                y 4º a Plata).
+                            </p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Puntuación</h3>
+            <div class="config-grid">
+                <div class="form-group">
+                    <label>Puntos por Victoria</label>
+                    <input type="number" [(ngModel)]="config.pointsWin" min="1" max="10" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label>Puntos por Empate</label>
+                    <input type="number" [(ngModel)]="config.pointsDraw" min="0" max="5" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label>Puntos por Derrota</label>
+                    <input type="number" [(ngModel)]="config.pointsLoss" min="0" max="3" class="form-control">
+                </div>
+            </div>
+
+            <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Reglas de Juego</h3>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" [(ngModel)]="config.tiebreakInThirdSet">
+                    <span>Tie-break en el tercer set (si no, se juega hasta ventaja de 2 games)</span>
+                </label>
+            </div>
+
+            <div class="info-box">
+                <strong>📋 Formato de Partidos:</strong>
+                <ul>
+                    <li>Mejor de 3 sets</li>
+                    <li>Sets a {{ config.gamesPerSet }} games</li>
+                    <li>Tie-break a {{ config.tiebreakAt }}-{{ config.tiebreakAt }}</li>
+                    <li>Tercer set con {{ config.tiebreakInThirdSet ? 'tie-break' : 'ventaja de 2 games' }}</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Step 3: Player Selection -->
+        <div class="wizard-step" *ngIf="currentStep === 3">
+            <h2>Seleccionar Jugadores</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Selecciona un número par de jugadores. Se formarán parejas automáticamente.
+            </p>
+
+            <div class="search-box">
+                <input type="text" [(ngModel)]="searchTerm" placeholder="🔍 Buscar jugador..." class="form-control">
+            </div>
+
+            <div class="selected-count">
+                <span>{{ selectedPlayerIds.length }} jugadores seleccionados</span>
+                <span style="color: var(--text-secondary);">{{ estimatedPairs }} parejas</span>
+            </div>
+
+            <div class="player-list">
+                <div *ngFor="let player of filteredPlayers" class="player-item"
+                    [class.selected]="isPlayerSelected(player.id)" (click)="togglePlayerSelection(player.id)">
+                    <div class="player-info">
+                        <span class="player-name">{{ player.name }}</span>
+                    </div>
+                    <div class="selection-indicator">
+                        {{ isPlayerSelected(player.id) ? '✓' : '' }}
+                    </div>
+                </div>
+            </div>
+
+            <div *ngIf="filteredPlayers.length === 0" class="empty-state">
+                <p>No se encontraron jugadores</p>
+            </div>
+        </div>
+
+        <!-- Step 4: Pair Configuration (NEW) -->
+        <div class="wizard-step" *ngIf="currentStep === 4">
+            <h2>Armar Parejas</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Forma las parejas manualmente o genera parejas aleatorias.
+            </p>
+
+            <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                <button (click)="generateRandomPairs()" class="btn btn-secondary">
+                    🎲 Generar Parejas Aleatorias
+                </button>
+            </div>
+
+            <!-- Configured Pairs -->
+            <div *ngIf="pairs.length > 0">
+                <h3 style="margin-bottom: 1rem;">Parejas Configuradas ({{ pairs.length }})</h3>
+                <div class="pairs-list">
+                    <div *ngFor="let pair of pairs; let i = index" class="pair-card">
+                        <div class="pair-info">
+                            <span class="pair-number">Pareja {{ i + 1 }}</span>
+                            <div class="pair-players">
+                                <span class="player">{{ getPlayerName(pair.playerA) }}</span>
+                                <span class="separator">/</span>
+                                <span class="player">{{ getPlayerName(pair.playerB) }}</span>
+                            </div>
+                        </div>
+                        <button (click)="removePair(i)" class="btn-icon btn-danger" title="Eliminar pareja">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Pairing Section -->
+            <div *ngIf="availableForPairing.length >= 2" style="margin-top: 2rem;">
+                <h3 style="margin-bottom: 1rem;">Jugadores Disponibles ({{ availableForPairing.length }})</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Selecciona dos jugadores de la lista para formar una pareja manualmente:
+                </p>
+
+                <div class="manual-pairing-grid">
+                    <select [(ngModel)]="manualPairA" class="form-control">
+                        <option value="">Selecciona Jugador A</option>
+                        <option *ngFor="let playerId of availableForPairing" [value]="playerId">
+                            {{ getPlayerName(playerId) }}
+                        </option>
+                    </select>
+
+                    <select [(ngModel)]="manualPairB" class="form-control">
+                        <option value="">Selecciona Jugador B</option>
+                        <option *ngFor="let playerId of availableForPairing" [value]="playerId">
+                            {{ getPlayerName(playerId) }}
+                        </option>
+                    </select>
+
+                    <button (click)="addManualPair(manualPairA, manualPairB); manualPairA=''; manualPairB=''"
+                        [disabled]="!manualPairA || !manualPairB" class="btn btn-primary">
+                        + Añadir Pareja
+                    </button>
+                </div>
+            </div>
+
+            <!-- Info when all paired -->
+            <div *ngIf="availableForPairing.length === 0 && pairs.length > 0" class="alert alert-success"
+                style="margin-top: 2rem;">
+                <strong>✅ Todos los jugadores están emparejados</strong><br>
+                Tienes {{ pairs.length }} parejas configuradas. Continúa al siguiente paso para confirmar y crear la
+                liga.
+            </div>
+
+            <!-- Warning if players remain -->
+            <div *ngIf="availableForPairing.length > 0 && availableForPairing.length < 2" class="alert alert-warning"
+                style="margin-top: 2rem;">
+                <strong>⚠️ Jugador sin pareja</strong><br>
+                Queda {{ availableForPairing.length }} jugador sin emparejar. Debes eliminar un jugador o formar una
+                última pareja.
+            </div>
+        </div>
+
+        <!-- Step 5: Confirmation (previously step 4) -->
+        <div class="wizard-step" *ngIf="currentStep === 5">
+            <h2>Confirmar y Crear Liga</h2>
+
+            <div class="summary-card">
+                <h3>{{ leagueName }}</h3>
+                <div class="summary-row">
+                    <span class="label">Tipo:</span>
+                    <span class="value">{{ leagueType === 'round_robin' ? 'Todos contra Todos' : 'Grupos + Playoffs'
+                        }}</span>
+                </div>
+                <div class="summary-row" *ngIf="category">
+                    <span class="label">Categoría:</span>
+                    <span class="value">{{ category }}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Inicio:</span>
+                    <span class="value">{{ startDate | date:'fullDate' }}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Parejas:</span>
+                    <span class="value">{{ pairs.length }}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Partidos estimados:</span>
+                    <span class="value">{{ pairs.length * (pairs.length - 1) / 2 * (config.rounds || 1) }}</span>
+                </div>
+                <div class="summary-row" *ngIf="leagueType === 'round_robin'">
+                    <span class="label">Rondas:</span>
+                    <span class="value">{{ config.rounds }}</span>
+                </div>
+                <div class="summary-row" *ngIf="leagueType === 'groups_playoff'">
+                    <span class="label">Grupos:</span>
+                    <span class="value">{{ config.numberOfGroups }}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Puntuación:</span>
+                    <span class="value">
+                        {{ config.pointsWin }}V / {{ config.pointsDraw }}E / {{ config.pointsLoss }}D
+                    </span>
+                </div>
+            </div>
+
+            <div class="alert alert-info">
+                <strong>ℹ️ Nota:</strong> Una vez creada la liga, se generarán automáticamente las parejas y el
+                calendario de partidos.
+                Podrás modificar fechas y horarios desde el panel de la liga.
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Buttons -->
+    <div class="wizard-footer">
+        <button *ngIf="currentStep > 1" (click)="previousStep()" class="btn btn-secondary">
+            ← Anterior
+        </button>
+
+        <div style="flex: 1;"></div>
+
+        <button *ngIf="currentStep < totalSteps" (click)="nextStep()" class="btn btn-primary">
+            Siguiente →
+        </button>
+
+        <button *ngIf="currentStep === totalSteps" (click)="createLeague()" [disabled]="creatingLeague"
+            class="btn btn-success">
+            {{ creatingLeague ? 'Creando...' : '✓ Crear Liga' }}
+        </button>
+    </div>
+</div>

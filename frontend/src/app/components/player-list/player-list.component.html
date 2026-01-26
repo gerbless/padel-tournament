@@ -8,10 +8,30 @@
         <h3>Nuevo Jugador</h3>
         <form [formGroup]="playerForm" (ngSubmit)="onSubmit()" class="flex gap-2">
             <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                <input type="text" formControlName="name" class="input" placeholder="Nombre del jugador" />
+                <label for="name">Nombre del Jugador</label>
+                <input type="text" id="name" formControlName="name" placeholder="Ej: Juan Pérez" class="input">
             </div>
-            <button type="submit" class="btn btn-primary" [disabled]="playerForm.invalid">
-                ➕ Agregar
+
+            <div class="form-group">
+                <label for="category">Categoría Inicial</label>
+                <select id="category" formControlName="categoryId" class="input">
+                    <option value="">Sin Categoría</option>
+                    <option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="position">Posición</label>
+                <select id="position" formControlName="position" class="input">
+                    <option value="">Sin Posición</option>
+                    <option value="reves">Revés</option>
+                    <option value="drive">Drive</option>
+                    <option value="mixto">Mixto</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" [disabled]="playerForm.invalid || loading">
+                {{ loading ? 'Creando...' : 'Crear Jugador' }}
             </button>
         </form>
     </div>
@@ -35,8 +55,11 @@
                     <tr>
                         <th style="width: 60px;">#</th>
                         <th>Nombre</th>
+                        <th class="text-center">Categoría</th>
+                        <th class="text-center">Posición</th>
                         <th class="text-center">Torneos</th>
-                        <th class="text-center">Puntos</th>
+                        <th class="text-center">Pts. Liga</th>
+                        <th class="text-center">Pts. Totales</th>
                         <th style="width: 80px;"></th>
                     </tr>
                 </thead>
@@ -51,13 +74,63 @@
                                 {{ player.name }}
                             </a>
                         </td>
+                        <td class="text-center">
+                            <div *ngIf="editingPlayerId !== player.id">
+                                <span class="badge" *ngIf="player.category"
+                                    style="background: var(--bg-secondary); color: var(--text-primary); font-weight: normal;">
+                                    {{ player.category.name }}
+                                </span>
+                                <span *ngIf="!player.category" class="text-muted">-</span>
+                            </div>
+                            <select *ngIf="editingPlayerId === player.id" [(ngModel)]="editingCategory" class="input"
+                                style="width: 100%; max-width: 150px; margin: 0 auto;">
+                                <option value="">Sin Categoría</option>
+                                <option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option>
+                            </select>
+                        </td>
+                        <td class="text-center">
+                            <div *ngIf="editingPlayerId !== player.id">
+                                <span class="badge" *ngIf="player.position"
+                                    [style.background]="getPositionColor(player.position)"
+                                    style="color: white; font-weight: normal;">
+                                    {{ getPositionLabel(player.position) }}
+                                </span>
+                                <span *ngIf="!player.position" class="text-muted">-</span>
+                            </div>
+                            <select *ngIf="editingPlayerId === player.id" [(ngModel)]="editingPosition" class="input"
+                                style="width: 100%; max-width: 120px; margin: 0 auto;">
+                                <option value="">Sin Posición</option>
+                                <option value="reves">Revés</option>
+                                <option value="drive">Drive</option>
+                                <option value="mixto">Mixto</option>
+                            </select>
+                        </td>
                         <td class="text-center">{{ player.tournamentsPlayed }}</td>
+                        <td class="text-center">{{ player.leaguePoints || 0 }}</td>
                         <td class="text-center text-accent">{{ player.totalPoints }}</td>
                         <td class="text-right">
-                            <button class="btn btn-sm btn-danger btn-icon" (click)="deletePlayer(player)"
-                                title="Eliminar jugador">
-                                🗑️
-                            </button>
+                            <div *ngIf="editingPlayerId !== player.id"
+                                style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                <button class="btn btn-sm btn-secondary btn-icon" (click)="startEditing(player)"
+                                    title="Editar categoría y posición">
+                                    ✏️
+                                </button>
+                                <button class="btn btn-sm btn-danger btn-icon" (click)="deletePlayer(player)"
+                                    title="Eliminar jugador">
+                                    🗑️
+                                </button>
+                            </div>
+                            <div *ngIf="editingPlayerId === player.id"
+                                style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                <button class="btn btn-sm btn-primary btn-icon" (click)="saveEdit(player)"
+                                    title="Guardar cambios" [disabled]="saving">
+                                    ✓
+                                </button>
+                                <button class="btn btn-sm btn-secondary btn-icon" (click)="cancelEdit()"
+                                    title="Cancelar" [disabled]="saving">
+                                    ✕
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

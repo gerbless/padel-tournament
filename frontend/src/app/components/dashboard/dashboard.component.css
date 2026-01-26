@@ -21,6 +21,20 @@
     border-radius: 50%;
 }
 
+.toggle-group {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--bg-secondary);
+    padding: 0.25rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+}
+
+.toggle-group .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
 .kpi-info h3 {
     margin: 0;
     font-size: 0.875rem;

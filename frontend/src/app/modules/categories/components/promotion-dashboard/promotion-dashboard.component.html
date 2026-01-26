@@ -1,0 +1,52 @@
+<div class="container fade-in">
+    <div class="flex-between mb-4">
+        <h1>⚖️ Panel de Ascensos y Descensos</h1>
+        <button class="btn btn-primary" (click)="loadAnalysis()" [disabled]="loading">
+            🔄 Analizar Ahora
+        </button>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Promotions -->
+        <div class="column">
+            <h2 class="text-success mb-3">🚀 Candidatos a Ascenso</h2>
+            <div *ngIf="analysis.promotions.length === 0" class="empty-state">
+                No hay ascensos sugeridos.
+            </div>
+            <div class="card mb-3 promotion-card" *ngFor="let item of analysis.promotions">
+                <div class="flex-between">
+                    <strong>{{ item.player }}</strong>
+                    <span class="badge badge-success">{{ item.points }} pts</span>
+                </div>
+                <div class="mt-2 text-sm text-muted">
+                    Superó el límite de {{ item.threshold }} pts en {{ item.currentCategory }}
+                </div>
+                <div class="mt-3 flex-between">
+                    <span>Sugerido: <strong>{{ item.suggestedCategory }}</strong></span>
+                    <button class="btn btn-sm btn-success" (click)="applyChange(item, 'promotion')">Aplicar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relegations -->
+        <div class="column">
+            <h2 class="text-danger mb-3">🔻 Candidatos a Descenso</h2>
+            <div *ngIf="analysis.relegations.length === 0" class="empty-state">
+                No hay descensos sugeridos.
+            </div>
+            <div class="card mb-3 relegation-card" *ngFor="let item of analysis.relegations">
+                <div class="flex-between">
+                    <strong>{{ item.player }}</strong>
+                    <span class="badge badge-danger">{{ item.points }} pts</span>
+                </div>
+                <div class="mt-2 text-sm text-muted">
+                    No alcanzó el mínimo de {{ item.threshold }} pts en {{ item.currentCategory }}
+                </div>
+                <div class="mt-3 flex-between">
+                    <span>Sugerido: <strong>{{ item.suggestedCategory }}</strong></span>
+                    <button class="btn btn-sm btn-danger" (click)="applyChange(item, 'relegation')">Aplicar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
