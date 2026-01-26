@@ -1,11 +1,14 @@
 import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { CategoryService } from '../../services/category.service';
 import { PlayerService } from '../../../../services/player.service';
 
 @Component({
     selector: 'app-promotion-dashboard',
     templateUrl: './promotion-dashboard.component.html',
-    styleUrls: ['./promotion-dashboard.component.css']
+    styleUrls: ['./promotion-dashboard.component.css'],
+    standalone: true,
+    imports: [CommonModule]
 })
 export class PromotionDashboardComponent implements OnInit {
     analysis: { promotions: any[], relegations: any[] } = { promotions: [], relegations: [] };

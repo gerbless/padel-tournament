@@ -78,11 +78,11 @@ export class LeagueCreateComponent implements OnInit {
     loadPlayers() {
         this.loading = true;
         this.http.get<Player[]>(`${environment.apiUrl}/players`).subscribe({
-            next: (players) => {
+            next: (players: Player[]) => {
                 this.availablePlayers = players;
                 this.loading = false;
             },
-            error: (err) => {
+            error: (err: any) => {
                 console.error('Error loading players:', err);
                 this.loading = false;
             }
@@ -229,12 +229,12 @@ export class LeagueCreateComponent implements OnInit {
         };
 
         this.leagueService.createLeague(request).subscribe({
-            next: (league) => {
+            next: (league: any) => {
                 this.creatingLeague = false;
                 alert('Liga creada exitosamente');
                 this.router.navigate(['/leagues', league.id]);
             },
-            error: (err) => {
+            error: (err: any) => {
                 console.error('Error creating league:', err);
                 alert('Error al crear la liga: ' + (err.error?.message || err.message));
                 this.creatingLeague = false;

@@ -12,15 +12,13 @@ const routes: Routes = [
 ];
 
 @NgModule({
-    declarations: [
-        CategoryListComponent,
-        PromotionDashboardComponent
-    ],
     imports: [
         CommonModule,
         FormsModule,
         ReactiveFormsModule,
-        RouterModule.forChild(routes)
+        RouterModule.forChild(routes),
+        CategoryListComponent,
+        PromotionDashboardComponent
     ],
     exports: [
         CategoryListComponent,

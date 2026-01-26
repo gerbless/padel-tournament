@@ -18,6 +18,9 @@ export class Player {
     @Column({ default: 0 })
     leaguePoints: number;
 
+    @Column({ nullable: true })
+    ranking: number;
+
     @Column({ default: 0 })
     tournamentPoints: number;
 
@@ -48,10 +51,10 @@ export class Player {
     @ManyToOne(() => Category, category => category.players, { nullable: true })
     category: Category;
 
-    @Column({ 
+    @Column({
         type: 'enum',
         enum: ['reves', 'drive', 'mixto'],
-        nullable: true 
+        nullable: true
     })
     position: 'reves' | 'drive' | 'mixto';
 
