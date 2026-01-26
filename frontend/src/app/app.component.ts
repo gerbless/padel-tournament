@@ -1,8 +1,9 @@
 import { Component } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { SidebarComponent } from './components/layout/sidebar/sidebar.component';
 import { LayoutService } from './services/layout.service';
+import { ThemeService } from './services/theme.service';
 
 @Component({
     selector: 'app-root',
@@ -14,6 +15,12 @@ import { LayoutService } from './services/layout.service';
         <main class="main-content" [class.expanded]="sidebarCollapsed">
             <router-outlet></router-outlet>
         </main>
+        
+        <!-- Theme Toggle Button -->
+        <button class="theme-toggle" (click)="toggleTheme()" [title]="themeService.darkMode() ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'">
+            <span *ngIf="!themeService.darkMode()">🌙</span>
+            <span *ngIf="themeService.darkMode()">☀️</span>
+        </button>
     </div>
     `,
     styles: [`
@@ -52,9 +59,16 @@ export class AppComponent {
     title = 'Padel Tournament Manager';
     sidebarCollapsed = false;
 
-    constructor(private layoutService: LayoutService) {
+    constructor(
+        private layoutService: LayoutService,
+        public themeService: ThemeService
+    ) {
         this.layoutService.sidebarCollapsed$.subscribe(
             collapsed => this.sidebarCollapsed = collapsed
         );
+    }
+
+    toggleTheme() {
+        this.themeService.toggleTheme();
     }
 }

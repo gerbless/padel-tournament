@@ -130,25 +130,25 @@ import { LayoutService } from '../../../services/layout.service';
         }
 
         .nav-item:hover {
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--bg-tertiary);
             color: var(--text-primary);
             transform: translateX(4px);
         }
 
         .sidebar.collapsed .nav-item:hover {
             transform: none;
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--bg-tertiary);
         }
 
         .nav-item.active {
-            background: linear-gradient(90deg, rgba(var(--primary-rgb), 0.15) 0%, transparent 100%);
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, transparent 100%);
             color: var(--primary);
             border-left: 3px solid var(--primary);
         }
 
         .sidebar.collapsed .nav-item.active {
             border-left: none;
-            background: rgba(var(--primary-rgb), 0.15);
+            background: rgba(16, 185, 129, 0.15);
         }
 
         .nav-item .icon {
@@ -161,7 +161,7 @@ import { LayoutService } from '../../../services/layout.service';
         .footer {
             margin-top: auto;
             padding-top: 1rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid var(--border);
             color: var(--text-muted);
             font-size: 0.75rem;
             text-align: center;
