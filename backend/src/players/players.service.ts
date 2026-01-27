@@ -238,6 +238,9 @@ export class PlayersService {
             teams.forEach(t => {
                 if (!t.player1Id || !t.player2Id) return;
 
+                // RESTRICTION: Player cannot form a pair with themselves
+                if (t.player1Id === t.player2Id) return;
+
                 // FILTER: Both players must be in the valid list (i.e., match the category)
                 // The user said "todo debe ser segmentado". Usually pairs are in same category.
                 // If one is not, maybe exclude? Or include if at least one?
@@ -390,6 +393,9 @@ export class PlayersService {
 
             for (let j = i + 1; j < eligiblePlayers.length; j++) {
                 const player2 = eligiblePlayers[j];
+
+                // Safety check: ensure not the same player
+                if (player1.id === player2.id) continue;
 
                 // Check if they are in the same category and have compatible positions
                 if (player1.category.id === player2.category.id &&

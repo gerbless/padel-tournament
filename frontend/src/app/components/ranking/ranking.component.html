@@ -20,7 +20,7 @@
 
     <div *ngIf="!loading && filteredPlayers.length > 0" class="card fade-in">
         <div class="table-container">
-            <table class="table-ranking">
+            <table class="table-ranking mobile-card-table">
                 <thead>
                     <tr>
                         <th style="width: 80px;">Pos</th>
@@ -32,7 +32,7 @@
                 </thead>
                 <tbody>
                     <tr *ngFor="let player of filteredPlayers; let i = index" [class.leader]="i < 3">
-                        <td class="rank-cell">
+                        <td class="rank-cell" data-label="Pos">
                             <div class="rank-badge" [attr.data-rank]="i + 1">
                                 <span *ngIf="i === 0">🥇</span>
                                 <span *ngIf="i === 1">🥈</span>
@@ -40,10 +40,10 @@
                                 <span *ngIf="i > 2">{{ i + 1 }}</span>
                             </div>
                         </td>
-                        <td class="player-cell">{{ player.name }}</td>
-                        <td class="text-center font-bold text-accent">{{ player.totalPoints }}</td>
-                        <td class="text-center">{{ player.tournamentsPlayed }}</td>
-                        <td class="text-center">{{ player.matchesWon }}</td>
+                        <td class="player-cell" data-label="Jugador">{{ player.name }}</td>
+                        <td class="text-center font-bold text-accent" data-label="Puntos">{{ player.totalPoints }}</td>
+                        <td class="text-center" data-label="Torneos">{{ player.tournamentsPlayed }}</td>
+                        <td class="text-center" data-label="Victorias">{{ player.matchesWon }}</td>
                     </tr>
                 </tbody>
             </table>

@@ -50,7 +50,7 @@
 
     <div *ngIf="!loading && players.length > 0" class="card">
         <div class="table-container">
-            <table class="table">
+            <table class="table mobile-card-table">
                 <thead>
                     <tr>
                         <th style="width: 60px;">#</th>
@@ -65,8 +65,8 @@
                 </thead>
                 <tbody>
                     <tr *ngFor="let player of players; let i = index">
-                        <td class="text-secondary">{{ i + 1 }}</td>
-                        <td class="text-bold">
+                        <td class="text-secondary" data-label="#">{{ i + 1 }}</td>
+                        <td class="text-bold" data-label="Nombre">
                             <a [routerLink]="['/players', player.id]"
                                 style="color: inherit; text-decoration: none; cursor: pointer;"
                                 onmouseover="this.style.textDecoration='underline'"
@@ -74,7 +74,7 @@
                                 {{ player.name }}
                             </a>
                         </td>
-                        <td class="text-center">
+                        <td class="text-center" data-label="Categoría">
                             <div *ngIf="editingPlayerId !== player.id">
                                 <span class="badge" *ngIf="player.category"
                                     style="background: var(--bg-secondary); color: var(--text-primary); font-weight: normal;">
@@ -88,7 +88,7 @@
                                 <option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option>
                             </select>
                         </td>
-                        <td class="text-center">
+                        <td class="text-center" data-label="Posición">
                             <div *ngIf="editingPlayerId !== player.id">
                                 <span class="badge" *ngIf="player.position"
                                     [style.background]="getPositionColor(player.position)"
@@ -105,10 +105,10 @@
                                 <option value="mixto">Mixto</option>
                             </select>
                         </td>
-                        <td class="text-center">{{ player.tournamentsPlayed }}</td>
-                        <td class="text-center">{{ player.leaguePoints || 0 }}</td>
-                        <td class="text-center text-accent">{{ player.totalPoints }}</td>
-                        <td class="text-right">
+                        <td class="text-center" data-label="Torneos">{{ player.tournamentsPlayed }}</td>
+                        <td class="text-center" data-label="Pts. Liga">{{ player.leaguePoints || 0 }}</td>
+                        <td class="text-center text-accent" data-label="Pts. Totales">{{ player.totalPoints }}</td>
+                        <td class="text-right" data-label="Acciones">
                             <div *ngIf="editingPlayerId !== player.id"
                                 style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                                 <button class="btn btn-sm btn-secondary btn-icon" (click)="startEditing(player)"

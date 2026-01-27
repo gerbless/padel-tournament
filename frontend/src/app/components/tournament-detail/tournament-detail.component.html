@@ -53,7 +53,7 @@
             <!-- Standings Section -->
             <div class="card" style="grid-column: 1 / -1;">
                 <h2>🏆 Clasificación</h2>
-                <table class="table">
+                <table class="table mobile-card-table">
                     <thead>
                         <tr>
                             <th>Pos</th>
@@ -70,27 +70,27 @@
                     </thead>
                     <tbody>
                         <tr *ngFor="let standing of standings" [class.winner-row]="standing.position === 1">
-                            <td>
+                            <td data-label="Pos">
                                 <strong>{{ standing.position }}</strong>
                                 <span *ngIf="standing.position === 1" style="margin-left: 0.5rem;">🥇</span>
                                 <span *ngIf="standing.position === 2" style="margin-left: 0.5rem;">🥈</span>
                                 <span *ngIf="standing.position === 3" style="margin-left: 0.5rem;">🥉</span>
                             </td>
-                            <td>
+                            <td data-label="Pareja">
                                 <strong>{{ standing.player1Name }}</strong> &
                                 <strong>{{ standing.player2Name }}</strong>
                             </td>
-                            <td class="text-center">{{ standing.matchesWon }}</td>
-                            <td class="text-center">{{ standing.matchesLost }}</td>
-                            <td class="text-center">{{ standing.setsWon }}</td>
-                            <td class="text-center">{{ standing.setsLost }}</td>
-                            <td class="text-center"
+                            <td data-label="PG (Ganados)" class="text-center">{{ standing.matchesWon }}</td>
+                            <td data-label="PP (Perdidos)" class="text-center">{{ standing.matchesLost }}</td>
+                            <td data-label="SG (Sets Ganados)" class="text-center">{{ standing.setsWon }}</td>
+                            <td data-label="SP (Sets Perdidos)" class="text-center">{{ standing.setsLost }}</td>
+                            <td data-label="DS (Dif. Sets)" class="text-center"
                                 [style.color]="standing.setDifference >= 0 ? 'var(--success)' : 'var(--error)'">
                                 {{ standing.setDifference > 0 ? '+' : '' }}{{ standing.setDifference }}
                             </td>
-                            <td class="text-center">{{ standing.gamesWon }}</td>
-                            <td class="text-center">{{ standing.gamesLost }}</td>
-                            <td class="text-center"
+                            <td data-label="JG (Juegos Ganados)" class="text-center">{{ standing.gamesWon }}</td>
+                            <td data-label="JP (Juegos Perdidos)" class="text-center">{{ standing.gamesLost }}</td>
+                            <td data-label="DJ (Dif. Juegos)" class="text-center"
                                 [style.color]="standing.gameDifference >= 0 ? 'var(--success)' : 'var(--error)'">
                                 {{ standing.gameDifference > 0 ? '+' : '' }}{{ standing.gameDifference }}
                             </td>

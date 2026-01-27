@@ -691,6 +691,59 @@ h3 {
   .card {
     padding: var(--spacing-md);
   }
+
+  /* ============================================
+     MOBILE CARD TABLE PATTERN
+     ============================================ */
+
+  .mobile-card-table thead {
+    display: none;
+  }
+
+  .mobile-card-table,
+  .mobile-card-table tbody,
+  .mobile-card-table tr,
+  .mobile-card-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .mobile-card-table tr {
+    margin-bottom: var(--spacing-md);
+    background: var(--bg-primary);
+    /* Contrast against card bg */
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm);
+  }
+
+  .mobile-card-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: right;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mobile-card-table td:last-child {
+    border-bottom: none;
+  }
+
+  .mobile-card-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-right: 1rem;
+    text-align: left;
+  }
+
+  /* Specific Adjustments for nested elements in cells */
+  .mobile-card-table td>* {
+    text-align: right;
+  }
 }
 
 @media (max-width: 480px) {
