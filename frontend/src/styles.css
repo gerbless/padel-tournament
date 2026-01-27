@@ -573,6 +573,131 @@ h3 {
   box-shadow: 0 25px 35px -5px rgba(16, 185, 129, 0.4);
 }
 
-.theme-toggle:active {
-  transform: scale(0.95);
+
+/* ============================================
+   RESPONSIVE STYLES (MOBILE)
+   ============================================ */
+
+/* Utility for wrapping scrolling tables */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: var(--spacing-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 768px) {
+
+  /* Typography Scale */
+  h1 {
+    font-size: 1.75rem;
+    /* Down from 2.5rem */
+    margin-bottom: var(--spacing-md);
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    /* Down from 2rem */
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    /* Down from 1.5rem */
+  }
+
+  /* Layout & Container */
+  .container {
+    padding: var(--spacing-md);
+    width: 100%;
+    margin-top: 60px;
+    /* Space for mobile header/FAB */
+  }
+
+  /* Flex Utilities Stacking */
+  .flex-between,
+  .flex-end,
+  .flex {
+    flex-wrap: wrap;
+    /* Allow wrapping */
+  }
+
+  /* Specific class for forced stacking on mobile */
+  .flex-stack-mobile {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+
+  /* Dashboard Adjustments */
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    /* Force single column */
+    gap: var(--spacing-md);
+  }
+
+  /* KPI Cards Grid */
+  .grid-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    /* 2 columns on mobile instead of 1 or 4 */
+    gap: var(--spacing-md);
+  }
+
+  /* Forms */
+  .form-group {
+    width: 100%;
+    margin-bottom: var(--spacing-md);
+  }
+
+  .input,
+  .form-select,
+  .btn {
+    width: 100%;
+    /* Full width interactive elements */
+  }
+
+  /* Header Controls Stacking */
+  .container .flex-between {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+
+  .container .flex-between>div {
+    width: 100%;
+  }
+
+  .flex-end.gap-2 {
+    width: 100%;
+    justify-content: space-between;
+    /* Spread controls */
+    flex-wrap: wrap;
+  }
+
+  /* Hide specific complex elements if needed or adjust */
+  .toggle-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .toggle-group .btn {
+    flex: 1;
+    /* Equal width toggle buttons */
+  }
+
+  /* Card Padding */
+  .card {
+    padding: var(--spacing-md);
+  }
+}
+
+@media (max-width: 480px) {
+
+  /* Ultra small screens */
+  .grid-4 {
+    grid-template-columns: 1fr;
+    /* 1 column for KPIs on very small screens */
+  }
 }

@@ -66,21 +66,21 @@
         <div class="ranking-column">
             <div class="card mb-4">
                 <h3>🏆 Top 10 Global</h3>
-                <div style="display: block;">
+                <div style="display: block; position: relative; height: 300px; width: 100%;">
                     <canvas baseChart [data]="globalRankingData" [options]="barChartOptions" [type]="'bar'">
                     </canvas>
                 </div>
             </div>
             <div class="card mb-4">
                 <h3>📊 Top 5 Ligas</h3>
-                <div style="display: block;">
+                <div style="display: block; position: relative; height: 300px; width: 100%;">
                     <canvas baseChart [data]="leagueRankingData" [options]="leagueChartOptions" [type]="'bar'">
                     </canvas>
                 </div>
             </div>
             <div class="card">
                 <h3>🏅 Top 5 Torneos</h3>
-                <div style="display: block;">
+                <div style="display: block; position: relative; height: 300px; width: 100%;">
                     <canvas baseChart [data]="tournamentRankingData" [options]="tournamentChartOptions" [type]="'bar'">
                     </canvas>
                 </div>

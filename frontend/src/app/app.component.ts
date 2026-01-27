@@ -13,6 +13,12 @@ import { ThemeService } from './services/theme.service';
     <div class="app-layout">
         <app-sidebar></app-sidebar>
         <main class="main-content" [class.expanded]="sidebarCollapsed">
+            <header class="mobile-header">
+                <button class="menu-fab" (click)="toggleMobileMenu()">
+                    ☰
+                </button>
+                <div class="mobile-title">PADEL MGR</div>
+            </header>
             <router-outlet></router-outlet>
         </main>
         
@@ -42,15 +48,48 @@ import { ThemeService } from './services/theme.service';
             width: calc(100% - 80px);
         }
 
+        .mobile-header {
+            display: none;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .menu-fab {
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+
+        .mobile-title {
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: var(--text-primary);
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 margin-left: 0;
+                padding: 1rem;
                 padding-bottom: 80px;
                 width: 100%;
             }
             .main-content.expanded {
                 margin-left: 0;
                 width: 100%;
+            }
+
+            .mobile-header {
+                display: flex;
             }
         }
     `]
@@ -64,11 +103,15 @@ export class AppComponent {
         public themeService: ThemeService
     ) {
         this.layoutService.sidebarCollapsed$.subscribe(
-            collapsed => this.sidebarCollapsed = collapsed
+            (collapsed: boolean) => this.sidebarCollapsed = collapsed
         );
     }
 
     toggleTheme() {
         this.themeService.toggleTheme();
+    }
+
+    toggleMobileMenu() {
+        this.layoutService.toggleMobileMenu();
     }
 }

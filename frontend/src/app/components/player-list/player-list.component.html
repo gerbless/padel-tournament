@@ -6,7 +6,7 @@
     <!-- Create Player Form -->
     <div class="card mb-4">
         <h3>Nuevo Jugador</h3>
-        <form [formGroup]="playerForm" (ngSubmit)="onSubmit()" class="flex gap-2">
+        <form [formGroup]="playerForm" (ngSubmit)="onSubmit()" class="flex gap-2 flex-stack-mobile">
             <div class="form-group" style="flex: 1; margin-bottom: 0;">
                 <label for="name">Nombre del Jugador</label>
                 <input type="text" id="name" formControlName="name" placeholder="Ej: Juan Pérez" class="input">

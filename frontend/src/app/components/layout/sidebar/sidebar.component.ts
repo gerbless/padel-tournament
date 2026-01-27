@@ -8,7 +8,8 @@ import { LayoutService } from '../../../services/layout.service';
     standalone: true,
     imports: [CommonModule, RouterLink, RouterLinkActive],
     template: `
-    <aside class="sidebar" [class.collapsed]="isCollapsed">
+    <div class="sidebar-overlay" *ngIf="isMobileOpen" (click)="closeMobileMenu()"></div>
+    <aside class="sidebar" [class.collapsed]="isCollapsed" [class.mobile-open]="isMobileOpen">
         <div class="brand">
             <span class="logo">🎾</span>
             <span class="title" *ngIf="!isCollapsed">PADEL MGR</span>
@@ -19,23 +20,23 @@ import { LayoutService } from '../../../services/layout.service';
         </button>
 
         <nav class="nav-menu">
-            <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+            <a routerLink="/dashboard" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
                 <span class="icon">📊</span>
                 <span class="label" *ngIf="!isCollapsed">Dashboard</span>
             </a>
-            <a routerLink="/tournaments" routerLinkActive="active" class="nav-item">
+            <a routerLink="/tournaments" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
                 <span class="icon">🏆</span>
                 <span class="label" *ngIf="!isCollapsed">Torneos</span>
             </a>
-            <a routerLink="/leagues" routerLinkActive="active" class="nav-item">
+            <a routerLink="/leagues" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
                 <span class="icon">🏆</span>
                 <span class="label" *ngIf="!isCollapsed">Ligas</span>
             </a>
-            <a routerLink="/players" routerLinkActive="active" class="nav-item">
+            <a routerLink="/players" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
                 <span class="icon">👥</span>
                 <span class="label" *ngIf="!isCollapsed">Jugadores</span>
             </a>
-            <a routerLink="/ranking" routerLinkActive="active" class="nav-item">
+            <a routerLink="/ranking" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
                 <span class="icon">🥇</span>
                 <span class="label" *ngIf="!isCollapsed">Ranking</span>
             </a>
@@ -61,7 +62,7 @@ import { LayoutService } from '../../../services/layout.service';
             top: 0;
             color: white;
             z-index: 100;
-            transition: width 0.3s ease;
+            transition: transform 0.3s ease, width 0.3s ease;
         }
 
         .sidebar.collapsed {
@@ -166,18 +167,57 @@ import { LayoutService } from '../../../services/layout.service';
             font-size: 0.75rem;
             text-align: center;
         }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99;
+            backdrop-filter: blur(2px);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px !important; /* Full width or wider on mobile */
+            }
+            
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .sidebar-overlay {
+                display: block;
+            }
+
+            .toggle-btn {
+                display: none; /* Hide toggle button on mobile */
+            }
+        }
     `]
 })
 export class SidebarComponent {
     isCollapsed = false;
+    isMobileOpen = false;
 
     constructor(private layoutService: LayoutService) {
         this.layoutService.sidebarCollapsed$.subscribe(
-            collapsed => this.isCollapsed = collapsed
+            (collapsed: boolean) => this.isCollapsed = collapsed
+        );
+        this.layoutService.mobileMenuOpen$.subscribe(
+            (open: boolean) => this.isMobileOpen = open
         );
     }
 
     toggleSidebar() {
         this.layoutService.toggleSidebar();
+    }
+
+    closeMobileMenu() {
+        this.layoutService.closeMobileMenu();
     }
 }
