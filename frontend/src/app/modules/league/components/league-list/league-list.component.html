@@ -36,7 +36,8 @@
                 }">
                     {{ getStatusLabel(league.status) }}
                 </span>
-                <button (click)="deleteLeague(league.id); $event.stopPropagation()" class="btn-icon btn-danger"
+                <button *ngIf="league.status !== 'completed'"
+                    (click)="deleteLeague(league.id); $event.stopPropagation()" class="btn-icon btn-danger"
                     title="Eliminar liga">
                     🗑️
                 </button>
@@ -61,7 +62,7 @@
                 </div>
                 <div class="stat">
                     <span class="stat-label">Partidos</span>
-                    <span class="stat-value">{{ league.matches?.length || 0 }}</span>
+                    <span class="stat-value">{{ league.matches ? league.matches.length : 0 }}</span>
                 </div>
                 <div class="stat">
                     <span class="stat-label">Ronda</span>

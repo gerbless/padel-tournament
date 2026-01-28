@@ -14,6 +14,7 @@ export interface Player {
     tournamentsPlayed: number;
     category?: { id: string; name: string; };
     position?: 'reves' | 'drive' | 'mixto';
+    clubs?: { id: string; name: string; }[];
 }
 
 @Injectable({
@@ -24,18 +25,22 @@ export class PlayerService {
 
     constructor(private http: HttpClient) { }
 
-    findAll(): Observable<Player[]> {
-        return this.http.get<Player[]>(this.apiUrl);
+    findAll(clubId?: string): Observable<Player[]> {
+        const params: any = {};
+        if (clubId) params.clubId = clubId;
+        return this.http.get<Player[]>(this.apiUrl, { params });
     }
 
-    createPlayer(name: string, categoryId?: string, position?: string): Observable<Player> {
+    createPlayer(name: string, categoryId?: string, position?: string, clubIds?: string[]): Observable<Player> {
         const body: any = { name };
         if (categoryId) body.categoryId = categoryId;
         if (position) body.position = position;
+        if (clubIds) body.clubIds = clubIds;
         return this.http.post<Player>(this.apiUrl, body);
     }
 
     updatePlayer(id: string, data: any): Observable<Player> {
+        // data can now include clubIds
         return this.http.patch<Player>(`${this.apiUrl}/${id}`, data);
     }
 
@@ -43,35 +48,43 @@ export class PlayerService {
         return this.http.delete<void>(`${this.apiUrl}/${id}`);
     }
 
-    getRanking(categoryId?: string): Observable<Player[]> {
+    getRanking(categoryId?: string, clubId?: string): Observable<Player[]> {
         const params: any = {};
         if (categoryId) params.categoryId = categoryId;
+        if (clubId) params.clubId = clubId;
         return this.http.get<Player[]>(`${this.apiUrl}/ranking`, { params });
     }
 
-    getLeagueRanking(categoryId?: string): Observable<Player[]> {
+    getLeagueRanking(categoryId?: string, clubId?: string): Observable<Player[]> {
         const params: any = {};
         if (categoryId) params.categoryId = categoryId;
+        if (clubId) params.clubId = clubId;
         return this.http.get<Player[]>(`${this.apiUrl}/ranking/league`, { params });
     }
 
-    getTournamentRanking(categoryId?: string): Observable<Player[]> {
+    getTournamentRanking(categoryId?: string, clubId?: string): Observable<Player[]> {
         const params: any = {};
         if (categoryId) params.categoryId = categoryId;
+        if (clubId) params.clubId = clubId;
         return this.http.get<Player[]>(`${this.apiUrl}/ranking/tournament`, { params });
     }
 
-    getPairRanking(type: 'global' | 'league' | 'tournament', categoryId?: string): Observable<{ p1: Player, p2: Player, points: number }[]> {
+    getPairRanking(type: 'global' | 'league' | 'tournament', categoryId?: string, clubId?: string): Observable<{ p1: Player, p2: Player, points: number }[]> {
         const params: any = { type };
         if (categoryId) params.categoryId = categoryId;
+        if (clubId) params.clubId = clubId;
         return this.http.get<{ p1: Player, p2: Player, points: number }[]>(`${this.apiUrl}/ranking/pairs`, { params });
     }
 
-    getRecommendedMatches(): Observable<any[]> {
-        return this.http.get<any[]>(`${this.apiUrl}/recommendations`);
+    getRecommendedMatches(clubId?: string): Observable<any[]> {
+        const params: any = {};
+        if (clubId) params.clubId = clubId;
+        return this.http.get<any[]>(`${this.apiUrl}/recommendations`, { params });
     }
 
-    getPartnerRecommendations(): Observable<any[]> {
-        return this.http.get<any[]>(`${this.apiUrl}/partner-recommendations`);
+    getPartnerRecommendations(clubId?: string): Observable<any[]> {
+        const params: any = {};
+        if (clubId) params.clubId = clubId;
+        return this.http.get<any[]>(`${this.apiUrl}/partner-recommendations`, { params });
     }
 }

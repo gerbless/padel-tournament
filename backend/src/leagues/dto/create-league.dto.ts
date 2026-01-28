@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsDateString, IsObject, ValidateNested, IsNumber, IsBoolean } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsDateString, IsObject, ValidateNested, IsNumber, IsBoolean, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { LeagueType } from '../entities/league.entity';
 
@@ -78,4 +78,8 @@ export class CreateLeagueDto {
     // Support for pair-based creation
     @IsOptional()
     pairs?: Array<{ playerA: string; playerB: string }>;
+
+    @IsOptional()
+    @IsUUID()
+    clubId?: string;
 }

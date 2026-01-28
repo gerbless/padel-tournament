@@ -1,8 +1,6 @@
-import { IsString, IsNotEmpty, IsOptional, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsIn, IsArray, IsUUID } from 'class-validator';
 
 export class CreatePlayerDto {
-    @IsString()
-    @IsNotEmpty()
     @IsString()
     @IsNotEmpty()
     name: string;
@@ -15,4 +13,9 @@ export class CreatePlayerDto {
     @IsString()
     @IsIn(['reves', 'drive', 'mixto'])
     position?: 'reves' | 'drive' | 'mixto';
+
+    @IsOptional()
+    @IsArray()
+    @IsUUID('4', { each: true })
+    clubIds?: string[];
 }

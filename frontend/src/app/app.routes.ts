@@ -9,9 +9,10 @@ import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { LeagueListComponent } from './modules/league/components/league-list/league-list.component';
 import { LeagueCreateComponent } from './modules/league/components/league-create/league-create.component';
 import { LeagueDashboardComponent } from './modules/league/components/league-dashboard/league-dashboard.component';
+import { ClubSelectionComponent } from './components/club-selection/club-selection.component';
 
 export const routes: Routes = [
-    { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
+    { path: '', component: ClubSelectionComponent },
     { path: 'dashboard', component: DashboardComponent },
     { path: 'tournaments', component: TournamentListComponent },
     { path: 'tournaments/create', component: TournamentCreateComponent },
@@ -19,7 +20,6 @@ export const routes: Routes = [
     { path: 'leagues', component: LeagueListComponent },
     { path: 'leagues/create', component: LeagueCreateComponent },
     { path: 'leagues/:id', component: LeagueDashboardComponent },
-    { path: 'players', component: PlayerListComponent },
     { path: 'players', component: PlayerListComponent },
     { path: 'ranking', component: RankingComponent },
     { path: 'categories', loadChildren: () => import('./modules/categories/categories.module').then(m => m.CategoriesModule) },

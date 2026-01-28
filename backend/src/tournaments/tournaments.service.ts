@@ -50,6 +50,7 @@ export class TournamentsService {
             name,
             type,
             status: TournamentStatus.IN_PROGRESS,
+            clubId: createTournamentDto.clubId
         });
 
         const savedTournament = await this.tournamentRepository.save(tournament);
@@ -86,11 +87,17 @@ export class TournamentsService {
         return this.findOne(savedTournament.id);
     }
 
-    async findAll(): Promise<Tournament[]> {
-        return this.tournamentRepository.find({
+    async findAll(clubId?: string): Promise<Tournament[]> {
+        const query: any = {
             relations: ['teams', 'teams.player1', 'teams.player2', 'matches'],
-            order: { createdAt: 'DESC' },
-        });
+            order: { createdAt: 'DESC' as any },
+        };
+
+        if (clubId) {
+            query.where = { clubId };
+        }
+
+        return this.tournamentRepository.find(query);
     }
 
     async findOne(id: string): Promise<Tournament> {
@@ -220,6 +227,10 @@ export class TournamentsService {
 
     async remove(id: string): Promise<void> {
         const tournament = await this.findOne(id);
+
+        if (tournament.status === TournamentStatus.COMPLETED) {
+            throw new BadRequestException('Cannot delete a completed tournament');
+        }
 
         // Collect involved players BEFORE deleting
         const playerIds = new Set<string>();

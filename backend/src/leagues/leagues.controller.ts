@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { LeaguesService } from './leagues.service';
 import { CreateLeagueDto } from './dto/create-league.dto';
 import { League } from './entities/league.entity';
@@ -14,8 +14,8 @@ export class LeaguesController {
     }
 
     @Get()
-    findAll() {
-        return this.leaguesService.findAll();
+    findAll(@Query('clubId') clubId?: string) {
+        return this.leaguesService.findAll(clubId);
     }
 
     @Get(':id')

@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { Player } from './entities/player.entity';
+import { PlayerClubStats } from './entities/player-club-stats.entity';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
 
@@ -10,6 +11,8 @@ export class PlayersService {
     constructor(
         @InjectRepository(Player)
         private playerRepository: Repository<Player>,
+        @InjectRepository(PlayerClubStats)
+        private playerClubStatsRepository: Repository<PlayerClubStats>,
     ) { }
 
     async create(createPlayerDto: CreatePlayerDto): Promise<Player> {
@@ -27,18 +30,68 @@ export class PlayersService {
             category: createPlayerDto.categoryId ? { id: createPlayerDto.categoryId } : undefined,
             position: createPlayerDto.position
         });
-        return this.playerRepository.save(player);
+
+        try {
+            // Save player first to get ID
+            const savedPlayer = await this.playerRepository.save(player);
+
+            // Handle club associations if provided
+            if (createPlayerDto.clubIds && createPlayerDto.clubIds.length > 0) {
+                savedPlayer.clubs = createPlayerDto.clubIds.map(id => ({ id } as any));
+                await this.playerRepository.save(savedPlayer);
+            }
+            // If no clubs specified, player belongs to ALL clubs (no associations needed)
+
+            return savedPlayer;
+        } catch (error) {
+            // Handle duplicate key error from concurrent requests
+            if (error.code === '23505') {
+                const existingPlayer = await this.playerRepository.findOne({
+                    where: { name: createPlayerDto.name },
+                    relations: ['category', 'clubs']
+                });
+                if (existingPlayer) {
+                    return existingPlayer;
+                }
+            }
+            throw error;
+        }
     }
 
     async findOrCreateByName(name: string): Promise<Player> {
         return this.create({ name });
     }
 
-    async findAll(): Promise<Player[]> {
-        return this.playerRepository.find({
-            relations: ['category'],
-            order: { name: 'ASC' }
-        });
+    async findAll(clubId?: string): Promise<Player[]> {
+        if (!clubId) {
+            // Return all players with their club associations
+            return this.playerRepository.find({
+                relations: ['category', 'clubs'],
+                order: { name: 'ASC' }
+            });
+        }
+
+        // When filtering by club:
+        // 1. Get players explicitly assigned to this club
+        // 2. Get players with NO club assignments (they belong to all clubs)
+        const playersInClub = await this.playerRepository.createQueryBuilder('player')
+            .leftJoinAndSelect('player.category', 'category')
+            .leftJoinAndSelect('player.clubs', 'club')
+            .where('club.id = :clubId', { clubId })
+            .orderBy('player.name', 'ASC')
+            .getMany();
+
+        const playersWithoutClubs = await this.playerRepository.createQueryBuilder('player')
+            .leftJoinAndSelect('player.category', 'category')
+            .leftJoinAndSelect('player.clubs', 'club')
+            .where('club.id IS NULL')
+            .orderBy('player.name', 'ASC')
+            .getMany();
+
+        // Combine and deduplicate
+        const playerMap = new Map();
+        [...playersInClub, ...playersWithoutClubs].forEach(p => playerMap.set(p.id, p));
+        return Array.from(playerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
     }
 
     async findOne(id: string): Promise<Player> {
@@ -53,7 +106,14 @@ export class PlayersService {
     }
 
     async update(id: string, updatePlayerDto: UpdatePlayerDto): Promise<Player> {
-        const player = await this.findOne(id);
+        const player = await this.playerRepository.findOne({
+            where: { id },
+            relations: ['category', 'clubs']
+        });
+
+        if (!player) {
+            throw new NotFoundException(`Player with ID ${id} not found`);
+        }
 
         if (updatePlayerDto.categoryId !== undefined) {
             player.category = updatePlayerDto.categoryId ? { id: updatePlayerDto.categoryId } as any : null;
@@ -63,20 +123,64 @@ export class PlayersService {
             player.position = updatePlayerDto.position;
         }
 
+        if (updatePlayerDto.clubIds !== undefined) {
+            // Update club associations
+            player.clubs = updatePlayerDto.clubIds.length > 0
+                ? updatePlayerDto.clubIds.map(clubId => ({ id: clubId } as any))
+                : [];
+        }
+
         return this.playerRepository.save(player);
     }
 
-    async getRanking(categoryId?: string): Promise<Player[]> {
-        const where: any = {};
-        if (categoryId) where.category = { id: categoryId };
+    async getRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
+        console.log('[PlayersService.getRanking] Called with categoryId:', categoryId, 'clubId:', clubId);
 
-        return this.playerRepository.find({
-            where,
-            order: {
-                totalPoints: 'DESC',
-                matchesWon: 'DESC'
+        if (!clubId) {
+            // No club filter: return all players sorted by global points
+            let query = this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category');
+
+            if (categoryId) {
+                query = query.where('player.categoryId = :categoryId', { categoryId });
             }
+
+            return query
+                .orderBy('player.totalPoints', 'DESC')
+                .addOrderBy('player.matchesWon', 'DESC')
+                .getMany();
+        }
+
+        // With club filter: get stats from PlayerClubStats
+        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
+            .leftJoinAndSelect('stats.player', 'player')
+            .leftJoinAndSelect('player.category', 'category')
+            .where('stats.club.id = :clubId', { clubId });
+
+        if (categoryId) {
+            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
+        }
+
+        // Only show players with points in this club
+        statsQuery = statsQuery.andWhere('stats.totalPoints > 0');
+
+        const stats = await statsQuery
+            .orderBy('stats.totalPoints', 'DESC')
+            .addOrderBy('stats.matchesWon', 'DESC')
+            .getMany();
+
+        // Map to players with club-specific stats
+        const players = stats.map(s => {
+            const player = s.player;
+            // Override with club-specific stats
+            player.totalPoints = s.totalPoints;
+            player.leaguePoints = s.leaguePoints;
+            player.tournamentPoints = s.tournamentPoints;
+            player.matchesWon = s.matchesWon;
+            return player;
         });
+
+        return players;
     }
 
     async updateStats(id: string, stats: Partial<Player>): Promise<void> {
@@ -111,39 +215,74 @@ export class PlayersService {
             const player = await this.playerRepository.findOne({
                 where: { id: playerId },
                 relations: [
-                    // Tournament Teams
-                    'teamsAsPlayer1', 'teamsAsPlayer1.matchesAsTeam1', 'teamsAsPlayer1.matchesAsTeam1.winner',
+                    'teamsAsPlayer1', 'teamsAsPlayer1.tournament',
+                    'teamsAsPlayer1.matchesAsTeam1', 'teamsAsPlayer1.matchesAsTeam1.winner',
                     'teamsAsPlayer1.matchesAsTeam2', 'teamsAsPlayer1.matchesAsTeam2.winner',
-                    'teamsAsPlayer2', 'teamsAsPlayer2.matchesAsTeam1', 'teamsAsPlayer2.matchesAsTeam1.winner',
-                    'teamsAsPlayer2', 'teamsAsPlayer2.matchesAsTeam2', 'teamsAsPlayer2.matchesAsTeam2.winner',
-                    // League Teams
-                    'leagueTeamsAsPlayer1',
-                    'leagueTeamsAsPlayer2'
+                    'teamsAsPlayer2', 'teamsAsPlayer2.tournament',
+                    'teamsAsPlayer2.matchesAsTeam1', 'teamsAsPlayer2.matchesAsTeam1.winner',
+                    'teamsAsPlayer2.matchesAsTeam2', 'teamsAsPlayer2.matchesAsTeam2.winner',
+                    'leagueTeamsAsPlayer1', 'leagueTeamsAsPlayer1.league',
+                    'leagueTeamsAsPlayer2', 'leagueTeamsAsPlayer2.league',
+                    'clubs'
                 ]
             });
 
             if (!player) continue;
 
-            let totalPoints = 0;
-            let leaguePoints = 0;
-            let tournamentPoints = 0;
-            let matchesWon = 0;
-            const tournamentIds = new Set<string>();
-            const leagueIds = new Set<string>();
+            // Global stats
+            let globalTotalPoints = 0;
+            let globalLeaguePoints = 0;
+            let globalTournamentPoints = 0;
+            let globalMatchesWon = 0;
+            const globalTournamentIds = new Set<string>();
+            const globalLeagueIds = new Set<string>();
 
-            // 1. Process Tournaments (Legacy match-based points)
+            // Stats grouped by club: { clubId: { totalPoints, leaguePoints, tournamentPoints, matchesWon, ... } }
+            const statsByClub = new Map<string, any>();
+
+            // Helper to ensure club stats entry exists
+            const ensureClubStats = (clubId: string | null) => {
+                const key = clubId || 'NO_CLUB';
+                if (!statsByClub.has(key)) {
+                    statsByClub.set(key, {
+                        clubId,
+                        totalPoints: 0,
+                        leaguePoints: 0,
+                        tournamentPoints: 0,
+                        matchesWon: 0,
+                        matchesLost: 0,
+                        gamesWon: 0,
+                        gamesLost: 0,
+                        tournamentIds: new Set<string>(),
+                        leagueIds: new Set<string>()
+                    });
+                }
+                return statsByClub.get(key);
+            };
+
+            // Process tournament teams
             const processTournamentTeams = (teams: any[]) => {
                 teams.forEach(team => {
-                    if (team.tournamentId) tournamentIds.add(team.tournamentId);
+                    const clubId = team.tournament?.clubId || null;
+                    const clubStats = ensureClubStats(clubId);
+
+                    if (team.tournamentId) {
+                        globalTournamentIds.add(team.tournamentId);
+                        clubStats.tournamentIds.add(team.tournamentId);
+                    }
 
                     // Process matches where team was Team 1
                     team.matchesAsTeam1?.forEach(match => {
                         if (match.status === 'completed') {
                             if (match.winner?.id === team.id) {
-                                tournamentPoints += 3;
-                                matchesWon++;
+                                globalTournamentPoints += 3;
+                                globalMatchesWon++;
+                                clubStats.tournamentPoints += 3;
+                                clubStats.matchesWon++;
                             } else {
-                                tournamentPoints += 1;
+                                globalTournamentPoints += 1;
+                                clubStats.tournamentPoints += 1;
+                                clubStats.matchesLost++;
                             }
                         }
                     });
@@ -152,10 +291,14 @@ export class PlayersService {
                     team.matchesAsTeam2?.forEach(match => {
                         if (match.status === 'completed') {
                             if (match.winner?.id === team.id) {
-                                tournamentPoints += 3;
-                                matchesWon++;
+                                globalTournamentPoints += 3;
+                                globalMatchesWon++;
+                                clubStats.tournamentPoints += 3;
+                                clubStats.matchesWon++;
                             } else {
-                                tournamentPoints += 1;
+                                globalTournamentPoints += 1;
+                                clubStats.tournamentPoints += 1;
+                                clubStats.matchesLost++;
                             }
                         }
                     });
@@ -165,67 +308,203 @@ export class PlayersService {
             processTournamentTeams(player.teamsAsPlayer1 || []);
             processTournamentTeams(player.teamsAsPlayer2 || []);
 
-            // 2. Process Leagues (Sum pre-calculated league points)
-            // League points are stored directly on the LeagueTeam entity
+            // Process league teams
             const processLeagueTeams = (teams: any[]) => {
                 teams.forEach(team => {
-                    if (team.leagueId) leagueIds.add(team.leagueId);
-                    leaguePoints += (team.points || 0);
-                    matchesWon += (team.matchesWon || 0);
+                    const clubId = team.league?.clubId || null;
+                    const clubStats = ensureClubStats(clubId);
+
+                    if (team.leagueId) {
+                        globalLeagueIds.add(team.leagueId);
+                        clubStats.leagueIds.add(team.leagueId);
+                    }
+
+                    const points = team.points || 0;
+                    const matchesWon = team.matchesWon || 0;
+
+                    globalLeaguePoints += points;
+                    globalMatchesWon += matchesWon;
+                    clubStats.leaguePoints += points;
+                    clubStats.matchesWon += matchesWon;
                 });
             };
 
             processLeagueTeams(player.leagueTeamsAsPlayer1 || []);
             processLeagueTeams(player.leagueTeamsAsPlayer2 || []);
 
-            // Update Player
-            player.totalPoints = tournamentPoints + leaguePoints;
-            player.tournamentPoints = tournamentPoints;
-            player.leaguePoints = leaguePoints;
-            player.matchesWon = matchesWon;
-            player.tournamentsPlayed = tournamentIds.size;
-            player.leaguesPlayed = leagueIds.size;
+            // Calculate total points for each club
+            statsByClub.forEach(stats => {
+                stats.totalPoints = stats.tournamentPoints + stats.leaguePoints;
+                stats.tournamentsPlayed = stats.tournamentIds.size;
+                stats.leaguesPlayed = stats.leagueIds.size;
+            });
+
+            // Update global player stats
+            globalTotalPoints = globalTournamentPoints + globalLeaguePoints;
+            player.totalPoints = globalTotalPoints;
+            player.tournamentPoints = globalTournamentPoints;
+            player.leaguePoints = globalLeaguePoints;
+            player.matchesWon = globalMatchesWon;
+            player.tournamentsPlayed = globalTournamentIds.size;
+            player.leaguesPlayed = globalLeagueIds.size;
 
             await this.playerRepository.save(player);
+
+            // Update PlayerClubStats for each club
+            for (const [key, stats] of statsByClub.entries()) {
+                if (key === 'NO_CLUB' || !stats.clubId) {
+                    // Skip inter-club stats (they use global Player stats)
+                    continue;
+                }
+
+                const clubStats = await this.getOrCreatePlayerClubStats(playerId, stats.clubId);
+                if (clubStats) {
+                    clubStats.totalPoints = stats.totalPoints;
+                    clubStats.leaguePoints = stats.leaguePoints;
+                    clubStats.tournamentPoints = stats.tournamentPoints;
+                    clubStats.matchesWon = stats.matchesWon;
+                    clubStats.matchesLost = stats.matchesLost;
+                    clubStats.tournamentsPlayed = stats.tournamentsPlayed;
+                    clubStats.leaguesPlayed = stats.leaguesPlayed;
+
+                    await this.playerClubStatsRepository.save(clubStats);
+                }
+            }
         }
     }
 
-    async getLeagueRanking(categoryId?: string): Promise<Player[]> {
-        const where: any = {};
-        if (categoryId) where.category = { id: categoryId };
+    async getLeagueRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
+        if (!clubId) {
+            let query = this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category');
 
-        return this.playerRepository.find({
-            where,
-            order: {
-                leaguePoints: 'DESC',
-                totalPoints: 'DESC',
-                matchesWon: 'DESC'
+            if (categoryId) {
+                query = query.where('player.categoryId = :categoryId', { categoryId });
             }
+
+            return query
+                .orderBy('player.leaguePoints', 'DESC')
+                .addOrderBy('player.totalPoints', 'DESC')
+                .addOrderBy('player.matchesWon', 'DESC')
+                .getMany();
+        }
+
+        // With club filter: query PlayerClubStats
+        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
+            .leftJoinAndSelect('stats.player', 'player')
+            .leftJoinAndSelect('player.category', 'category')
+            .where('stats.club.id = :clubId', { clubId })
+            .andWhere('stats.leaguePoints > 0'); // Filter active in leagues
+
+        if (categoryId) {
+            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
+        }
+
+        const stats = await statsQuery
+            .orderBy('stats.leaguePoints', 'DESC')
+            .addOrderBy('stats.totalPoints', 'DESC')
+            .addOrderBy('stats.matchesWon', 'DESC')
+            .getMany();
+
+        // Map to players with club-specific stats
+        return stats.map(s => {
+            const player = s.player;
+            player.totalPoints = s.totalPoints;
+            player.leaguePoints = s.leaguePoints;
+            player.tournamentPoints = s.tournamentPoints;
+            player.matchesWon = s.matchesWon;
+            return player;
         });
     }
 
-    async getTournamentRanking(categoryId?: string): Promise<Player[]> {
-        const where: any = {};
-        if (categoryId) where.category = { id: categoryId };
+    async getTournamentRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
+        if (!clubId) {
+            let query = this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category');
 
-        return this.playerRepository.find({
-            where,
-            order: {
-                tournamentPoints: 'DESC',
-                totalPoints: 'DESC',
-                matchesWon: 'DESC'
+            if (categoryId) {
+                query = query.where('player.categoryId = :categoryId', { categoryId });
             }
+
+            return query
+                .orderBy('player.tournamentPoints', 'DESC')
+                .addOrderBy('player.totalPoints', 'DESC')
+                .addOrderBy('player.matchesWon', 'DESC')
+                .getMany();
+        }
+
+        // With club filter: query PlayerClubStats
+        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
+            .leftJoinAndSelect('stats.player', 'player')
+            .leftJoinAndSelect('player.category', 'category')
+            .where('stats.club.id = :clubId', { clubId })
+            .andWhere('stats.tournamentPoints > 0'); // Filter active in tournaments
+
+        if (categoryId) {
+            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
+        }
+
+        const stats = await statsQuery
+            .orderBy('stats.tournamentPoints', 'DESC')
+            .addOrderBy('stats.totalPoints', 'DESC')
+            .addOrderBy('stats.matchesWon', 'DESC')
+            .getMany();
+
+        // Map to players with club-specific stats
+        return stats.map(s => {
+            const player = s.player;
+            player.totalPoints = s.totalPoints;
+            player.leaguePoints = s.leaguePoints;
+            player.tournamentPoints = s.tournamentPoints;
+            player.matchesWon = s.matchesWon;
+            return player;
         });
     }
 
-    async getPairRankings(type: 'global' | 'league' | 'tournament', categoryId?: string): Promise<any[]> {
-        // 1. Fetch all players (filtered by Category if needed, for optimization)
-        const where: any = {};
-        if (categoryId) where.category = { id: categoryId };
+    async getPairRankings(type: 'global' | 'league' | 'tournament', categoryId?: string, clubId?: string): Promise<any[]> {
+        // 1. Fetch all players (filtered by Category and Club if needed)
+        let players: Player[];
 
-        const players = await this.playerRepository.find({ where, relations: ['category'] });
+        if (!clubId) {
+            let query = this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category');
 
-        // If no players found for category, return empty
+            if (categoryId) {
+                query = query.where('player.categoryId = :categoryId', { categoryId });
+            }
+
+            players = await query.getMany();
+        } else {
+            // Get players in club OR without clubs
+            let baseQuery = this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category')
+                .leftJoinAndSelect('player.clubs', 'club');
+
+            if (categoryId) {
+                baseQuery = baseQuery.where('player.categoryId = :categoryId', { categoryId });
+            }
+
+            const playersInClub = await baseQuery
+                .andWhere('club.id = :clubId', { clubId })
+                .getMany();
+
+            let noClubQuery = this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category')
+                .leftJoin('player.clubs', 'club')
+                .where('club.id IS NULL');
+
+            if (categoryId) {
+                noClubQuery = noClubQuery.andWhere('player.categoryId = :categoryId', { categoryId });
+            }
+
+            const playersWithoutClubs = await noClubQuery.getMany();
+
+            const playerMap = new Map();
+            [...playersInClub, ...playersWithoutClubs].forEach(p => playerMap.set(p.id, p));
+            players = Array.from(playerMap.values());
+        }
+
+        // If no players found for category/club, return empty
         if (players.length === 0) return [];
 
         const playerMap = new Map(players.map(p => [p.id, p]));
@@ -294,14 +573,34 @@ export class PlayersService {
         // NOTE: We fetch ALL teams, but filter inside processTeams using validPlayerIds
 
         if (type === 'global' || type === 'tournament') {
-            const tournamentTeams = await this.playerRepository.manager.getRepository('Team').find({
-                relations: ['matchesAsTeam1', 'matchesAsTeam1.winner', 'matchesAsTeam2', 'matchesAsTeam2.winner']
-            });
+            // Fetch tournament teams, filtered by tournament's clubId if applicable
+            let tournamentTeamsQuery = this.playerRepository.manager.getRepository('Team')
+                .createQueryBuilder('team')
+                .leftJoinAndSelect('team.matchesAsTeam1', 'matchesAsTeam1')
+                .leftJoinAndSelect('matchesAsTeam1.winner', 'winner1')
+                .leftJoinAndSelect('team.matchesAsTeam2', 'matchesAsTeam2')
+                .leftJoinAndSelect('matchesAsTeam2.winner', 'winner2')
+                .leftJoin('team.tournament', 'tournament');
+
+            if (clubId) {
+                tournamentTeamsQuery = tournamentTeamsQuery.where('tournament.clubId = :clubId OR tournament.clubId IS NULL', { clubId });
+            }
+
+            const tournamentTeams = await tournamentTeamsQuery.getMany();
             processTeams(tournamentTeams, true);
         }
 
         if (type === 'global' || type === 'league') {
-            const leagueTeams = await this.playerRepository.manager.getRepository('LeagueTeam').find();
+            // Fetch league teams, filtered by league's clubId if applicable
+            let leagueTeamsQuery = this.playerRepository.manager.getRepository('LeagueTeam')
+                .createQueryBuilder('leagueTeam')
+                .leftJoin('leagueTeam.league', 'league');
+
+            if (clubId) {
+                leagueTeamsQuery = leagueTeamsQuery.where('league.clubId = :clubId OR league.clubId IS NULL', { clubId });
+            }
+
+            const leagueTeams = await leagueTeamsQuery.getMany();
             processTeams(leagueTeams, false);
         }
 
@@ -310,9 +609,9 @@ export class PlayersService {
             .sort((a, b) => b.points - a.points);
     }
 
-    async getRecommendedMatches(): Promise<any[]> {
-        // 1. Get Global Pair Rankings
-        const rankings = await this.getPairRankings('global');
+    async getRecommendedMatches(clubId?: string): Promise<any[]> {
+        // 1. Get Global Pair Rankings filtered by club
+        const rankings = await this.getPairRankings('global', undefined, clubId);
         const recommendations = [];
 
         // 2. iterate to find balanced matches
@@ -368,14 +667,38 @@ export class PlayersService {
         await this.recalculateTotalPoints(ids);
     }
 
-    async getAllPartnerRecommendations(): Promise<any[]> {
-        // Get all players with category and position
-        const allPlayers = await this.playerRepository.find({
-            relations: ['category']
-        });
+    async getAllPartnerRecommendations(clubId?: string): Promise<any[]> {
+        // Get all players with category and position, filtered by club if provided
+        let eligiblePlayers: Player[];
 
-        // Filter players that have both category and position
-        const eligiblePlayers = allPlayers.filter(p => p.category && p.position);
+        if (!clubId) {
+            eligiblePlayers = await this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category')
+                .where('player.position IS NOT NULL')
+                .andWhere('player.categoryId IS NOT NULL')
+                .getMany();
+        } else {
+            // Get players in club OR without clubs
+            const playersInClub = await this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category')
+                .innerJoin('player.clubs', 'club')
+                .where('player.position IS NOT NULL')
+                .andWhere('player.categoryId IS NOT NULL')
+                .andWhere('club.id = :clubId', { clubId })
+                .getMany();
+
+            const playersWithoutClubs = await this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category')
+                .leftJoin('player.clubs', 'club')
+                .where('player.position IS NOT NULL')
+                .andWhere('player.categoryId IS NOT NULL')
+                .andWhere('club.id IS NULL')
+                .getMany();
+
+            const playerMap = new Map();
+            [...playersInClub, ...playersWithoutClubs].forEach(p => playerMap.set(p.id, p));
+            eligiblePlayers = Array.from(playerMap.values());
+        }
 
         // Helper function to check position compatibility
         const isPositionCompatible = (pos1: string, pos2: string): boolean => {
@@ -430,4 +753,114 @@ export class PlayersService {
         recommendations.sort((a, b) => b.compatibility - a.compatibility);
         return recommendations.slice(0, 10);
     }
+
+    async getGlobalTopPlayers(limit: number = 10): Promise<Player[]> {
+        // Get top players across all clubs (aggregated stats)
+        // Only return players who have actually played (totalPoints > 0)
+        return this.playerRepository.find({
+            relations: ['category'],
+            where: {
+                totalPoints: MoreThan(0)
+            },
+            order: {
+                totalPoints: 'DESC',
+                matchesWon: 'DESC'
+            },
+            take: limit
+        });
+    }
+
+    // ==================== Player Club Stats Methods ====================
+
+    async getOrCreatePlayerClubStats(playerId: string, clubId: string): Promise<PlayerClubStats> {
+        if (!clubId) {
+            return null; // No club stats for inter-club players
+        }
+
+        // Try to find existing stats
+        let stats = await this.playerClubStatsRepository.findOne({
+            where: {
+                player: { id: playerId },
+                club: { id: clubId }
+            },
+            relations: ['player', 'club']
+        });
+
+        if (!stats) {
+            // Create new stats
+            stats = this.playerClubStatsRepository.create({
+                player: { id: playerId } as Player,
+                club: { id: clubId } as any,
+                totalPoints: 0,
+                leaguePoints: 0,
+                tournamentPoints: 0,
+                matchesWon: 0,
+                matchesLost: 0,
+                gamesWon: 0,
+                gamesLost: 0,
+                tournamentsPlayed: 0,
+                leaguesPlayed: 0
+            });
+            stats = await this.playerClubStatsRepository.save(stats);
+        }
+
+        return stats;
+    }
+
+    async updatePlayerClubStats(
+        playerId: string,
+        clubId: string,
+        updates: Partial<{
+            totalPoints: number;
+            leaguePoints: number;
+            tournamentPoints: number;
+            matchesWon: number;
+            matchesLost: number;
+            gamesWon: number;
+            gamesLost: number;
+            tournamentsPlayed: number;
+            leaguesPlayed: number;
+        }>
+    ): Promise<PlayerClubStats> {
+        const stats = await this.getOrCreatePlayerClubStats(playerId, clubId);
+
+        if (!stats) {
+            return null; // No club, nothing to update
+        }
+
+        // Apply incremental updates
+        Object.keys(updates).forEach(key => {
+            if (typeof updates[key] === 'number') {
+                stats[key] += updates[key];
+            }
+        });
+
+        return this.playerClubStatsRepository.save(stats);
+    }
+
+    async updatePlayerGlobalStats(
+        playerId: string,
+        updates: Partial<{
+            totalPoints: number;
+            leaguePoints: number;
+            tournamentPoints: number;
+            matchesWon: number;
+        }>
+    ): Promise<Player> {
+        const player = await this.playerRepository.findOne({ where: { id: playerId } });
+
+        if (!player) {
+            throw new NotFoundException(`Player ${playerId} not found`);
+        }
+
+        // Apply incremental updates to global stats
+        Object.keys(updates).forEach(key => {
+            if (typeof updates[key] === 'number') {
+                player[key] += updates[key];
+            }
+        });
+
+        return this.playerRepository.save(player);
+    }
 }
+

@@ -7,6 +7,7 @@ import { TeamsModule } from './teams/teams.module';
 import { PlayersModule } from './players/players.module';
 import { LeaguesModule } from './leagues/leagues.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ClubsModule } from './clubs/clubs.module';
 
 @Module({
     imports: [
@@ -33,6 +34,7 @@ import { CategoriesModule } from './categories/categories.module';
         PlayersModule,
         LeaguesModule,
         CategoriesModule,
+        ClubsModule,
     ],
 })
 export class AppModule { }

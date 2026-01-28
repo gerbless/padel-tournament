@@ -1,0 +1,79 @@
+<div class="club-selection-container">
+    <!-- Hero Section with Global Top 10 -->
+    <div class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">🎾 Padel Tournament Manager</h1>
+            <p class="hero-subtitle">Gestión profesional de torneos y ligas de pádel</p>
+        </div>
+
+        <!-- Club Selection Section (Moved to Top) -->
+        <div class="clubs-section">
+            <div class="section-header">
+                <h2>Selecciona tu Club</h2>
+                <div class="controls-wrapper">
+                    <input type="text" class="search-input" placeholder="🔍 Buscar club..." [(ngModel)]="searchTerm" />
+                </div>
+            </div>
+
+            <div class="clubs-grid" *ngIf="!loading">
+                <div class="club-card" *ngFor="let club of filteredClubs" (click)="selectClub(club)">
+                    <div class="club-logo">
+                        <span *ngIf="!club.logo">{{ club.name.charAt(0) }}</span>
+                        <img *ngIf="club.logo" [src]="club.logo" [alt]="club.name" />
+                    </div>
+                    <div class="club-info">
+                        <h3>{{ club.name }}</h3>
+                        <p *ngIf="club.description">{{ club.description }}</p>
+                    </div>
+                    <div class="club-arrow">→</div>
+                </div>
+            </div>
+
+            <!-- Show More/Less Button -->
+            <div class="show-more-container" *ngIf="!loading && !searchTerm && clubs.length > MAX_VISIBLE">
+                <button class="btn-outline" (click)="toggleShowAll()">
+                    {{ showAll ? 'Ver menos' : 'Ver todos (' + clubs.length + ')' }}
+                </button>
+            </div>
+
+            <div class="loading-spinner" *ngIf="loading">
+                <div class="spinner"></div>
+                <p>Cargando clubes...</p>
+            </div>
+
+            <div class="no-results" *ngIf="!loading && filteredClubs.length === 0">
+                <p>No se encontraron clubes</p>
+            </div>
+        </div>
+
+        <!-- Global Stats Card (Moved to Bottom) -->
+        <div class="global-stats-card-wrapper">
+            <div class="global-stats-card">
+                <h2>🏆 Top 10 Global - Mejores Jugadores</h2>
+                <p class="stats-subtitle">Ranking acumulado entre todos los clubes</p>
+
+                <div class="top-players-list" *ngIf="globalTopPlayers.length > 0">
+                    <div class="player-item" *ngFor="let player of globalTopPlayers; let i = index"
+                        [class.gold]="i === 0" [class.silver]="i === 1" [class.bronze]="i === 2">
+                        <div class="rank">{{ i + 1 }}</div>
+                        <div class="player-avatar">{{ getPlayerInitials(player.name) }}</div>
+                        <div class="player-info">
+                            <div class="player-name">{{ player.name }}</div>
+                            <div class="player-stats">
+                                {{ player.totalPoints }} pts • {{ player.matchesWon }} victorias
+                            </div>
+                        </div>
+                        <div class="trophy" *ngIf="i < 3">
+                            <span *ngIf="i === 0">🥇</span>
+                            <span *ngIf="i === 1">🥈</span>
+                            <span *ngIf="i === 2">🥉</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div *ngIf="globalTopPlayers.length === 0" class="no-data">
+                    <p>No hay datos disponibles aún</p>
+                </div>
+            </div>
+        </div>
+    </div>

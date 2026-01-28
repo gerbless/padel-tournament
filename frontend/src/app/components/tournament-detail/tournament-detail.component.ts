@@ -18,6 +18,7 @@ export class TournamentDetailComponent implements OnInit {
     loading = true;
     selectedMatch: Match | null = null;
     scoreForm: FormGroup;
+    errorMessage: string | null = null;
 
     constructor(
         private route: ActivatedRoute,
@@ -69,7 +70,13 @@ export class TournamentDetailComponent implements OnInit {
     }
 
     openMatchScoreModal(match: Match) {
+        if (this.tournament?.status === 'completed') {
+            this.errorMessage = 'El torneo está finalizado. No se pueden modificar los resultados.';
+            return;
+        }
+
         this.selectedMatch = match;
+        this.errorMessage = null;
 
         // Clear existing sets
         while (this.sets.length > 0) {
@@ -82,6 +89,8 @@ export class TournamentDetailComponent implements OnInit {
                 this.sets.push(this.fb.group({
                     team1Games: [set.team1Games ?? 0, [Validators.required, Validators.min(0)]],
                     team2Games: [set.team2Games ?? 0, [Validators.required, Validators.min(0)]],
+                    tiebreakTeam1: [set.tiebreak?.team1Points ?? '', []],
+                    tiebreakTeam2: [set.tiebreak?.team2Points ?? '', []]
                 }));
             });
         } else {
@@ -99,6 +108,8 @@ export class TournamentDetailComponent implements OnInit {
             this.sets.push(this.fb.group({
                 team1Games: ['', [Validators.required, Validators.min(0)]],
                 team2Games: ['', [Validators.required, Validators.min(0)]],
+                tiebreakTeam1: ['', []],
+                tiebreakTeam2: ['', []]
             }));
         }
     }
@@ -109,22 +120,49 @@ export class TournamentDetailComponent implements OnInit {
         }
     }
 
+    isTieBreakNeeded(index: number): boolean {
+        const set = this.sets.at(index);
+        const g1 = set.get('team1Games')?.value;
+        const g2 = set.get('team2Games')?.value;
+        // Tie-break needed if 6-6, 7-6, 6-7
+        return (g1 == 6 && g2 == 6) || (g1 == 7 && g2 == 6) || (g1 == 6 && g2 == 7);
+    }
+
     saveScore() {
+        this.errorMessage = null;
         if (!this.selectedMatch || this.scoreForm.invalid) {
+            this.errorMessage = 'Por favor completa todos los campos requeridos correctamente.';
             return;
         }
 
-        // Explicitly cast to numbers to ensure backend compatibility
+        // Check validation for tie-breaks
         const formValue = this.scoreForm.value;
-        const processedSets = formValue.sets.map((set: any) => ({
-            ...set,
-            team1Games: Number(set.team1Games),
-            team2Games: Number(set.team2Games),
-            tiebreak: set.tiebreak ? {
-                team1Points: Number(set.tiebreak.team1Points),
-                team2Points: Number(set.tiebreak.team2Points)
-            } : undefined
-        }));
+        const processedSets: any[] = [];
+
+        for (let i = 0; i < formValue.sets.length; i++) {
+            const set = formValue.sets[i];
+            const g1 = Number(set.team1Games);
+            const g2 = Number(set.team2Games);
+
+            const setPayload: any = {
+                team1Games: g1,
+                team2Games: g2
+            };
+
+            // Validate tie-break
+            if (this.isTieBreakNeeded(i)) {
+                if (set.tiebreakTeam1 === '' || set.tiebreakTeam2 === '' || set.tiebreakTeam1 === null || set.tiebreakTeam2 === null) {
+                    this.errorMessage = `El Set ${i + 1} requiere puntos de Tie-break (ej. 7-4)`;
+                    return;
+                }
+                setPayload.tiebreak = {
+                    team1Points: Number(set.tiebreakTeam1),
+                    team2Points: Number(set.tiebreakTeam2)
+                };
+            }
+
+            processedSets.push(setPayload);
+        }
 
         const payload = { sets: processedSets };
 
@@ -137,7 +175,7 @@ export class TournamentDetailComponent implements OnInit {
             },
             error: (error) => {
                 console.error('Error updating score:', error);
-                alert('Error al actualizar el resultado: ' + (error.error?.message || 'Error desconocido'));
+                this.errorMessage = 'Error al actualizar: ' + (error.error?.message || 'Error desconocido');
             }
         });
     }
@@ -171,20 +209,40 @@ export class TournamentDetailComponent implements OnInit {
         );
     }
 
-    closeTournament() {
-        if (!this.tournament || !this.canCloseTournament()) return;
+    showCloseModal = false;
 
-        if (confirm('¿Estás seguro de finalizar el torneo? No se podrán modificar más resultados.')) {
-            this.tournamentService.closeTournament(this.tournament.id).subscribe({
-                next: (updatedTournament) => {
-                    this.tournament = updatedTournament;
-                    alert('¡Torneo finalizado con éxito!');
-                },
-                error: (error) => {
-                    console.error('Error closing tournament:', error);
-                    alert('Error al finalizar el torneo: ' + (error.error?.message || 'Error desconocido'));
-                }
-            });
+    confirmCloseTournament() {
+        if (!this.tournament) return;
+
+        // Validation check
+        const incompleteMatches = this.tournament.matches.filter(m => !m.sets || m.sets.length === 0);
+        if (incompleteMatches.length > 0) {
+            this.errorMessage = `No se puede finalizar: Hay ${incompleteMatches.length} partidos pendientes.`;
+            return;
         }
+
+        this.showCloseModal = true;
+    }
+
+    cancelCloseTournament() {
+        this.showCloseModal = false;
+    }
+
+    finalizeTournament() {
+        if (!this.tournament) return;
+
+        this.tournamentService.closeTournament(this.tournament.id).subscribe({
+            next: (updatedTournament) => {
+                this.tournament = updatedTournament;
+                this.errorMessage = null;
+                this.showCloseModal = false;
+                // Optional: Scroll to top to show status change or show a success banner
+            },
+            error: (error) => {
+                console.error('Error closing tournament:', error);
+                this.errorMessage = 'Error al finalizar el torneo: ' + (error.error?.message || 'Error desconocido');
+                // Keep modal open to show error
+            }
+        });
     }
 }

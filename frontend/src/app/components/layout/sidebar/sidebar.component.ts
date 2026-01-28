@@ -1,7 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { LayoutService } from '../../../services/layout.service';
+import { ClubService } from '../../../services/club.service';
+import { Club } from '../../../models/club.model';
 
 @Component({
     selector: 'app-sidebar',
@@ -11,8 +13,21 @@ import { LayoutService } from '../../../services/layout.service';
     <div class="sidebar-overlay" *ngIf="isMobileOpen" (click)="closeMobileMenu()"></div>
     <aside class="sidebar" [class.collapsed]="isCollapsed" [class.mobile-open]="isMobileOpen">
         <div class="brand">
-            <span class="logo">🎾</span>
-            <span class="title" *ngIf="!isCollapsed">PADEL MGR</span>
+            <!-- Default Logo -->
+            <span class="logo" *ngIf="!selectedClub">🎾</span>
+            <!-- Club Context Logo (Initials) -->
+            <div class="club-logo-circle" *ngIf="selectedClub">
+                {{ selectedClub.name.charAt(0).toUpperCase() }}
+            </div>
+
+            <div class="brand-content" *ngIf="!isCollapsed">
+                <span class="title" *ngIf="!selectedClub">PADEL MGR</span>
+                
+                <div class="club-info" *ngIf="selectedClub">
+                    <span class="club-name" title="{{ selectedClub.name }}">{{ selectedClub.name }}</span>
+                    <a class="change-link" (click)="clearClub()">Cambiar Club</a>
+                </div>
+            </div>
         </div>
         
         <button class="toggle-btn" (click)="toggleSidebar()">
@@ -22,7 +37,7 @@ import { LayoutService } from '../../../services/layout.service';
         <nav class="nav-menu">
             <a routerLink="/dashboard" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
                 <span class="icon">📊</span>
-                <span class="label" *ngIf="!isCollapsed">Dashboard</span>
+                <span class="label" *ngIf="!isCollapsed">Estadísticas</span>
             </a>
             <a routerLink="/tournaments" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
                 <span class="icon">🏆</span>
@@ -76,13 +91,68 @@ import { LayoutService } from '../../../services/layout.service';
             gap: 0.75rem;
             margin-bottom: 2rem;
             padding-left: 0.5rem;
-            height: 40px;
+            min-height: 48px; /* Fixed height to prevent jumps */
             overflow: hidden;
         }
 
         .brand .logo {
             min-width: 40px;
             text-align: center;
+            font-size: 1.5rem;
+        }
+
+        .club-logo-circle {
+            min-width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: white;
+            box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.3);
+        }
+
+        .brand-content {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .title {
+            font-weight: bold;
+            font-size: 1.2rem;
+            white-space: nowrap;
+        }
+
+        .club-info {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+
+        .club-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 140px;
+            color: white;
+        }
+
+        .change-link {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            text-decoration: underline;
+            transition: color 0.2s;
+        }
+
+        .change-link:hover {
+            color: var(--primary);
         }
 
         .toggle-btn {
@@ -197,14 +267,23 @@ import { LayoutService } from '../../../services/layout.service';
             .toggle-btn {
                 display: none; /* Hide toggle button on mobile */
             }
+            
+            .brand {
+                margin-top: 1rem;
+            }
         }
     `]
 })
-export class SidebarComponent {
+export class SidebarComponent implements OnInit {
     isCollapsed = false;
     isMobileOpen = false;
+    selectedClub: Club | null = null;
 
-    constructor(private layoutService: LayoutService) {
+    constructor(
+        private layoutService: LayoutService,
+        private clubService: ClubService,
+        private router: Router
+    ) {
         this.layoutService.sidebarCollapsed$.subscribe(
             (collapsed: boolean) => this.isCollapsed = collapsed
         );
@@ -213,11 +292,23 @@ export class SidebarComponent {
         );
     }
 
+    ngOnInit() {
+        this.clubService.selectedClub$.subscribe(club => {
+            this.selectedClub = club;
+        });
+    }
+
     toggleSidebar() {
         this.layoutService.toggleSidebar();
     }
 
     closeMobileMenu() {
         this.layoutService.closeMobileMenu();
+    }
+
+    clearClub() {
+        this.clubService.clearSelectedClub();
+        this.router.navigate(['/']);
+        this.closeMobileMenu();
     }
 }

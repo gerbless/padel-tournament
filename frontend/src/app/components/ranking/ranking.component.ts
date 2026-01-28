@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PlayerService, Player } from '../../services/player.service';
+import { ClubService } from '../../services/club.service';
+import { Subscription } from 'rxjs';
 
 @Component({
     selector: 'app-ranking',
@@ -10,21 +12,33 @@ import { PlayerService, Player } from '../../services/player.service';
     templateUrl: './ranking.component.html',
     styleUrls: ['./ranking.component.css']
 })
-export class RankingComponent implements OnInit {
+export class RankingComponent implements OnInit, OnDestroy {
     players: Player[] = [];
     filteredPlayers: Player[] = [];
     loading = true;
     searchTerm = '';
+    currentClubId: string | undefined;
+    private clubSubscription: Subscription | undefined;
 
-    constructor(private playerService: PlayerService) { }
+    constructor(
+        private playerService: PlayerService,
+        private clubService: ClubService
+    ) { }
 
     ngOnInit() {
-        this.loadRanking();
+        this.clubSubscription = this.clubService.selectedClub$.subscribe(club => {
+            this.currentClubId = club?.id;
+            this.loadRanking();
+        });
+    }
+
+    ngOnDestroy() {
+        this.clubSubscription?.unsubscribe();
     }
 
     loadRanking() {
         this.loading = true;
-        this.playerService.getRanking().subscribe({
+        this.playerService.getRanking(undefined, this.currentClubId).subscribe({
             next: (players) => {
                 this.players = players;
                 this.filterPlayers();

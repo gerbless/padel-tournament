@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { League, LeagueStatus } from './entities/league.entity';
@@ -20,7 +20,10 @@ export class LeaguesService {
     ) { }
 
     async create(createLeagueDto: CreateLeagueDto): Promise<League> {
-        const league = this.leagueRepository.create(createLeagueDto);
+        const league = this.leagueRepository.create({
+            ...createLeagueDto,
+            clubId: createLeagueDto.clubId
+        });
         const savedLeague = await this.leagueRepository.save(league);
 
         // If pairs are provided, create teams automatically
@@ -39,10 +42,16 @@ export class LeaguesService {
         return this.findOne(savedLeague.id); // Return with teams loaded
     }
 
-    async findAll(): Promise<League[]> {
-        return this.leagueRepository.find({
+    async findAll(clubId?: string): Promise<League[]> {
+        const query: any = {
             relations: ['teams', 'teams.player1', 'teams.player2', 'matches']
-        });
+        };
+
+        if (clubId) {
+            query.where = { clubId };
+        }
+
+        return this.leagueRepository.find(query);
     }
 
     async findOne(id: string): Promise<League> {
@@ -69,6 +78,10 @@ export class LeaguesService {
 
     async remove(id: string): Promise<void> {
         const league = await this.findOne(id);
+
+        if (league.status === LeagueStatus.COMPLETED) {
+            throw new BadRequestException('Cannot delete a completed league');
+        }
 
         // Collect player IDs to recalculate stats after deletion
         const playerIds = new Set<string>();
@@ -130,6 +143,10 @@ export class LeaguesService {
             relations: ['league']
         });
         if (!match) throw new NotFoundException('Match not found');
+
+        if (match.league && match.league.status === LeagueStatus.COMPLETED) {
+            throw new BadRequestException('Cannot update match result for a completed league');
+        }
 
         match.sets = sets;
         match.winnerId = winnerId;

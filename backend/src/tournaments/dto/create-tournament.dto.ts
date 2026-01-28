@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsArray, ValidateNested, IsNotEmpty } from 'class-validator';
+import { IsString, IsEnum, IsArray, ValidateNested, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TournamentType } from '../entities/tournament.entity';
 
@@ -24,4 +24,8 @@ export class CreateTournamentDto {
     @ValidateNested({ each: true })
     @Type(() => TeamDto)
     teams: TeamDto[];
+
+    @IsOptional()
+    @IsUUID()
+    clubId?: string;
 }

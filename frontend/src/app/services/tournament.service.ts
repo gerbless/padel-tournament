@@ -58,10 +58,12 @@ export interface Standing {
     position: number;
 }
 
+
 export interface CreateTournamentRequest {
     name: string;
     type: 'cuadrangular' | 'hexagonal';
     teams: { player1Name: string; player2Name: string }[];
+    clubId?: string;
 }
 
 @Injectable({
@@ -72,8 +74,10 @@ export class TournamentService {
 
     constructor(private http: HttpClient) { }
 
-    getTournaments(): Observable<Tournament[]> {
-        return this.http.get<Tournament[]>(this.apiUrl);
+    getTournaments(clubId?: string): Observable<Tournament[]> {
+        const params: any = {};
+        if (clubId) params.clubId = clubId;
+        return this.http.get<Tournament[]>(this.apiUrl, { params });
     }
 
     getTournament(id: string): Observable<Tournament> {

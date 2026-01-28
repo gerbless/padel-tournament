@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne } from 'typeorm';
 import { LeagueTeam } from './league-team.entity';
 import { LeagueMatch } from './league-match.entity';
+import { Club } from '../../clubs/entities/club.entity';
 
 export enum LeagueType {
     ROUND_ROBIN = 'round_robin',
@@ -57,6 +58,12 @@ export class League {
 
     @OneToMany(() => LeagueMatch, match => match.league, { cascade: true })
     matches: LeagueMatch[];
+
+    @ManyToOne(() => Club, club => club.leagues)
+    club: Club;
+
+    @Column({ nullable: true })
+    clubId: string;
 
     @CreateDateColumn()
     createdAt: Date;

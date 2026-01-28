@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TournamentService, Tournament } from '../../services/tournament.service';
+import { ClubService } from '../../services/club.service';
+import { Subscription } from 'rxjs';
 
 @Component({
     selector: 'app-tournament-list',
@@ -10,19 +12,33 @@ import { TournamentService, Tournament } from '../../services/tournament.service
     templateUrl: './tournament-list.component.html',
     styleUrls: ['./tournament-list.component.css']
 })
-export class TournamentListComponent implements OnInit {
+export class TournamentListComponent implements OnInit, OnDestroy {
     tournaments: Tournament[] = [];
     loading = true;
+    currentClubName: string = '';
+    private clubSubscription?: Subscription;
 
-    constructor(private tournamentService: TournamentService) { }
+    constructor(
+        private tournamentService: TournamentService,
+        private clubService: ClubService
+    ) { }
 
     ngOnInit() {
-        this.loadTournaments();
+        // Subscribe to selected club and reload tournaments when it changes
+        this.clubSubscription = this.clubService.selectedClub$.subscribe(club => {
+            this.currentClubName = club?.name || 'Todos los clubs';
+            this.loadTournaments();
+        });
+    }
+
+    ngOnDestroy() {
+        this.clubSubscription?.unsubscribe();
     }
 
     loadTournaments() {
         this.loading = true;
-        this.tournamentService.getTournaments().subscribe({
+        const clubId = this.clubService.getSelectedClub()?.id;
+        this.tournamentService.getTournaments(clubId).subscribe({
             next: (tournaments) => {
                 this.tournaments = tournaments;
                 this.loading = false;

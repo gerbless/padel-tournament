@@ -341,6 +341,11 @@ export class LeagueDashboardComponent implements OnInit {
     }
 
     openResultModal(match: Match) {
+        if (this.league?.status === 'completed') {
+            alert('La liga está finalizada. No se pueden modificar los resultados.');
+            return;
+        }
+
         if (match.status === 'completed') {
             alert('Este partido ya tiene resultado registrado');
             return;

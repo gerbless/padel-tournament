@@ -1,6 +1,11 @@
 <div class="container fade-in">
   <div class="flex-between mb-4">
-    <h1>🎾 Torneos de Pádel</h1>
+    <div>
+      <h1>🎾 Torneos de Pádel</h1>
+      <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+        📍 Club: <strong>{{ currentClubName }}</strong>
+      </p>
+    </div>
     <a routerLink="/tournaments/create" class="btn btn-primary">
       ➕ Crear Torneo
     </a>
@@ -25,10 +30,10 @@
           {{ getStatusText(tournament.status) }}
         </span>
       </div>
-      
+
       <div style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
         <p>
-          <strong>Tipo:</strong> 
+          <strong>Tipo:</strong>
           {{ tournament.type === 'cuadrangular' ? 'Cuadrangular' : 'Hexagonal' }}
           ({{ getTeamCount(tournament.type) }} parejas)
         </p>
@@ -41,8 +46,7 @@
         <a [routerLink]="['/tournaments', tournament.id]" class="btn btn-primary" style="flex: 1;">
           Ver Torneo
         </a>
-        <button 
-          (click)="deleteTournament(tournament.id, $event)" 
+        <button *ngIf="tournament.status !== 'completed'" (click)="deleteTournament(tournament.id, $event)"
           class="btn btn-danger">
           🗑️
         </button>

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { TournamentsService } from './tournaments.service';
 import { CreateTournamentDto } from './dto/create-tournament.dto';
 
@@ -12,8 +12,8 @@ export class TournamentsController {
     }
 
     @Get()
-    findAll() {
-        return this.tournamentsService.findAll();
+    findAll(@Query('clubId') clubId?: string) {
+        return this.tournamentsService.findAll(clubId);
     }
 
     @Get(':id')

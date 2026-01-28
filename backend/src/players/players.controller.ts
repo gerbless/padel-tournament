@@ -13,43 +13,65 @@ export class PlayersController {
     }
 
     @Post('recalculate-all')
-    recalculateAll() {
-        return this.playersService.recalculateAll();
+    async recalculateAll() {
+        const players = await this.playersService.findAll();
+        const playerIds = players.map(p => p.id);
+        await this.playersService.recalculateTotalPoints(playerIds);
+        return { message: 'All player points recalculated successfully' };
+    }
+
+    @Post('migrate-club-stats')
+    async migrateClubStats() {
+        const players = await this.playersService.findAll();
+        const playerIds = players.map(p => p.id);
+
+        console.log(`[Migration] Starting migration for ${playerIds.length} players`);
+        await this.playersService.recalculateTotalPoints(playerIds);
+
+        return {
+            message: 'Club stats migration completed successfully',
+            playersProcessed: playerIds.length
+        };
     }
 
     @Get()
-    findAll() {
-        return this.playersService.findAll();
+    findAll(@Query('clubId') clubId?: string) {
+        return this.playersService.findAll(clubId);
     }
 
     @Get('ranking')
-    getRanking(@Query('categoryId') categoryId?: string) {
-        return this.playersService.getRanking(categoryId);
+    getRanking(@Query('categoryId') categoryId?: string, @Query('clubId') clubId?: string) {
+        return this.playersService.getRanking(categoryId, clubId);
     }
 
     @Get('ranking/league')
-    getLeagueRanking(@Query('categoryId') categoryId?: string) {
-        return this.playersService.getLeagueRanking(categoryId);
+    getLeagueRanking(@Query('categoryId') categoryId?: string, @Query('clubId') clubId?: string) {
+        return this.playersService.getLeagueRanking(categoryId, clubId);
     }
 
     @Get('ranking/tournament')
-    getTournamentRanking(@Query('categoryId') categoryId?: string) {
-        return this.playersService.getTournamentRanking(categoryId);
+    getTournamentRanking(@Query('categoryId') categoryId?: string, @Query('clubId') clubId?: string) {
+        return this.playersService.getTournamentRanking(categoryId, clubId);
     }
 
     @Get('ranking/pairs')
-    getPairRanking(@Query('type') type: 'global' | 'league' | 'tournament' = 'global', @Query('categoryId') categoryId?: string) {
-        return this.playersService.getPairRankings(type, categoryId);
+    getPairRanking(@Query('type') type: 'global' | 'league' | 'tournament' = 'global', @Query('categoryId') categoryId?: string, @Query('clubId') clubId?: string) {
+        return this.playersService.getPairRankings(type, categoryId, clubId);
+    }
+
+    @Get('top-global')
+    getGlobalTopPlayers() {
+        return this.playersService.getGlobalTopPlayers();
     }
 
     @Get('recommendations')
-    getRecommendations() {
-        return this.playersService.getRecommendedMatches();
+    getRecommendations(@Query('clubId') clubId?: string) {
+        return this.playersService.getRecommendedMatches(clubId);
     }
 
     @Get('partner-recommendations')
-    getPartnerRecommendations() {
-        return this.playersService.getAllPartnerRecommendations();
+    getPartnerRecommendations(@Query('clubId') clubId?: string) {
+        return this.playersService.getAllPartnerRecommendations(clubId);
     }
 
     @Get(':id')

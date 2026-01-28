@@ -1,9 +1,10 @@
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, OnInit } from '@angular/core';
+import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { SidebarComponent } from './components/layout/sidebar/sidebar.component';
 import { LayoutService } from './services/layout.service';
 import { ThemeService } from './services/theme.service';
+import { filter } from 'rxjs/operators';
 
 @Component({
     selector: 'app-root',
@@ -11,9 +12,9 @@ import { ThemeService } from './services/theme.service';
     imports: [RouterOutlet, CommonModule, SidebarComponent],
     template: `
     <div class="app-layout">
-        <app-sidebar></app-sidebar>
-        <main class="main-content" [class.expanded]="sidebarCollapsed">
-            <header class="mobile-header">
+        <app-sidebar *ngIf="showSidebar"></app-sidebar>
+        <main class="main-content" [class.expanded]="sidebarCollapsed" [class.no-sidebar]="!showSidebar">
+            <header class="mobile-header" *ngIf="showSidebar">
                 <button class="menu-fab" (click)="toggleMobileMenu()">
                     ☰
                 </button>
@@ -46,6 +47,12 @@ import { ThemeService } from './services/theme.service';
         .main-content.expanded {
             margin-left: 80px;
             width: calc(100% - 80px);
+        }
+
+        .main-content.no-sidebar {
+            margin-left: 0 !important;
+            width: 100% !important;
+            padding: 0; 
         }
 
         .mobile-header {
@@ -94,17 +101,28 @@ import { ThemeService } from './services/theme.service';
         }
     `]
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
     title = 'Padel Tournament Manager';
     sidebarCollapsed = false;
+    showSidebar = true;
 
     constructor(
         private layoutService: LayoutService,
-        public themeService: ThemeService
+        public themeService: ThemeService,
+        private router: Router
     ) {
         this.layoutService.sidebarCollapsed$.subscribe(
             (collapsed: boolean) => this.sidebarCollapsed = collapsed
         );
+    }
+
+    ngOnInit() {
+        // Hide sidebar on landing page (/)
+        this.router.events.pipe(
+            filter(event => event instanceof NavigationEnd)
+        ).subscribe((event: any) => {
+            this.showSidebar = event.url !== '/' && event.url !== '/club-selection';
+        });
     }
 
     toggleTheme() {

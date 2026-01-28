@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne } from 'typeorm';
 import { Team } from '../../teams/entities/team.entity';
 import { Match } from '../../matches/entities/match.entity';
+import { Club } from '../../clubs/entities/club.entity';
 
 export enum TournamentType {
     CUADRANGULAR = 'cuadrangular', // 4 teams
@@ -39,6 +40,12 @@ export class Tournament {
 
     @OneToMany(() => Match, match => match.tournament, { cascade: true })
     matches: Match[];
+
+    @ManyToOne(() => Club, club => club.tournaments)
+    club: Club;
+
+    @Column({ nullable: true })
+    clubId: string;
 
     @CreateDateColumn()
     createdAt: Date;

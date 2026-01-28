@@ -25,7 +25,19 @@ export class MatchesService {
     }
 
     async updateScore(id: string, updateMatchScoreDto: UpdateMatchScoreDto): Promise<Match> {
-        const match = await this.findOne(id);
+        const match = await this.matchRepository.findOne({
+            where: { id },
+            relations: ['team1', 'team2', 'winner', 'tournament'],
+        });
+
+        if (!match) {
+            throw new NotFoundException(`Match with ID ${id} not found`);
+        }
+
+        if (match.tournament && match.tournament.status === 'completed') {
+            throw new BadRequestException('Cannot update match result for a completed tournament');
+        }
+
         const { sets } = updateMatchScoreDto;
 
         // Validate sets

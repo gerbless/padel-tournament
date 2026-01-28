@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NgChartsModule } from 'ng2-charts';
 import { ChartConfiguration, ChartOptions } from 'chart.js';
@@ -7,7 +7,9 @@ import { TournamentService, Tournament } from '../../services/tournament.service
 import { LeagueService } from '../../modules/league/services/league.service';
 import { League } from '../../models/league.model';
 import { CategoryService } from '../../modules/categories/services/category.service';
-import { FormsModule } from '@angular/forms'; // Need FormsModule for ngModel
+import { ClubService } from '../../services/club.service';
+import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 
 @Component({
     selector: 'app-dashboard',
@@ -16,7 +18,7 @@ import { FormsModule } from '@angular/forms'; // Need FormsModule for ngModel
     templateUrl: './dashboard.component.html',
     styleUrls: ['./dashboard.component.css']
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
     // Stats
     totalPlayers = 0;
     totalTournaments = 0;
@@ -109,17 +111,30 @@ export class DashboardComponent implements OnInit {
     // Category Filtering
     categories: any[] = [];
     selectedCategoryId: string = '';
+    selectedClubId: string | null = null;
+    private clubSubscription?: Subscription;
 
     constructor(
         private playerService: PlayerService,
         private tournamentService: TournamentService,
         private leagueService: LeagueService,
-        private categoryService: CategoryService // Added CategoryService to constructor
+        private categoryService: CategoryService,
+        private clubService: ClubService
     ) { }
 
     ngOnInit() {
-        this.loadCategories(); // Load categories on init
-        this.loadStats();
+        this.loadCategories();
+        // Subscribe to selected club
+        this.clubSubscription = this.clubService.selectedClub$.subscribe(club => {
+            console.log('[Dashboard] Club changed:', club);
+            this.selectedClubId = club?.id || null;
+            console.log('[Dashboard] selectedClubId:', this.selectedClubId);
+            this.loadStats();
+        });
+    }
+
+    ngOnDestroy() {
+        this.clubSubscription?.unsubscribe();
     }
 
     loadCategories() {
@@ -172,22 +187,22 @@ export class DashboardComponent implements OnInit {
     }
 
     loadStats() {
-        // 1. Recommended Matches
-        this.playerService.getRecommendedMatches().subscribe(matches => {
-            // Recommendation doesn't support category filtering yet on backend,
-            // but for rankings it's critical.
+        const catId = this.selectedCategoryId || undefined;
+        const clubId = this.selectedClubId || undefined;
+        console.log('[Dashboard] loadStats called with clubId:', clubId);
+
+        // 1. Recommended Matches - filtered by club
+        this.playerService.getRecommendedMatches(clubId).subscribe(matches => {
             this.recommendedMatches = matches;
         });
 
-        // 1b. Partner Recommendations
-        this.playerService.getPartnerRecommendations().subscribe(partners => {
+        // 1b. Partner Recommendations - filtered by club
+        this.playerService.getPartnerRecommendations(clubId).subscribe(partners => {
             this.partnerRecommendations = partners;
         });
 
-        const catId = this.selectedCategoryId || undefined;
-
-        // 2. Load Player Data
-        this.playerService.getRanking(catId).subscribe(players => {
+        // 2. Load Player Data - filtered by club and category
+        this.playerService.getRanking(catId, clubId).subscribe(players => {
             this.totalPlayers = players.length;
             this.globalPlayers = players.slice(0, 10);
 
@@ -202,36 +217,36 @@ export class DashboardComponent implements OnInit {
             if (this.viewMode === 'players') this.updateCharts();
         });
 
-        this.playerService.getLeagueRanking(catId).subscribe(players => {
+        this.playerService.getLeagueRanking(catId, clubId).subscribe(players => {
             this.leaguePlayers = players.slice(0, 5);
             if (this.viewMode === 'players') this.updateCharts();
         });
 
-        this.playerService.getTournamentRanking(catId).subscribe(players => {
+        this.playerService.getTournamentRanking(catId, clubId).subscribe(players => {
             this.tournamentPlayers = players.slice(0, 5);
             if (this.viewMode === 'players') this.updateCharts();
         });
 
-        // 2. Load Pair Data
-        this.playerService.getPairRanking('global', catId).subscribe(pairs => {
+        // 2. Load Pair Data - filtered by club and category
+        this.playerService.getPairRanking('global', catId, clubId).subscribe(pairs => {
             this.globalPairs = pairs.slice(0, 10);
             if (this.viewMode === 'pairs') this.updateCharts();
         });
 
-        this.playerService.getPairRanking('league', catId).subscribe(pairs => {
+        this.playerService.getPairRanking('league', catId, clubId).subscribe(pairs => {
             this.leaguePairs = pairs.slice(0, 5);
             if (this.viewMode === 'pairs') this.updateCharts();
         });
 
-        this.playerService.getPairRanking('tournament', catId).subscribe(pairs => {
+        this.playerService.getPairRanking('tournament', catId, clubId).subscribe(pairs => {
             this.tournamentPairs = pairs.slice(0, 5);
             if (this.viewMode === 'pairs') this.updateCharts();
         });
 
-        // Load Tournaments & Leagues
+        // Load Tournaments & Leagues - filtered by club
         let matchesCount = 0;
 
-        this.tournamentService.getTournaments().subscribe((tournaments: Tournament[]) => {
+        this.tournamentService.getTournaments(clubId).subscribe((tournaments: Tournament[]) => {
             this.totalTournaments = tournaments.length;
             this.activeTournaments = tournaments.filter(t => t.status !== 'completed').length;
 
@@ -241,7 +256,7 @@ export class DashboardComponent implements OnInit {
             this.totalMatches = matchesCount;
         });
 
-        this.leagueService.getLeagues().subscribe((leagues: League[]) => {
+        this.leagueService.getLeagues(clubId).subscribe((leagues: League[]) => {
             this.totalLeagues = leagues.length;
             this.activeLeagues = leagues.filter(l => l.status !== 'completed').length;
 

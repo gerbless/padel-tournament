@@ -18,3 +18,309 @@
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
 }
+
+/* Club Selector Styles */
+.club-select-wrapper {
+    position: relative;
+}
+
+.club-select-wrapper select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.club-selector-compact {
+    width: 100%;
+    max-width: 200px;
+    margin: 0 auto;
+}
+
+.club-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+}
+
+.club-option {
+    padding: 2px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    background: white;
+    transition: all 0.2s;
+    user-select: none;
+    color: #374151;
+}
+
+.club-option:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.club-option.selected {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.text-small {
+    font-size: 0.75rem;
+}
+
+/* Ensure table cells align nicely with new content */
+.table td {
+    vertical-align: middle;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* Club Selection List Styles */
+/* Dropdown Styles */
+/* Dropdown Styles */
+.dropdown-container {
+    position: relative;
+    width: 100%;
+}
+
+.dropdown-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    background: var(--bg-primary, white);
+    /* Use theme bg with fallback */
+    color: var(--text-primary, #374151);
+    /* Use theme text */
+    user-select: none;
+    min-height: 38px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 0 10px;
+}
+
+.dropdown-trigger:hover {
+    border-color: var(--primary);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary, white);
+    /* Theme aware */
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+    z-index: 9999;
+    /* Fix "behind table" issue */
+    margin-top: 4px;
+    overflow: hidden;
+    min-width: 250px;
+}
+
+/* Fixed positioning for Table Dropdown (Global Modal style) */
+.dropdown-menu.fixed-popover {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    max-width: 400px;
+    margin-top: 0;
+    z-index: 10000;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+
+    background: var(--bg-secondary, white);
+    color: var(--text-primary, #111827);
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+
+    animation: modalSlideIn 0.2s ease-out forwards;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -45%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary, #ffffff);
+}
+
+.modal-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    color: var(--text-muted, #6b7280);
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+    background-color: var(--bg-primary);
+    color: #ef4444;
+}
+
+/* Update Footer */
+.modal-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-primary, #f9fafb);
+    text-align: right;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.dropdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.4);
+    /* Darker dim */
+    backdrop-filter: blur(2px);
+    /* Blur effect for modern feel */
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.search-input-wrapper {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    flex-shrink: 0;
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+}
+
+.club-list-scroll {
+    max-height: 250px;
+    overflow-y: auto;
+    padding: 4px 0;
+    flex-grow: 1;
+}
+
+/* Ensure fixed popover scroll area expands */
+.dropdown-menu.fixed-popover .club-list-scroll {
+    max-height: none;
+    /* Let flex handle it up to 80vh */
+}
+
+.club-checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.1s;
+    color: var(--text-primary);
+}
+
+.club-checkbox-item:hover {
+    background-color: var(--bg-primary);
+    /* Or a hover specific var */
+    filter: brightness(95%);
+    /* Simple hover effect compatible with themes */
+}
+
+.checkbox-custom {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #d1d5db;
+    border-radius: 4px;
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.checkbox-custom.checked {
+    background-color: var(--primary);
+    border-color: var(--primary);
+}
+
+.club-name {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.no-results {
+    padding: 12px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.875rem;
+}
+
+/* Scrollbar styling */
+.club-list-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.club-list-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.club-list-scroll::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 3px;
+}

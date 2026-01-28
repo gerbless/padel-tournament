@@ -156,12 +156,12 @@
                         [class.winner]="match.result && match.result.winnerPairId === match.pairA.id">
                         <div class="team-players">
                             <div class="player-pill">
-                                <div class="avatar-circle">{{ getInitials(match.pairA?.playerA) }}</div>
-                                <span class="player-name">{{ getName(match.pairA?.playerA) }}</span>
+                                <div class="avatar-circle">{{ getInitials(match.pairA.playerA) }}</div>
+                                <span class="player-name">{{ getName(match.pairA.playerA) }}</span>
                             </div>
                             <div class="player-pill">
-                                <div class="avatar-circle">{{ getInitials(match.pairA?.playerB) }}</div>
-                                <span class="player-name">{{ getName(match.pairA?.playerB) }}</span>
+                                <div class="avatar-circle">{{ getInitials(match.pairA.playerB) }}</div>
+                                <span class="player-name">{{ getName(match.pairA.playerB) }}</span>
                             </div>
                         </div>
                         <div class="pair-score" *ngIf="match.result">
@@ -181,12 +181,12 @@
                         [class.winner]="match.result && match.result.winnerPairId === match.pairB.id">
                         <div class="team-players">
                             <div class="player-pill">
-                                <div class="avatar-circle">{{ getInitials(match.pairB?.playerA) }}</div>
-                                <span class="player-name">{{ getName(match.pairB?.playerA) }}</span>
+                                <div class="avatar-circle">{{ getInitials(match.pairB.playerA) }}</div>
+                                <span class="player-name">{{ getName(match.pairB.playerA) }}</span>
                             </div>
                             <div class="player-pill">
-                                <div class="avatar-circle">{{ getInitials(match.pairB?.playerB) }}</div>
-                                <span class="player-name">{{ getName(match.pairB?.playerB) }}</span>
+                                <div class="avatar-circle">{{ getInitials(match.pairB.playerB) }}</div>
+                                <span class="player-name">{{ getName(match.pairB.playerB) }}</span>
                             </div>
                         </div>
                         <div class="pair-score" *ngIf="match.result">
@@ -202,8 +202,8 @@
                     <span *ngIf="match.scheduledAt" class="match-date">
                         📅 {{ match.scheduledAt | date:'short' }}
                     </span>
-                    <button *ngIf="match.status !== 'completed'" (click)="openResultModal(match)"
-                        class="btn btn-sm btn-primary">
+                    <button *ngIf="match.status !== 'completed' && league.status !== 'completed'"
+                        (click)="openResultModal(match)" class="btn btn-sm btn-primary">
                         Ingresar Resultado
                     </button>
                 </div>

@@ -4,6 +4,14 @@
     </div>
 
     <div *ngIf="!loading && tournament">
+        <!-- Main Error Alert -->
+        <div *ngIf="errorMessage && !selectedMatch" class="alert alert-danger mb-4"
+            style="background-color: #fee2e2; color: #dc2626; padding: 1rem; border-radius: 0.5rem; border: 1px solid #fca5a5; display: flex; justify-content: space-between; align-items: center;">
+            <span>{{ errorMessage }}</span>
+            <button (click)="errorMessage = null"
+                style="background: none; border: none; color: #dc2626; cursor: pointer; font-size: 1.2rem;">&times;</button>
+        </div>
+
         <!-- Header -->
         <div class="flex-between mb-4">
             <div>
@@ -16,7 +24,7 @@
                 </p>
             </div>
             <div class="flex gap-2">
-                <button *ngIf="canCloseTournament()" (click)="closeTournament()" class="btn btn-success">
+                <button *ngIf="canCloseTournament()" (click)="confirmCloseTournament()" class="btn btn-success">
                     🏆 Finalizar Torneo
                 </button>
                 <a routerLink="/tournaments" class="btn btn-secondary">
@@ -116,10 +124,16 @@
         </div>
 
         <form [formGroup]="scoreForm" (ngSubmit)="saveScore()">
+            <div *ngIf="errorMessage" class="alert alert-danger mb-3"
+                style="background-color: #fee2e2; color: #dc2626; padding: 1rem; border-radius: 0.5rem; border: 1px solid #fca5a5;">
+                {{ errorMessage }}
+            </div>
+
             <div formArrayName="sets">
-                <div *ngFor="let set of sets.controls; let i = index" [formGroupName]="i" class="set-input mb-3">
+                <div *ngFor="let set of sets.controls; let i = index" [formGroupName]="i" class="set-input mb-3"
+                    style="border-bottom: 1px solid #eee; padding-bottom: 1rem;">
                     <label class="label text-center mb-2">Set {{ i + 1 }}</label>
-                    <div class="flex gap-2 align-items-center">
+                    <div class="flex gap-2 align-items-center justify-content-center">
                         <!-- Team 1 Input Group -->
                         <div style="flex: 1; text-align: center;">
                             <label class="label" style="font-size: 0.8rem; margin-bottom: 4px;">
@@ -139,27 +153,66 @@
                             <input type="number" class="input text-center" formControlName="team2Games" placeholder="0"
                                 min="0" />
                         </div>
+                    </div>
 
-                        <button type="button" class="btn btn-danger" (click)="removeSet(i)" *ngIf="sets.length > 1"
-                            style="margin-top: 24px;">
-                            ✕
+                    <!-- Tie-break Inputs (Conditional) -->
+                    <div *ngIf="isTieBreakNeeded(i)" class="tiebreak-container fade-in">
+                        <div class="tiebreak-label">Tie-break</div>
+                        <div class="tiebreak-inputs">
+                            <input type="number" class="input text-center" formControlName="tiebreakTeam1"
+                                placeholder="0" />
+                            <span class="tiebreak-separator">vs</span>
+                            <input type="number" class="input text-center" formControlName="tiebreakTeam2"
+                                placeholder="0" />
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-2" *ngIf="sets.length > 1">
+                        <button type="button" class="btn btn-danger btn-sm" (click)="removeSet(i)">
+                            Eliminar Set
                         </button>
                     </div>
                 </div>
             </div>
 
-            <button type="button" class="btn btn-secondary mt-2" (click)="addSet()" *ngIf="sets.length < 3">
+            <button type="button" class="btn btn-secondary mt-2 w-100" (click)="addSet()" *ngIf="sets.length < 3">
                 ➕ Agregar Set
             </button>
 
             <div class="flex gap-2 mt-4">
                 <button type="submit" class="btn btn-primary" style="flex: 1;">
-                    💾 Guardar
+                    💾 Guardar Resultado
                 </button>
                 <button type="button" class="btn btn-secondary" (click)="closeModal()">
                     Cancelar
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Finalize Tournament Modal -->
+<div *ngIf="showCloseModal" class="modal-overlay" (click)="cancelCloseTournament()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <h2>Finalizar Torneo</h2>
+        <p class="mb-4">¿Estás seguro de que deseas finalizar este torneo?</p>
+        <p class="mb-4" style="color: var(--text-muted); font-size: 0.9em;">
+            Esta acción calculará los puntos finales y actualizará el ranking.
+            <strong>No se podrán modificar los resultados después.</strong>
+        </p>
+
+        <div *ngIf="errorMessage" class="alert alert-danger mb-3"
+            style="background-color: #fee2e2; color: #dc2626; padding: 1rem; border-radius: 0.5rem; border: 1px solid #fca5a5;">
+            {{ errorMessage }}
+        </div>
+
+        <div class="flex gap-2 mt-4">
+            <button class="btn btn-success" style="flex: 1;" (click)="finalizeTournament()">
+                🏆 Finalizar
+            </button>
+            <button class="btn btn-secondary" (click)="cancelCloseTournament()">
+                Cancelar
+            </button>
+        </div>
     </div>
 </div>

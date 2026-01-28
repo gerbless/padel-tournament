@@ -24,8 +24,10 @@ export class LeagueService {
     constructor(private http: HttpClient) { }
 
     // CRUD Operations
-    getLeagues(): Observable<League[]> {
-        return this.http.get<League[]>(this.apiUrl).pipe(
+    getLeagues(clubId?: string): Observable<League[]> {
+        const params: any = {};
+        if (clubId) params.clubId = clubId;
+        return this.http.get<League[]>(this.apiUrl, { params }).pipe(
             tap(leagues => this.leaguesSubject.next(leagues))
         );
     }
