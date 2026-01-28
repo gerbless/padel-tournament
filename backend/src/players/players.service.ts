@@ -16,9 +16,17 @@ export class PlayersService {
     ) { }
 
     async create(createPlayerDto: CreatePlayerDto): Promise<Player> {
-        // Check if player exists
+        // Build query to check for existing player by identifiers
+        const whereConditions: any[] = [{ name: createPlayerDto.name }];
+        if (createPlayerDto.identification) {
+            whereConditions.push({ identification: createPlayerDto.identification });
+        }
+        if (createPlayerDto.email) {
+            whereConditions.push({ email: createPlayerDto.email });
+        }
+
         const existing = await this.playerRepository.findOne({
-            where: { name: createPlayerDto.name }
+            where: whereConditions
         });
 
         if (existing) {
@@ -27,6 +35,8 @@ export class PlayersService {
 
         const player = this.playerRepository.create({
             name: createPlayerDto.name,
+            identification: createPlayerDto.identification,
+            email: createPlayerDto.email,
             category: createPlayerDto.categoryId ? { id: createPlayerDto.categoryId } : undefined,
             position: createPlayerDto.position
         });
@@ -45,9 +55,18 @@ export class PlayersService {
             return savedPlayer;
         } catch (error) {
             // Handle duplicate key error from concurrent requests
+            // Handle duplicate key error from concurrent requests
             if (error.code === '23505') {
+                const whereConditions: any[] = [{ name: createPlayerDto.name }];
+                if (createPlayerDto.identification) {
+                    whereConditions.push({ identification: createPlayerDto.identification });
+                }
+                if (createPlayerDto.email) {
+                    whereConditions.push({ email: createPlayerDto.email });
+                }
+
                 const existingPlayer = await this.playerRepository.findOne({
-                    where: { name: createPlayerDto.name },
+                    where: whereConditions,
                     relations: ['category', 'clubs']
                 });
                 if (existingPlayer) {

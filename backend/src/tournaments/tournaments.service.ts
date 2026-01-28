@@ -50,14 +50,24 @@ export class TournamentsService {
             name,
             type,
             status: TournamentStatus.IN_PROGRESS,
-            clubId: createTournamentDto.clubId
+            clubId: createTournamentDto.clubId || null // Ensure null if undefined/empty
         });
 
-        const savedTournament = await this.tournamentRepository.save(tournament);
+        let savedTournament: Tournament;
+        try {
+            savedTournament = await this.tournamentRepository.save(tournament);
+        } catch (error) {
+            console.error('Error saving tournament:', error);
+            if (error.code === '23503') { // Foreign Key Violation
+                throw new BadRequestException('El club seleccionado no es válido (ID no encontrado). Intente seleccionar el club nuevamente.');
+            }
+            throw error;
+        }
 
         // Create teams
         const teams = await Promise.all(
             teamsData.map(async teamData => {
+                // Ensure players exist (idempotent)
                 const p1 = await this.playersService.findOrCreateByName(teamData.player1Name);
                 const p2 = await this.playersService.findOrCreateByName(teamData.player2Name);
 

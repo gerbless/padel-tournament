@@ -15,6 +15,8 @@ export interface Player {
     category?: { id: string; name: string; };
     position?: 'reves' | 'drive' | 'mixto';
     clubs?: { id: string; name: string; }[];
+    identification?: string;
+    email?: string;
 }
 
 @Injectable({
@@ -31,11 +33,13 @@ export class PlayerService {
         return this.http.get<Player[]>(this.apiUrl, { params });
     }
 
-    createPlayer(name: string, categoryId?: string, position?: string, clubIds?: string[]): Observable<Player> {
+    createPlayer(name: string, categoryId?: string, position?: string, clubIds?: string[], identification?: string, email?: string): Observable<Player> {
         const body: any = { name };
         if (categoryId) body.categoryId = categoryId;
         if (position) body.position = position;
         if (clubIds) body.clubIds = clubIds;
+        if (identification) body.identification = identification;
+        if (email) body.email = email;
         return this.http.post<Player>(this.apiUrl, body);
     }
 

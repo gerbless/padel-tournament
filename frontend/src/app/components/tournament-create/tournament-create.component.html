@@ -37,19 +37,26 @@
                 <label class="label">Parejas</label>
                 <div class="grid grid-2">
                     <div *ngFor="let team of teams.controls; let i = index" [formGroup]="$any(team)" class="card"
-                        style="padding: var(--spacing-lg);">
+                        [style.z-index]="100 - i"
+                        style="padding: var(--spacing-lg); position: relative; overflow: visible;">
                         <h3 style="font-size: 1.125rem; margin-bottom: var(--spacing-md);">
                             Pareja {{ i + 1 }}
                         </h3>
                         <div style="margin-bottom: var(--spacing-md);">
                             <label class="label" style="font-size: 0.75rem;">Jugador 1</label>
-                            <input type="text" class="input" formControlName="player1Name" list="playerList"
-                                placeholder="Nombre del jugador 1" />
+                            <app-player-select #pSelect1 formControlName="player1Name" [currentClubId]="currentClubId"
+                                [excludeNames]="getSelectedPlayerNames('player1Name', i)"
+                                (requestCreatePlayer)="openCreateModal($event, pSelect1)"
+                                placeholder="Buscar Jugador 1...">
+                            </app-player-select>
                         </div>
                         <div>
                             <label class="label" style="font-size: 0.75rem;">Jugador 2</label>
-                            <input type="text" class="input" formControlName="player2Name" list="playerList"
-                                placeholder="Nombre del jugador 2" />
+                            <app-player-select #pSelect2 formControlName="player2Name" [currentClubId]="currentClubId"
+                                [excludeNames]="getSelectedPlayerNames('player2Name', i)"
+                                (requestCreatePlayer)="openCreateModal($event, pSelect2)"
+                                placeholder="Buscar Jugador 2...">
+                            </app-player-select>
                         </div>
                     </div>
                 </div>
@@ -67,3 +74,8 @@
         </form>
     </div>
 </div>
+
+<!-- Global Create Player Modal -->
+<app-player-create-modal *ngIf="showCreateModal" [initialName]="createModalInitialName"
+    [predefinedClubId]="currentClubId" (close)="closeCreateModal()" (playerCreated)="onPlayerCreated($event)">
+</app-player-create-modal>

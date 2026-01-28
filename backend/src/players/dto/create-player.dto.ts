@@ -1,9 +1,17 @@
-import { IsString, IsNotEmpty, IsOptional, IsIn, IsArray, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsIn, IsArray, IsUUID, IsEmail } from 'class-validator';
 
 export class CreatePlayerDto {
     @IsString()
     @IsNotEmpty()
     name: string;
+
+    @IsOptional()
+    @IsString()
+    identification?: string;
+
+    @IsOptional()
+    @IsEmail()
+    email?: string;
 
     @IsOptional()
     @IsString()

@@ -13,6 +13,12 @@ export class Player {
     @Column({ unique: true })
     name: string;
 
+    @Column({ nullable: true, unique: true })
+    identification: string;
+
+    @Column({ nullable: true, unique: true })
+    email: string;
+
     @Column({ default: 0 })
     totalPoints: number;
 
