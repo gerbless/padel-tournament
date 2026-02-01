@@ -58,6 +58,7 @@ import { PlayerService, Player } from '../../services/player.service';
                 <div class="player-meta">
                   <span class="club-badge" *ngIf="isClubMember(player)">Miembro del Club</span>
                   <span class="category-badge" *ngIf="player.category">{{ player.category.name }}</span>
+                  <span class="position-badge" *ngIf="player.position">{{ getPositionLabel(player.position) }}</span>
                 </div>
               </div>
             </div>
@@ -203,6 +204,14 @@ import { PlayerService, Player } from '../../services/player.service';
     .category-badge {
       background: rgba(255,255,255,0.1);
       color: var(--text-secondary, #d1d5db);
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .position-badge {
+      background: rgba(59, 130, 246, 0.2);
+      color: var(--info, #3b82f6);
       font-size: 0.7rem;
       padding: 1px 6px;
       border-radius: 4px;
@@ -363,6 +372,16 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
       .slice(0, 2)
       .join('')
       .toUpperCase();
+  }
+
+  getPositionLabel(position?: 'reves' | 'drive' | 'mixto'): string {
+    if (!position) return '';
+    const labels = {
+      'reves': 'Revés',
+      'drive': 'Drive',
+      'mixto': 'Mixto'
+    };
+    return labels[position] || position;
   }
 
   // --- ControlValueAccessor Implementation ---
