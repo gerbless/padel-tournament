@@ -449,132 +449,117 @@ export class LeagueDashboardComponent implements OnInit {
     }
 
     getName(player: any): string {
-        return player?.name || 'Desconocido';
-    }
+        e
 
-
-
-    // Confirmation Modals
-    showScheduleConfirmationModal = false;
-
-    generateSchedule() {
-        if (!this.league) return;
-        this.showScheduleConfirmationModal = true;
-    }
-
-    closeScheduleConfirmationModal() {
-        this.showScheduleConfirmationModal = false;
-    }
-
-    confirmGenerateSchedule() {
-        if (!this.league) return;
-        this.closeScheduleConfirmationModal();
-        this.loading = true; // Show loading indicator
-
-        this.leagueService.generateSchedule(this.league.id).subscribe({
-            next: () => {
-                this.loadLeague(this.league!.id);
-                // Optional: Show success toast/modal if needed, but UI update is usually enough
-            },
-            error: (err) => {
-                console.error('Error generating schedule:', err);
-                this.loading = false;
-                alert('Error al generar calendario'); // Keeping this alert for now as error fallback
-            }
-        });
-    }
-
-    // Suggestion Modal
-    showSuggestionModal = false;
-    suggestedMatch: any = null;
-
-    suggestNextMatch() {
-        if (!this.league) return;
-
-        this.leagueService.suggestNextMatch(this.league.id).subscribe({
-            next: (match: any) => {
-                // Normalize backend response to frontend format if needed
-                if (!match.pairA && match.team1) {
-                    match.pairA = match.team1;
-                    match.pairB = match.team2;
-                }
-                this.suggestedMatch = match;
-                this.showSuggestionModal = true;
-            },
-            error: (err) => {
-                console.error('Error suggesting match:', err);
-                alert('No hay partidos pendientes o error al generar sugerencia');
-            }
-        });
-    }
-
-    closeSuggestionModal() {
-        this.showSuggestionModal = false;
-        this.suggestedMatch = null;
-    }
-
-    getMatchStatus(status: string): string {
-        const labels: Record<string, string> = {
-            'pending': 'Pendiente',
-            'scheduled': 'Programado',
-            'in_progress': 'En curso',
-            'completed': 'Completado',
-            'cancelled': 'Cancelado'
-        };
-        return labels[status] || status;
-    }
-
-    confirmCompleteLeague() {
-        if (confirm('¿Estás seguro de que deseas finalizar la liga? Esto marcará el torneo como completado y no se podrán modificar resultados.')) {
+        confirmGenerateSchedule() {
             if (!this.league) return;
-            this.leagueService.completeLeague(this.league.id).subscribe({
+            this.closeScheduleConfirmationModal();
+            this.loading = true; // Show loading indicator
+
+            this.leagueService.generateSchedule(this.league.id).subscribe({
                 next: () => {
-                    // Reload to get normalized data and update UI status
                     this.loadLeague(this.league!.id);
-                    alert('Liga finalizada exitosamente. ¡Felicidades a los campeones!');
+                    // Optional: Show success toast/modal if needed, but UI update is usually enough
                 },
-                error: (err) => console.error('Failed to complete league', err)
+                error: (err) => {
+                    console.error('Error generating schedule:', err);
+                    this.loading = false;
+                    alert('Error al generar calendario'); // Keeping this alert for now as error fallback
+                }
+            });
+        }
+
+        // Suggestion Modal
+        showSuggestionModal = false;
+        suggestedMatch: any = null;
+
+        suggestNextMatch() {
+            if (!this.league) return;
+
+            this.leagueService.suggestNextMatch(this.league.id).subscribe({
+                next: (match: any) => {
+                    // Normalize backend response to frontend format if needed
+                    if (!match.pairA && match.team1) {
+                        match.pairA = match.team1;
+                        match.pairB = match.team2;
+                    }
+                    this.suggestedMatch = match;
+                    this.showSuggestionModal = true;
+                },
+                error: (err) => {
+                    console.error('Error suggesting match:', err);
+                    alert('No hay partidos pendientes o error al generar sugerencia');
+                }
+            });
+        }
+
+        closeSuggestionModal() {
+            this.showSuggestionModal = false;
+            this.suggestedMatch = null;
+        }
+
+        getMatchStatus(status: string): string {
+            const labels: Record<string, string> = {
+                'pending': 'Pendiente',
+                'scheduled': 'Programado',
+                'in_progress': 'En curso',
+                'completed': 'Completado',
+                'cancelled': 'Cancelado'
+            };
+            return labels[status] || status;
+        }
+
+        confirmCompleteLeague() {
+            if (confirm('¿Estás seguro de que deseas finalizar la liga? Esto marcará el torneo como completado y no se podrán modificar resultados.')) {
+                if (!this.league) return;
+                this.leagueService.completeLeague(this.league.id).subscribe({
+                    next: () => {
+                        // Reload to get normalized data and update UI status
+                        this.loadLeague(this.league!.id);
+                        alert('Liga finalizada exitosamente. ¡Felicidades a los campeones!');
+                    },
+                    error: (err) => console.error('Failed to complete league', err)
+                });
+            }
+        }
+
+    get hasTies(): boolean {
+            if (!this.league || this.league.status === 'completed') return false;
+            // Only relevant for round_robin or groups if we want to resolve group ties (but user asked for standings)
+            if (this.league.type !== 'round_robin') return false;
+
+            const standings = this.standingsSorted;
+            if (standings.length < 2) return false;
+
+            const isTied = (t1: any, t2: any) => {
+                if (!t1 || !t2) return false;
+                const diffA = t1.setsWon - t1.setsLost;
+                const diffB = t2.setsWon - t2.setsLost;
+                const gamesDiffA = t1.gamesWon - t1.gamesLost;
+                const gamesDiffB = t2.gamesWon - t2.gamesLost;
+                return t1.points === t2.points && diffA === diffB && gamesDiffA === gamesDiffB;
+            };
+
+            // Check Top 3 Ties
+            if (isTied(standings[0], standings[1])) return true;
+            if (standings.length >= 3 && isTied(standings[1], standings[2])) return true;
+            if (standings.length >= 4 && isTied(standings[2], standings[3])) return true;
+
+            return false;
+        }
+
+        generateTieBreaker() {
+            if (!confirm('Se han detectado empates en los primeros lugares. ¿Deseas generar partidos de desempate?')) return;
+
+            this.leagueService.generateTieBreaker(this.league!.id).subscribe({
+                next: () => {
+                    this.loadLeague(this.league!.id);
+                    alert('Partidos de desempate generados exitosamente. Por favor juégalos para definir las posiciones.');
+                },
+                error: (err) => {
+                    console.error('Error generating tie-breaker', err);
+                    alert('No se pudieron generar los partidos. Asegúrate de que realmente existan empates en el Top 3.');
+                }
             });
         }
     }
-
-    get hasTies(): boolean {
-        if (!this.league || this.league.status === 'completed') return false;
-        // Only relevant for round_robin or groups if we want to resolve group ties (but user asked for standings)
-        if (this.league.type !== 'round_robin') return false;
-
-        const standings = this.standingsSorted;
-        if (standings.length < 2) return false;
-
-        const isTied = (t1: any, t2: any) => {
-            if (!t1 || !t2) return false;
-            const diffA = t1.setsWon - t1.setsLost;
-            const diffB = t2.setsWon - t2.setsLost;
-            const gamesDiffA = t1.gamesWon - t1.gamesLost;
-            const gamesDiffB = t2.gamesWon - t2.gamesLost;
-            return t1.points === t2.points && diffA === diffB && gamesDiffA === gamesDiffB;
-        };
-
-        // Check Top 3 Ties
-        if (isTied(standings[0], standings[1])) return true;
-        if (standings.length >= 3 && isTied(standings[1], standings[2])) return true;
-        if (standings.length >= 4 && isTied(standings[2], standings[3])) return true;
-
-        return false;
-    }
-
-    generateTieBreaker() {
-        if (!confirm('Se han detectado empates en los primeros lugares. ¿Deseas generar partidos de desempate?')) return;
-
-        this.leagueService.generateTieBreaker(this.league!.id).subscribe({
-            next: () => {
-                this.loadLeague(this.league!.id);
-                alert('Partidos de desempate generados exitosamente. Por favor juégalos para definir las posiciones.');
-            },
-            error: (err) => {
-                console.error('Error generating tie-breaker', err);
-                alert('No se pudieron generar los partidos. Asegúrate de que realmente existan empates en el Top 3.');
-            }
-        });
-    }
-}

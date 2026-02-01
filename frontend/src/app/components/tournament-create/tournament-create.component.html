@@ -34,7 +34,13 @@
 
             <!-- Teams -->
             <div class="form-group">
-                <label class="label">Parejas</label>
+                <div class="flex-between" style="margin-bottom: var(--spacing-sm);">
+                    <label class="label" style="margin-bottom: 0;">Parejas</label>
+                    <button type="button" class="btn btn-sm btn-info" (click)="autoGenerateTeams()"
+                        title="Generar parejas aleatorias respetando posiciones">
+                        🎲 Generar Parejas Aleatorias
+                    </button>
+                </div>
                 <div class="grid grid-2">
                     <div *ngFor="let team of teams.controls; let i = index" [formGroup]="$any(team)" class="card"
                         [style.z-index]="100 - i"

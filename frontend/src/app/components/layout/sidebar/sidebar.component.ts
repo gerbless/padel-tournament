@@ -56,21 +56,22 @@ import { AuthService } from '../../../services/auth.service';
                 <span class="icon">🥇</span>
                 <span class="label" *ngIf="!isCollapsed">Ranking</span>
             </a>
+            
+            <div class="divider" style="height: 1px; background: rgba(255,255,255,0.1); margin: 0.5rem 0;"></div>
+
+            <a *ngIf="!isLoggedIn" routerLink="/login" class="nav-item" (click)="closeMobileMenu()" style="color: var(--primary);">
+                <span class="icon">🔐</span>
+                <span class="label" *ngIf="!isCollapsed">Iniciar Sesión</span>
+            </a>
+            <a *ngIf="isLoggedIn" (click)="logout()" class="nav-item" style="color: var(--error); cursor: pointer;">
+                <span class="icon">🚪</span>
+                <span class="label" *ngIf="!isCollapsed">Cerrar Sesión</span>
+            </a>
         </nav>
 
         <div class="footer">
             <div *ngIf="!isCollapsed">
                 <p>v1.2.0</p>
-            </div>
-            <div class="auth-buttons" style="margin-top: 10px; width: 100%;">
-                 <a *ngIf="!isLoggedIn" routerLink="/login" class="nav-item" (click)="closeMobileMenu()" style="color: var(--primary); justify-content: center;">
-                    <span class="label" *ngIf="!isCollapsed">Iniciar Sesión</span>
-                    <span class="icon" *ngIf="isCollapsed">🔐</span>
-                </a>
-                 <a *ngIf="isLoggedIn" (click)="logout()" class="nav-item" style="color: var(--error); cursor: pointer; justify-content: center;">
-                    <span class="label" *ngIf="!isCollapsed">Cerrar Sesión</span>
-                    <span class="icon" *ngIf="isCollapsed">🚪</span>
-                </a>
             </div>
         </div>
     </aside>
