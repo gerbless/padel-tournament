@@ -9,8 +9,8 @@ export class AuthService {
     async validateUser(username: string, pass: string): Promise<any> {
         // Hardcoded admin user for demonstration
         // In a real app, you'd lookup in a database and verify hased password
-        if (username === 'admin' && pass === 'admin123') {
-            const { ...result } = { userId: 1, username: 'admin', role: 'admin' };
+        if (username === 'gerbueno' && pass === 'gerbueno123') {
+            const { ...result } = { userId: 1, username: 'gerbueno', role: 'admin' };
             return result;
         }
         return null;
