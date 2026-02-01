@@ -19,6 +19,7 @@ export class LeagueDashboardComponent implements OnInit {
 
     // Match result modal
     showResultModal = false;
+    savingResult = false; // New state for loading
     selectedMatch: Match | null = null;
     matchResult: MatchResult = {
         sets: [
@@ -30,6 +31,57 @@ export class LeagueDashboardComponent implements OnInit {
         pointsAwarded: { pairA: 0, pairB: 0 },
         completedAt: new Date()
     };
+
+    // ... (existing code) ...
+
+    saveMatchResult() {
+        if (!this.selectedMatch || !this.league) return;
+
+        // Validate result
+        const validation = this.leagueService.validateMatchResult(
+            this.matchResult,
+            this.league.config
+        );
+
+        if (!validation.valid) {
+            alert(validation.error);
+            return;
+        }
+
+        // Calculate winner
+        let pairAWins = 0;
+        let pairBWins = 0;
+        this.matchResult.sets.forEach(set => {
+            if (set.pairAGames > set.pairBGames) pairAWins++;
+            else pairBWins++;
+        });
+
+        this.matchResult.winnerPairId = pairAWins > pairBWins
+            ? this.selectedMatch.pairA.id
+            : this.selectedMatch.pairB.id;
+
+        // Start loading
+        this.savingResult = true;
+
+        // Save to backend
+        this.leagueService.updateMatchResult(
+            this.league.id,
+            this.selectedMatch.id,
+            this.matchResult
+        ).subscribe({
+            next: () => {
+                this.savingResult = false;
+                this.closeResultModal();
+                this.loadLeague(this.league!.id);
+            },
+            error: (err) => {
+                this.savingResult = false;
+                console.error('Error saving result:', err);
+                const msg = err.error?.message || err.message || 'Error desconocido';
+                alert(`Error al guardar el resultado: ${msg}`);
+            }
+        });
+    }
 
     // Filters
     selectedRound: number = 0;
@@ -395,83 +447,54 @@ export class LeagueDashboardComponent implements OnInit {
         return player?.name || 'Desconocido';
     }
 
-    saveMatchResult() {
-        if (!this.selectedMatch || !this.league) return;
 
-        // Validate result
-        const validation = this.leagueService.validateMatchResult(
-            this.matchResult,
-            this.league.config
-        );
 
-        if (!validation.valid) {
-            alert(validation.error);
-            return;
-        }
+    // Confirmation Modals
+    showScheduleConfirmationModal = false;
 
-        // Calculate winner
-        let pairAWins = 0;
-        let pairBWins = 0;
-        this.matchResult.sets.forEach(set => {
-            if (set.pairAGames > set.pairBGames) pairAWins++;
-            else pairBWins++;
-        });
+    generateSchedule() {
+        if (!this.league) return;
+        this.showScheduleConfirmationModal = true;
+    }
 
-        this.matchResult.winnerPairId = pairAWins > pairBWins
-            ? this.selectedMatch.pairA.id
-            : this.selectedMatch.pairB.id;
+    closeScheduleConfirmationModal() {
+        this.showScheduleConfirmationModal = false;
+    }
 
-        // Debug
-        console.log('Saving result:', {
-            matchId: this.selectedMatch.id,
-            winnerId: this.matchResult.winnerPairId,
-            pairAId: this.selectedMatch.pairA.id,
-            pairBId: this.selectedMatch.pairB.id,
-            sets: this.matchResult.sets
-        });
+    confirmGenerateSchedule() {
+        if (!this.league) return;
+        this.closeScheduleConfirmationModal();
+        this.loading = true; // Show loading indicator
 
-        // Save to backend
-        this.leagueService.updateMatchResult(
-            this.league.id,
-            this.selectedMatch.id,
-            this.matchResult
-        ).subscribe({
+        this.leagueService.generateSchedule(this.league.id).subscribe({
             next: () => {
-                alert('Resultado guardado exitosamente');
-                this.closeResultModal();
                 this.loadLeague(this.league!.id);
+                // Optional: Show success toast/modal if needed, but UI update is usually enough
             },
             error: (err) => {
-                console.error('Error saving result:', err);
-                const msg = err.error?.message || err.message || 'Error desconocido';
-                alert(`Error al guardar el resultado: ${msg}`);
+                console.error('Error generating schedule:', err);
+                this.loading = false;
+                alert('Error al generar calendario'); // Keeping this alert for now as error fallback
             }
         });
     }
 
-    generateSchedule() {
-        if (!this.league) return;
-
-        if (confirm('¿Generar calendario automático? Esto creará todos los partidos de la liga.')) {
-            this.leagueService.generateSchedule(this.league.id).subscribe({
-                next: () => {
-                    alert('Calendario generado exitosamente');
-                    this.loadLeague(this.league!.id);
-                },
-                error: (err) => {
-                    console.error('Error generating schedule:', err);
-                    alert('Error al generar calendario');
-                }
-            });
-        }
-    }
+    // Suggestion Modal
+    showSuggestionModal = false;
+    suggestedMatch: any = null;
 
     suggestNextMatch() {
         if (!this.league) return;
 
         this.leagueService.suggestNextMatch(this.league.id).subscribe({
-            next: (match) => {
-                alert(`Próximo partido sugerido:\n${match.pairA.playerA.name} / ${match.pairA.playerB.name}\nvs\n${match.pairB.playerA.name} / ${match.pairB.playerB.name}`);
+            next: (match: any) => {
+                // Normalize backend response to frontend format if needed
+                if (!match.pairA && match.team1) {
+                    match.pairA = match.team1;
+                    match.pairB = match.team2;
+                }
+                this.suggestedMatch = match;
+                this.showSuggestionModal = true;
             },
             error: (err) => {
                 console.error('Error suggesting match:', err);
@@ -480,8 +503,14 @@ export class LeagueDashboardComponent implements OnInit {
         });
     }
 
+    closeSuggestionModal() {
+        this.showSuggestionModal = false;
+        this.suggestedMatch = null;
+    }
+
     getMatchStatus(status: string): string {
         const labels: Record<string, string> = {
+            'pending': 'Pendiente',
             'scheduled': 'Programado',
             'in_progress': 'En curso',
             'completed': 'Completado',

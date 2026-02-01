@@ -72,6 +72,7 @@ import { Club } from '../../../models/club.model';
             display: flex;
             flex-direction: column;
             padding: 1.5rem;
+            padding-top: calc(1.5rem + var(--sat)); /* Safe area support */
             position: fixed;
             left: 0;
             top: 0;

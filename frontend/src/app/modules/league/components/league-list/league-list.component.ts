@@ -59,13 +59,37 @@ export class LeagueListComponent implements OnInit {
         }
     }
 
+    // Delete Confirmation Modal
+    showDeleteModal = false;
+    leagueToDelete: string | null = null;
+    deleting = false;
+
     deleteLeague(id: string) {
-        if (confirm('¿Estás seguro de eliminar esta liga? Se eliminarán todos los partidos y resultados.')) {
-            this.leagueService.deleteLeague(id).subscribe({
-                next: () => this.loadLeagues(),
-                error: (err) => console.error('Error deleting league:', err)
-            });
-        }
+        this.leagueToDelete = id;
+        this.showDeleteModal = true;
+    }
+
+    closeDeleteModal() {
+        this.showDeleteModal = false;
+        this.leagueToDelete = null;
+    }
+
+    confirmDelete() {
+        if (!this.leagueToDelete) return;
+
+        this.deleting = true;
+        this.leagueService.deleteLeague(this.leagueToDelete).subscribe({
+            next: () => {
+                this.deleting = false;
+                this.closeDeleteModal();
+                this.loadLeagues();
+            },
+            error: (err) => {
+                console.error('Error deleting league:', err);
+                this.deleting = false;
+                // Optional: show error toast here if desired
+            }
+        });
     }
 
     getTypeLabel(type: string): string {

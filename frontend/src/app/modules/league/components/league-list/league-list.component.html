@@ -77,3 +77,25 @@
         </div>
     </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>Eliminar Liga</h2>
+            <button class="modal-close" (click)="closeDeleteModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <p>¿Estás seguro de que deseas eliminar esta liga?</p>
+            <p class="text-sm text-gray-400 mt-2">Esta acción no se puede deshacer. Se eliminarán permanentemente todos
+                los partidos, resultados y estadísticas asociadas.</p>
+        </div>
+        <div class="modal-footer">
+            <button (click)="closeDeleteModal()" class="btn btn-secondary" [disabled]="deleting">Cancelar</button>
+            <button (click)="confirmDelete()" class="btn btn-danger" [disabled]="deleting">
+                <span *ngIf="deleting">⏳ Eliminando...</span>
+                <span *ngIf="!deleting">🗑️ Eliminar Liga</span>
+            </button>
+        </div>
+    </div>
+</div>

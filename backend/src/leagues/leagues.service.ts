@@ -364,23 +364,29 @@ export class LeaguesService {
     }
 
     async generateFixtures(id: string): Promise<LeagueMatch[]> {
+        console.log(`Generating fixtures for league ${id}`);
         const league = await this.findOne(id);
+        console.log(`League found: ${league.id}, type: ${league.type}, teams: ${league.teams.length}`);
 
         if (league.teams.length < 2) {
+            console.error('Not enough teams');
             throw new Error('Not enough teams to generate fixtures');
         }
 
         const matches: LeagueMatch[] = [];
 
         if (league.type === 'round_robin') {
+            console.log('Generating Round Robin matches...');
             this.generateRoundRobinMatches(league.teams, matches, id);
         } else if (league.type === 'groups_playoff') {
+            console.log('Generating Groups Playoff matches...');
             const groups = league.config.groups || [];
             if (groups.length === 0) {
                 const teamGroups = new Set(league.teams.map(t => t.group).filter(g => !!g));
 
                 // Auto-generate groups if not assigned
                 if (teamGroups.size === 0) {
+                    console.log('Auto-generating groups...');
                     await this.generateGroups(id, league.config.numberOfGroups || 2);
                     // Refresh league with new groups
                     const updatedLeague = await this.findOne(id);
@@ -400,7 +406,15 @@ export class LeaguesService {
             }
         }
 
-        return this.leagueMatchRepository.save(matches);
+        console.log(`Saving ${matches.length} matches...`);
+        try {
+            const saved = await this.leagueMatchRepository.save(matches);
+            console.log('Matches saved successfully');
+            return saved;
+        } catch (error) {
+            console.error('Error saving matches:', error);
+            throw error;
+        }
     }
 
     private generateRoundRobinMatches(teams: LeagueTeam[], matches: LeagueMatch[], leagueId: string, group?: string) {
@@ -412,6 +426,8 @@ export class LeaguesService {
         const workingTeams = ghost ? [...teams, null] : [...teams];
         const totalRounds = workingTeams.length - 1;
         const matchesPerRound = workingTeams.length / 2;
+
+        console.log(`RR: ${numTeams} teams (ghost=${ghost}), ${totalRounds} rounds`);
 
         for (let round = 0; round < totalRounds; round++) {
             for (let match = 0; match < matchesPerRound; match++) {
@@ -432,7 +448,7 @@ export class LeaguesService {
             // Rotate
             const fixed = workingTeams[0];
             const tail = workingTeams.slice(1);
-            tail.unshift(tail.pop()!);
+            tail.unshift(tail.pop()!); // This line assumes tail is not empty.
             workingTeams.splice(0, workingTeams.length, fixed, ...tail);
         }
     }

@@ -231,7 +231,7 @@ export class LeagueCreateComponent implements OnInit {
         this.leagueService.createLeague(request).subscribe({
             next: (league: any) => {
                 this.creatingLeague = false;
-                alert('Liga creada exitosamente');
+                // alert('Liga creada exitosamente'); // Removed as per request
                 this.router.navigate(['/leagues', league.id]);
             },
             error: (err: any) => {

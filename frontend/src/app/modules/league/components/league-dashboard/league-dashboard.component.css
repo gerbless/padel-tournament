@@ -822,4 +822,4 @@
 
 .set-label {
     font-size: 1.1rem;
-}
+}.btn:disabled, .btn[disabled] { opacity: 0.5; cursor: not-allowed; pointer-events: none; filter: grayscale(100%); }

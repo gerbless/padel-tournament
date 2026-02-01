@@ -19,8 +19,10 @@
         </div>
 
         <div class="header-actions">
-            <button (click)="generateSchedule()" class="btn btn-secondary"
-                *ngIf="league.status === 'draft' || !league.matches || league.matches.length === 0">
+            <!-- Generate Schedule: Disabled if matches exist, Visible only in draft -->
+            <button (click)="generateSchedule()" class="btn btn-secondary" *ngIf="league.status === 'draft'"
+                [disabled]="league.matches && league.matches.length > 0"
+                [title]="league.matches && league.matches.length > 0 ? 'El calendario ya ha sido generado' : 'Generar calendario'">
                 📅 Generar Calendario
             </button>
             <button (click)="suggestNextMatch()" class="btn btn-primary"
@@ -30,8 +32,9 @@
             <button (click)="generateTieBreaker()" class="btn btn-warning" *ngIf="hasTies">
                 ⚖️ Resolución de Empate
             </button>
+            <!-- Complete League: Visible only when all matches are completed -->
             <button (click)="confirmCompleteLeague()" class="btn btn-danger"
-                *ngIf="league.status !== 'completed' && league.matches && league.matches.length > 0">
+                *ngIf="league.status !== 'completed' && league.matches && league.matches.length > 0 && completedMatchesCount === league.matches.length">
                 🏁 Finalizar Liga
             </button>
         </div>
@@ -370,8 +373,67 @@
         </div>
 
         <div class="modal-footer">
-            <button (click)="closeResultModal()" class="btn btn-secondary">Cancelar</button>
-            <button (click)="saveMatchResult()" class="btn btn-success">Guardar Resultado</button>
+            <button (click)="closeResultModal()" class="btn btn-secondary" [disabled]="savingResult">Cancelar</button>
+            <button (click)="saveMatchResult()" class="btn btn-success" [disabled]="savingResult">
+                <span *ngIf="savingResult">⏳ Guardando...</span>
+                <span *ngIf="!savingResult">Guardar Resultado</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Generate Schedule Confirmation Modal -->
+<div class="modal-overlay" *ngIf="showScheduleConfirmationModal" (click)="closeScheduleConfirmationModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>Generar Calendario</h2>
+            <button class="modal-close" (click)="closeScheduleConfirmationModal()">×</button>
+        </div>
+
+        <div class="modal-body">
+            <p>¿Estás seguro de que deseas generar el calendario automático?</p>
+            <p class="text-sm text-gray-600 mt-2">Esta acción creará todos los partidos de la liga basándose en los
+                equipos registrados. Asegúrate de tener todos los equipos inscritos antes de continuar.</p>
+        </div>
+
+        <div class="modal-footer">
+            <button (click)="closeScheduleConfirmationModal()" class="btn btn-secondary">Cancelar</button>
+            <button (click)="confirmGenerateSchedule()" class="btn btn-primary">Generar Calendario</button>
+        </div>
+    </div>
+</div>
+
+<!-- Suggested Match Modal -->
+<div class="modal-overlay" *ngIf="showSuggestionModal" (click)="closeSuggestionModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>💡 Partido Sugerido</h2>
+            <button class="modal-close" (click)="closeSuggestionModal()">×</button>
+        </div>
+
+        <div class="modal-body text-center" *ngIf="suggestedMatch">
+            <p class="mb-4 text-gray-400">Basado en la clasificación actual, este es el partido más competitivo
+                disponible:</p>
+
+            <div class="match-teams">
+                <div class="team">
+                    <div class="pair-name">{{ getPairName(suggestedMatch.pairA) }}</div>
+                </div>
+                <div class="vs">VS</div>
+                <div class="team">
+                    <div class="pair-name">{{ getPairName(suggestedMatch.pairB) }}</div>
+                </div>
+            </div>
+
+            <div class="match-meta mt-4">
+                <span class="badge badge-info">Ronda {{ suggestedMatch.round }}</span>
+                <span class="text-sm text-gray-500 ml-2" *ngIf="suggestedMatch.group">Grupo {{ suggestedMatch.group
+                    }}</span>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button (click)="closeSuggestionModal()" class="btn btn-primary">Entendido</button>
         </div>
     </div>
 </div>

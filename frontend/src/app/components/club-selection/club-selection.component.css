@@ -18,7 +18,6 @@
 .hero-title {
     font-size: 3rem;
     font-weight: 800;
-    margin: 0 0 1rem 0;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -129,7 +128,7 @@
 .clubs-section {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 3rem 2rem;
+    padding: 0.5rem 2rem;
 }
 
 .section-header {
@@ -259,6 +258,11 @@
         font-size: 2rem;
     }
 
+    .hero-section {
+        padding-top: calc(2rem + var(--sat));
+        /* Safe area top */
+    }
+
     .section-header {
         flex-direction: column;
         align-items: stretch;
@@ -302,6 +306,8 @@
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 0.9rem;
+    min-height: 44px;
+    /* Touch target */
 }
 
 .btn-outline:hover {
@@ -311,6 +317,13 @@
 
 .global-stats-card-wrapper {
     padding: 2rem 2rem 4rem 2rem;
+    padding-bottom: calc(4rem + var(--sab));
+    /* Safe area bottom */
     background: rgba(0, 0, 0, 0.1);
     /* Slight separation background */
+}
+
+.club-card:active {
+    transform: scale(0.98);
+    background: var(--bg-tertiary);
 }

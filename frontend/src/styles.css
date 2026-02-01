@@ -58,6 +58,14 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
 }
 
+/* Safe Area Insets (Native App Feel) */
+:root {
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+}
+
 /* Spacing */
 :root {
   --spacing-xs: 0.25rem;
@@ -93,6 +101,37 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, color 0.3s ease;
+
+  /* Mobile Optimizations */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  /* Prevent pull-to-refresh if desired, gives app feel */
+}
+
+/* Hide Scrollbar for App-like feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.8);
+}
+
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    display: none;
+    /* Completely hide on mobile for cleanliness */
+  }
 }
 
 /* Dark mode gradient background */
@@ -159,19 +198,31 @@ h3 {
 }
 
 /* Buttons */
+/* Buttons */
 .btn {
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   padding: 0.75rem 1.5rem;
+  /* Touch target size optimization */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  text-decoration: none;
   border-radius: var(--radius-md);
   border: none;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: 1rem;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  text-decoration: none;
+  user-select: none;
+  /* Prevent text selection on long press */
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.btn:active {
+  transform: scale(0.96);
 }
 
 .btn-primary {
@@ -211,6 +262,8 @@ h3 {
 .input {
   width: 100%;
   padding: 0.75rem 1rem;
+  min-height: 44px;
+  /* Touch target */
   background: var(--bg-tertiary);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);

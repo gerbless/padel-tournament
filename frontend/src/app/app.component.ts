@@ -60,6 +60,16 @@ import { filter } from 'rxjs/operators';
             align-items: center;
             gap: 1rem;
             margin-bottom: 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 90;
+            background: rgba(255, 255, 255, 0.85); /* Fallback */
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: calc(0.5rem + var(--sat)) 1rem 0.5rem 1rem; /* Top padding adds safe area */
+            margin: -2rem -2rem 1.5rem -2rem; /* Negative margin to stretch full width of container padding */
+            border-bottom: 1px solid var(--glass-border);
         }
 
         .menu-fab {
@@ -73,30 +83,50 @@ import { filter } from 'rxjs/operators';
             align-items: center;
             justify-content: center;
             font-size: 1.2rem;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             cursor: pointer;
+            flex-shrink: 0;
         }
 
         .mobile-title {
-            font-weight: bold;
-            font-size: 1.2rem;
+            font-weight: 800;
+            font-size: 1.25rem;
             color: var(--text-primary);
+            letter-spacing: -0.025em;
+        }
+
+        /* Theme Toggle Adjustment for Safe Area */
+        .theme-toggle {
+            bottom: calc(2rem + var(--sab)); /* Safe area bottom supported */
+            right: 2rem;
         }
 
         @media (max-width: 768px) {
             .main-content {
                 margin-left: 0;
-                padding: 1rem;
-                padding-bottom: 80px;
+                padding: 0; /* Reset padding, manage inside */
+                padding-bottom: calc(80px + var(--sab));
                 width: 100%;
             }
-            .main-content.expanded {
-                margin-left: 0;
+            
+            /* Content wrapper inside main for padding if needed, or apply directly */
+            .main-content > router-outlet + * {
+                 /* This selector is tricky, better to just padding the container elements in pages 
+                    OR add padding to router-outlet wrapper if one existed.
+                    But waiting, the styling above had padding: 2rem initially.
+                    Let's restore some padding but keep header full width.
+                 */
+            }
+            
+            .mobile-header {
+                display: flex;
+                margin: 0; /* Reset negative margins as we removed parent padding */
                 width: 100%;
             }
 
-            .mobile-header {
-                display: flex;
+            .main-content.expanded {
+                margin-left: 0;
+                width: 100%;
             }
         }
     `]
