@@ -18,7 +18,7 @@
             </div>
         </div>
 
-        <div class="header-actions">
+        <div class="header-actions" *ngIf="isLoggedIn">
             <!-- Generate Schedule: Disabled if matches exist, Visible only in draft -->
             <button (click)="generateSchedule()" class="btn btn-secondary" *ngIf="league.status === 'draft'"
                 [disabled]="league.matches && league.matches.length > 0"
@@ -205,7 +205,7 @@
                     <span *ngIf="match.scheduledAt" class="match-date">
                         📅 {{ match.scheduledAt | date:'short' }}
                     </span>
-                    <button *ngIf="match.status !== 'completed' && league.status !== 'completed'"
+                    <button *ngIf="match.status !== 'completed' && league.status !== 'completed' && isLoggedIn"
                         (click)="openResultModal(match)" class="btn btn-sm btn-primary">
                         Ingresar Resultado
                     </button>

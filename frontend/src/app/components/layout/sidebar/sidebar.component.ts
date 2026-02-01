@@ -4,6 +4,7 @@ import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { LayoutService } from '../../../services/layout.service';
 import { ClubService } from '../../../services/club.service';
 import { Club } from '../../../models/club.model';
+import { AuthService } from '../../../services/auth.service';
 
 @Component({
     selector: 'app-sidebar',
@@ -57,8 +58,20 @@ import { Club } from '../../../models/club.model';
             </a>
         </nav>
 
-        <div class="footer" *ngIf="!isCollapsed">
-            <p>v1.2.0</p>
+        <div class="footer">
+            <div *ngIf="!isCollapsed">
+                <p>v1.2.0</p>
+            </div>
+            <div class="auth-buttons" style="margin-top: 10px; width: 100%;">
+                 <a *ngIf="!isLoggedIn" routerLink="/login" class="nav-item" (click)="closeMobileMenu()" style="color: var(--primary); justify-content: center;">
+                    <span class="label" *ngIf="!isCollapsed">Iniciar Sesión</span>
+                    <span class="icon" *ngIf="isCollapsed">🔐</span>
+                </a>
+                 <a *ngIf="isLoggedIn" (click)="logout()" class="nav-item" style="color: var(--error); cursor: pointer; justify-content: center;">
+                    <span class="label" *ngIf="!isCollapsed">Cerrar Sesión</span>
+                    <span class="icon" *ngIf="isCollapsed">🚪</span>
+                </a>
+            </div>
         </div>
     </aside>
     `,
@@ -280,9 +293,12 @@ export class SidebarComponent implements OnInit {
     isMobileOpen = false;
     selectedClub: Club | null = null;
 
+    isLoggedIn = false;
+
     constructor(
         private layoutService: LayoutService,
         private clubService: ClubService,
+        private authService: AuthService,
         private router: Router
     ) {
         this.layoutService.sidebarCollapsed$.subscribe(
@@ -291,12 +307,20 @@ export class SidebarComponent implements OnInit {
         this.layoutService.mobileMenuOpen$.subscribe(
             (open: boolean) => this.isMobileOpen = open
         );
+        this.authService.currentUser$.subscribe((user: any) => {
+            this.isLoggedIn = !!user;
+        });
     }
 
     ngOnInit() {
         this.clubService.selectedClub$.subscribe(club => {
             this.selectedClub = club;
         });
+    }
+
+    logout() {
+        this.authService.logout();
+        this.router.navigate(['/']);
     }
 
     toggleSidebar() {

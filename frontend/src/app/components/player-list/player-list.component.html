@@ -1,12 +1,10 @@
 <div class="container fade-in">
     <div class="flex-between mb-4">
         <h1>👥 Gestión de Jugadores</h1>
-        <button class="btn btn-primary" (click)="openCreateModal()">
+        <button class="btn btn-primary" (click)="openCreateModal()" *ngIf="isLoggedIn">
             + Nuevo Jugador
         </button>
     </div>
-
-
 
     <!-- Player List -->
     <div *ngIf="loading" class="flex-center" style="min-height: 200px;">
@@ -121,9 +119,6 @@
                                     </span>
                                     <i class="fas fa-chevron-down text-muted" style="font-size: 0.7rem;"></i>
                                 </div>
-
-
-                                <!-- Dropdown Menu (Removed - using Global Modal at bottom) -->
                             </div>
                         </td>
                         <td class="text-center" data-label="Pts. Liga">{{ player.leaguePoints || 0 }}</td>
@@ -131,14 +126,16 @@
                         <td class="text-right" data-label="Acciones">
                             <div *ngIf="editingPlayerId !== player.id"
                                 style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-                                <button class="btn btn-sm btn-secondary btn-icon" (click)="startEditing(player)"
-                                    title="Editar categoría y posición">
-                                    ✏️
-                                </button>
-                                <button class="btn btn-sm btn-danger btn-icon" (click)="deletePlayer(player)"
-                                    title="Eliminar jugador">
-                                    🗑️
-                                </button>
+                                <ng-container *ngIf="isLoggedIn">
+                                    <button class="btn btn-sm btn-secondary btn-icon" (click)="startEditing(player)"
+                                        title="Editar categoría y posición">
+                                        ✏️
+                                    </button>
+                                    <button class="btn btn-sm btn-danger btn-icon" (click)="deletePlayer(player)"
+                                        title="Eliminar jugador">
+                                        🗑️
+                                    </button>
+                                </ng-container>
                             </div>
                             <div *ngIf="editingPlayerId === player.id"
                                 style="display: flex; gap: 0.5rem; justify-content: flex-end;">

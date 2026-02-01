@@ -5,6 +5,8 @@ import { TournamentService, Tournament } from '../../services/tournament.service
 import { ClubService } from '../../services/club.service';
 import { Subscription } from 'rxjs';
 
+import { AuthService } from '../../services/auth.service';
+
 @Component({
     selector: 'app-tournament-list',
     standalone: true,
@@ -16,14 +18,17 @@ export class TournamentListComponent implements OnInit, OnDestroy {
     tournaments: Tournament[] = [];
     loading = true;
     currentClubName: string = '';
+    isLoggedIn = false;
     private clubSubscription?: Subscription;
 
     constructor(
         private tournamentService: TournamentService,
-        private clubService: ClubService
+        private clubService: ClubService,
+        private authService: AuthService
     ) { }
 
     ngOnInit() {
+        this.isLoggedIn = this.authService.isAuthenticated();
         // Subscribe to selected club and reload tournaments when it changes
         this.clubSubscription = this.clubService.selectedClub$.subscribe(club => {
             this.currentClubName = club?.name || 'Todos los clubs';

@@ -5,6 +5,8 @@ import { FormsModule } from '@angular/forms';
 import { LeagueService } from '../../services/league.service';
 import { League, Match, MatchResult, SetScore, Pair } from '../../../../models/league.model';
 
+import { AuthService } from '../../../../services/auth.service';
+
 @Component({
     selector: 'app-league-dashboard',
     standalone: true,
@@ -16,6 +18,7 @@ export class LeagueDashboardComponent implements OnInit {
     league: League | null = null;
     loading = true;
     activeTab: 'matches' | 'standings' | 'config' = 'matches';
+    isLoggedIn = false;
 
     // Match result modal
     showResultModal = false;
@@ -90,10 +93,12 @@ export class LeagueDashboardComponent implements OnInit {
     constructor(
         private route: ActivatedRoute,
         private router: Router,
-        private leagueService: LeagueService
+        private leagueService: LeagueService,
+        private authService: AuthService
     ) { }
 
     ngOnInit() {
+        this.isLoggedIn = this.authService.isAuthenticated();
         const id = this.route.snapshot.paramMap.get('id');
         if (id) {
             this.loadLeague(id);

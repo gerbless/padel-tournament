@@ -4,6 +4,8 @@ import { RouterLink } from '@angular/router';
 import { LeagueService } from '../../services/league.service';
 import { League } from '../../../../models/league.model';
 
+import { AuthService } from '../../../../services/auth.service';
+
 @Component({
     selector: 'app-league-list',
     standalone: true,
@@ -14,22 +16,27 @@ import { League } from '../../../../models/league.model';
 export class LeagueListComponent implements OnInit {
     leagues: League[] = [];
     loading = false;
+    isLoggedIn = false;
 
-    constructor(private leagueService: LeagueService) { }
+    constructor(
+        private leagueService: LeagueService,
+        private authService: AuthService
+    ) { }
 
     ngOnInit() {
+        this.isLoggedIn = this.authService.isAuthenticated();
         this.loadLeagues();
     }
 
     loadLeagues() {
         this.loading = true;
         this.leagueService.getLeagues().subscribe({
-            next: (leagues) => {
-                leagues.forEach(league => this.normalizePairs(league));
+            next: (leagues: League[]) => {
+                leagues.forEach((league: League) => this.normalizePairs(league));
                 this.leagues = leagues;
                 this.loading = false;
             },
-            error: (err) => {
+            error: (err: any) => {
                 console.error('Error loading leagues:', err);
                 this.loading = false;
             }
@@ -84,7 +91,7 @@ export class LeagueListComponent implements OnInit {
                 this.closeDeleteModal();
                 this.loadLeagues();
             },
-            error: (err) => {
+            error: (err: any) => {
                 console.error('Error deleting league:', err);
                 this.deleting = false;
                 // Optional: show error toast here if desired

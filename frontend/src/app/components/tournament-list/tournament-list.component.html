@@ -6,7 +6,7 @@
         📍 Club: <strong>{{ currentClubName }}</strong>
       </p>
     </div>
-    <a routerLink="/tournaments/create" class="btn btn-primary">
+    <a routerLink="/tournaments/create" class="btn btn-primary" *ngIf="isLoggedIn">
       ➕ Crear Torneo
     </a>
   </div>
@@ -46,8 +46,8 @@
         <a [routerLink]="['/tournaments', tournament.id]" class="btn btn-primary" style="flex: 1;">
           Ver Torneo
         </a>
-        <button *ngIf="tournament.status !== 'completed'" (click)="deleteTournament(tournament.id, $event)"
-          class="btn btn-danger">
+        <button *ngIf="tournament.status !== 'completed' && isLoggedIn"
+          (click)="deleteTournament(tournament.id, $event)" class="btn btn-danger">
           🗑️
         </button>
       </div>

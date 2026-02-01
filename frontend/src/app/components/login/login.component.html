@@ -1,0 +1,31 @@
+<div class="login-container fade-in">
+    <div class="login-card">
+        <div class="logo">
+            🎾 PADEL MGR
+        </div>
+        <h2>Iniciar Sesión</h2>
+
+        <form (ngSubmit)="login()">
+            <div class="form-group">
+                <label for="username">Usuario</label>
+                <input type="text" id="username" [(ngModel)]="username" name="username" class="form-control"
+                    placeholder="admin" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" [(ngModel)]="password" name="password" class="form-control"
+                    placeholder="admin123" required>
+            </div>
+
+            <div *ngIf="error" class="error-message">
+                {{ error }}
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" [disabled]="loading">
+                <span *ngIf="loading">Cargando...</span>
+                <span *ngIf="!loading">Ingresar</span>
+            </button>
+        </form>
+    </div>
+</div>

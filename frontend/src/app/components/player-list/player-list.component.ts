@@ -8,6 +8,8 @@ import { ClubService } from '../../services/club.service';
 import { Club } from '../../models/club.model';
 import { PlayerCreateModalComponent } from '../player-create-modal/player-create-modal.component';
 
+import { AuthService } from '../../services/auth.service';
+
 @Component({
     selector: 'app-player-list',
     standalone: true,
@@ -20,6 +22,7 @@ export class PlayerListComponent implements OnInit {
     loading = true;
     categories: any[] = [];
     clubs: Club[] = []; // Available clubs
+    isLoggedIn = false;
 
     // Inline editing state
     editingPlayerId: string | null = null;
@@ -42,9 +45,11 @@ export class PlayerListComponent implements OnInit {
         private playerService: PlayerService,
         private categoryService: CategoryService,
         private clubService: ClubService,
+        private authService: AuthService
     ) { }
 
     ngOnInit() {
+        this.isLoggedIn = this.authService.isAuthenticated();
         this.loadPlayers();
         this.loadCategories();
         this.loadClubs();

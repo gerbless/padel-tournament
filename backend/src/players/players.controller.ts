@@ -1,17 +1,20 @@
-import { Controller, Get, Post, Delete, Patch, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { PlayersService } from './players.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('players')
 export class PlayersController {
     constructor(private readonly playersService: PlayersService) { }
 
+    @UseGuards(JwtAuthGuard)
     @Post()
     create(@Body() createPlayerDto: CreatePlayerDto) {
         return this.playersService.create(createPlayerDto);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Post('recalculate-all')
     async recalculateAll() {
         const players = await this.playersService.findAll();
@@ -20,6 +23,7 @@ export class PlayersController {
         return { message: 'All player points recalculated successfully' };
     }
 
+    @UseGuards(JwtAuthGuard)
     @Post('migrate-club-stats')
     async migrateClubStats() {
         const players = await this.playersService.findAll();
@@ -79,11 +83,13 @@ export class PlayersController {
         return this.playersService.findOne(id);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Patch(':id')
     update(@Param('id') id: string, @Body() updatePlayerDto: UpdatePlayerDto) {
         return this.playersService.update(id, updatePlayerDto);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Delete(':id')
     remove(@Param('id') id: string) {
         return this.playersService.remove(id);

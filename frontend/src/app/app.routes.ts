@@ -11,8 +11,11 @@ import { LeagueCreateComponent } from './modules/league/components/league-create
 import { LeagueDashboardComponent } from './modules/league/components/league-dashboard/league-dashboard.component';
 import { ClubSelectionComponent } from './components/club-selection/club-selection.component';
 
+import { LoginComponent } from './components/login/login.component';
+
 export const routes: Routes = [
     { path: '', component: ClubSelectionComponent },
+    { path: 'login', component: LoginComponent },
     { path: 'dashboard', component: DashboardComponent },
     { path: 'tournaments', component: TournamentListComponent },
     { path: 'tournaments/create', component: TournamentCreateComponent },
