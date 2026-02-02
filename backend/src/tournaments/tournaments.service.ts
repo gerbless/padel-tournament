@@ -11,8 +11,10 @@ export interface Standing {
     teamId: string;
     player1Name: string;
     player2Name: string;
+    matchesPlayed: number;
     matchesWon: number;
     matchesLost: number;
+    matchesDrawn: number;
     setsWon: number;
     setsLost: number;
     setDifference: number;
@@ -50,7 +52,8 @@ export class TournamentsService {
             name,
             type,
             status: TournamentStatus.IN_PROGRESS,
-            clubId: createTournamentDto.clubId || null // Ensure null if undefined/empty
+            clubId: createTournamentDto.clubId || null, // Ensure null if undefined/empty
+            config: createTournamentDto.config || { strictScoring: false, allowTies: true } // Default to flexible if not specified
         });
 
         let savedTournament: Tournament;
@@ -147,8 +150,10 @@ export class TournamentsService {
                 teamId: team.id,
                 player1Name: team.player1Name,
                 player2Name: team.player2Name,
+                matchesPlayed: 0,
                 matchesWon: 0,
                 matchesLost: 0,
+                matchesDrawn: 0,
                 setsWon: 0,
                 setsLost: 0,
                 setDifference: 0,
@@ -177,7 +182,7 @@ export class TournamentsService {
 
                 if (t1Games > t2Games) {
                     team1SetsWon++;
-                } else {
+                } else if (t2Games > t1Games) {
                     team2SetsWon++;
                 }
                 team1GamesTotal += t1Games;
@@ -194,12 +199,18 @@ export class TournamentsService {
             team2Stats.gamesWon += team2GamesTotal;
             team2Stats.gamesLost += team1GamesTotal;
 
+            team1Stats.matchesPlayed++;
+            team2Stats.matchesPlayed++;
+
             if (match.winnerId === match.team1Id) {
                 team1Stats.matchesWon++;
                 team2Stats.matchesLost++;
             } else if (match.winnerId === match.team2Id) {
                 team2Stats.matchesWon++;
                 team1Stats.matchesLost++;
+            } else if (match.winnerId === null && match.status === MatchStatus.COMPLETED) {
+                team1Stats.matchesDrawn++;
+                team2Stats.matchesDrawn++;
             }
         });
 

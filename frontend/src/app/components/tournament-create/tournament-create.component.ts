@@ -35,6 +35,10 @@ export class TournamentCreateComponent implements OnInit, OnDestroy {
         this.tournamentForm = this.fb.group({
             name: ['', [Validators.required, Validators.minLength(3)]],
             type: ['cuadrangular', Validators.required],
+            config: this.fb.group({
+                strictScoring: [false], // Defaults to flexible as per user preference
+                allowTies: [true]       // Defaults to allowing ties
+            }),
             teams: this.fb.array([])
         });
     }

@@ -41,10 +41,13 @@ export class MatchesService {
         const { sets } = updateMatchScoreDto;
 
         // Validate sets
-        this.validateSets(sets);
+        const config = match.tournament?.config || { strictScoring: false, allowTies: true };
+
+        // Validate sets
+        this.validateSets(sets, config.strictScoring ?? false);
 
         // Calculate winner
-        const winnerId = this.calculateMatchWinner(sets, match.team1Id, match.team2Id);
+        const winnerId = this.calculateMatchWinner(sets, match.team1Id, match.team2Id, config.allowTies ?? true);
 
         // Update match using direct update to avoid relation conflicts with save()
         await this.matchRepository.update(id, {
@@ -58,7 +61,7 @@ export class MatchesService {
         return this.findOne(id);
     }
 
-    private validateSets(sets: SetResult[]): void {
+    private validateSets(sets: SetResult[], strictMode: boolean): void {
         if (sets.length === 0 || sets.length > 3) {
             throw new BadRequestException('A match must have 1 to 3 sets');
         }
@@ -71,56 +74,55 @@ export class MatchesService {
                 throw new BadRequestException(`Set ${index + 1}: Games cannot be negative`);
             }
 
-            // Normal set: must win by 2, minimum 6 games
-            const maxGames = Math.max(team1Games, team2Games);
-            const minGames = Math.min(team1Games, team2Games);
-            const diff = maxGames - minGames;
+            if (strictMode) {
+                // Strict validation logic re-implemented
+                const maxGames = Math.max(team1Games, team2Games);
+                const minGames = Math.min(team1Games, team2Games);
+                const diff = maxGames - minGames;
 
-            // Check for tie-break scenario (6-6 -> 7-6 or higher)
-            if (team1Games === 6 && team2Games === 6) {
-                throw new BadRequestException(
-                    `Set ${index + 1}: At 6-6, must play a tie-break (enter 7-6 or 6-7 with tiebreak score)`
-                );
-            }
-
-            // Tie-break set (7-6 or 6-7)
-            if ((team1Games === 7 && team2Games === 6) || (team1Games === 6 && team2Games === 7)) {
-                if (!tiebreak) {
-                    throw new BadRequestException(`Set ${index + 1}: Tie-break score required for 7-6 or 6-7 result`);
-                }
-                if (tiebreak.team1Points < 0 || tiebreak.team2Points < 0) {
-                    throw new BadRequestException(`Set ${index + 1}: Tie-break points cannot be negative`);
-                }
-                const maxPoints = Math.max(tiebreak.team1Points, tiebreak.team2Points);
-                const minPoints = Math.min(tiebreak.team1Points, tiebreak.team2Points);
-                if (maxPoints < 7 || maxPoints - minPoints < 2) {
+                if (team1Games === 6 && team2Games === 6) {
                     throw new BadRequestException(
-                        `Set ${index + 1}: Tie-break must reach at least 7 points with 2-point difference`
+                        `Set ${index + 1}: At 6-6, must play a tie-break (enter 7-6 or 6-7 with tiebreak score)`
                     );
                 }
+
+                if ((team1Games === 7 && team2Games === 6) || (team1Games === 6 && team2Games === 7)) {
+                    if (!tiebreak) {
+                        throw new BadRequestException(`Set ${index + 1}: Tie-break score required for 7-6 or 6-7 result`);
+                    }
+                    if (tiebreak.team1Points < 0 || tiebreak.team2Points < 0) {
+                        throw new BadRequestException(`Set ${index + 1}: Tie-break points cannot be negative`);
+                    }
+                } else {
+                    if (maxGames < 6) {
+                        throw new BadRequestException(`Set ${index + 1}: Winner must have at least 6 games`);
+                    }
+                    if (maxGames === 6 && diff < 2) {
+                        throw new BadRequestException(`Set ${index + 1}: Must win by at least 2 games at 6`);
+                    }
+                    if (maxGames > 6 && diff !== 2) {
+                        throw new BadRequestException(`Set ${index + 1}: Must win by exactly 2 games when going beyond 6`);
+                    }
+                }
             } else {
-                // Normal set validation
-                if (maxGames < 6) {
-                    throw new BadRequestException(`Set ${index + 1}: Winner must have at least 6 games`);
-                }
-                if (maxGames === 6 && diff < 2) {
-                    throw new BadRequestException(`Set ${index + 1}: Must win by at least 2 games at 6`);
-                }
-                if (maxGames > 6 && diff !== 2) {
-                    throw new BadRequestException(`Set ${index + 1}: Must win by exactly 2 games when going beyond 6`);
+                // Flexible mode: just check tiebreak if provided
+                if (tiebreak) {
+                    if (tiebreak.team1Points < 0 || tiebreak.team2Points < 0) {
+                        throw new BadRequestException(`Set ${index + 1}: Tie-break points cannot be negative`);
+                    }
                 }
             }
         });
     }
 
-    private calculateMatchWinner(sets: SetResult[], team1Id: string, team2Id: string): string {
+    private calculateMatchWinner(sets: SetResult[], team1Id: string, team2Id: string, allowDraws: boolean): string | null {
         let team1SetsWon = 0;
         let team2SetsWon = 0;
 
         sets.forEach(set => {
             if (set.team1Games > set.team2Games) {
                 team1SetsWon++;
-            } else {
+            } else if (set.team2Games > set.team1Games) {
                 team2SetsWon++;
             }
         });
@@ -131,6 +133,11 @@ export class MatchesService {
             return team2Id;
         }
 
-        throw new BadRequestException('Cannot determine match winner from provided sets');
+        if (!allowDraws) {
+            throw new BadRequestException('Match ended in a draw but ties are not allowed in this tournament settings');
+        }
+
+        // Return null for draw
+        return null;
     }
 }

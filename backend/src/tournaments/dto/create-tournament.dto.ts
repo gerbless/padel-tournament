@@ -28,4 +28,13 @@ export class CreateTournamentDto {
     @IsOptional()
     @IsUUID()
     clubId?: string;
+
+    @IsOptional()
+    config?: {
+        strictScoring?: boolean;
+        allowTies?: boolean;
+        pointsForWin?: number;
+        pointsForTie?: number;
+        pointsForLoss?: number;
+    };
 }

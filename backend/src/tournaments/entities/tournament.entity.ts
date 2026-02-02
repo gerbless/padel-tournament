@@ -47,6 +47,15 @@ export class Tournament {
     @Column({ nullable: true })
     clubId: string;
 
+    @Column({ type: 'jsonb', nullable: true })
+    config: {
+        strictScoring?: boolean;
+        allowTies?: boolean;
+        pointsForWin?: number;
+        pointsForTie?: number;
+        pointsForLoss?: number;
+    };
+
     @CreateDateColumn()
     createdAt: Date;
 

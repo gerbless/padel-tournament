@@ -124,8 +124,16 @@ export class TournamentDetailComponent implements OnInit {
         const set = this.sets.at(index);
         const g1 = set.get('team1Games')?.value;
         const g2 = set.get('team2Games')?.value;
+
         // Tie-break needed if 6-6, 7-6, 6-7
-        return (g1 == 6 && g2 == 6) || (g1 == 7 && g2 == 6) || (g1 == 6 && g2 == 7);
+        const isStandardTieBreak = (g1 == 6 && g2 == 6) || (g1 == 7 && g2 == 6) || (g1 == 6 && g2 == 7);
+
+        if (this.tournament?.config?.strictScoring === false && g1 == 6 && g2 == 6) {
+            // In flexible mode, 6-6 is treated as a valid draw, so tiebreak inputs are optional/hidden unless score becomes 7-6
+            return false;
+        }
+
+        return isStandardTieBreak;
     }
 
     saveScore() {

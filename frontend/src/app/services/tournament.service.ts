@@ -12,6 +12,10 @@ export interface Tournament {
     matches: Match[];
     createdAt: string;
     updatedAt: string;
+    config?: {
+        strictScoring?: boolean;
+        allowTies?: boolean;
+    };
 }
 
 export interface Team {
