@@ -55,12 +55,12 @@ export class ClubSelectionComponent implements OnInit {
 
     private calculateRanks(players: Player[]): (Player & { rank: number })[] {
         const rankedPlayers: (Player & { rank: number })[] = [];
+        let currentRank = 1;
         for (let i = 0; i < players.length; i++) {
-            let rank = i + 1;
-            if (i > 0 && players[i].totalPoints === players[i - 1].totalPoints) {
-                rank = rankedPlayers[i - 1].rank;
+            if (i > 0 && players[i].totalPoints < players[i - 1].totalPoints) {
+                currentRank++;
             }
-            rankedPlayers.push({ ...players[i], rank });
+            rankedPlayers.push({ ...players[i], rank: currentRank });
         }
         return rankedPlayers;
     }
