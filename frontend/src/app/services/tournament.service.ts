@@ -51,7 +51,9 @@ export interface Standing {
     teamId: string;
     player1Name: string; // Backend might still return this flattened in getStandings custom query? Let's check backend service.
     player2Name: string; // Checked backend TournamentsService.getStandings: it manually constructs the object.
+    matchesPlayed: number;
     matchesWon: number;
+    matchesDrawn: number;
     matchesLost: number;
     setsWon: number;
     setsLost: number;
