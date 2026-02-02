@@ -70,6 +70,7 @@
                             <th class="text-center" title="Partidos Ganados">PG</th>
                             <th class="text-center" title="Partidos Empatados">PE</th>
                             <th class="text-center" title="Partidos Perdidos">PP</th>
+                            <th class="text-center" style="color: var(--primary);">Pts</th>
                             <th class="text-center">SG</th>
                             <th class="text-center">SP</th>
                             <th class="text-center">DS</th>
@@ -94,6 +95,8 @@
                             <td data-label="PG" class="text-center">{{ standing.matchesWon }}</td>
                             <td data-label="PE" class="text-center">{{ standing.matchesDrawn }}</td>
                             <td data-label="PP" class="text-center">{{ standing.matchesLost }}</td>
+                            <td data-label="Pts" class="text-center" style="color: var(--primary); font-weight: bold;">
+                                {{ standing.points }}</td>
                             <td data-label="SG (Sets Ganados)" class="text-center">{{ standing.setsWon }}</td>
                             <td data-label="SP (Sets Perdidos)" class="text-center">{{ standing.setsLost }}</td>
                             <td data-label="DS (Dif. Sets)" class="text-center"

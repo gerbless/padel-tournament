@@ -22,6 +22,7 @@ export interface Standing {
     gamesLost: number;
     gameDifference: number;
     position: number;
+    points: number;
 }
 
 @Injectable()
@@ -161,6 +162,7 @@ export class TournamentsService {
                 gamesLost: 0,
                 gameDifference: 0,
                 position: 0,
+                points: 0,
             });
         });
 
@@ -214,19 +216,30 @@ export class TournamentsService {
             }
         });
 
-        // Calculate differences
+        // Calculate points and differences
+        const ptsWin = tournament.config?.pointsForWin ?? 3;
+        const ptsTie = tournament.config?.pointsForTie ?? 1;
+        const ptsLoss = tournament.config?.pointsForLoss ?? 0;
+
         standingsMap.forEach(standing => {
             standing.setDifference = standing.setsWon - standing.setsLost;
             standing.gameDifference = standing.gamesWon - standing.gamesLost;
+            standing.points = (standing.matchesWon * ptsWin) +
+                (standing.matchesDrawn * ptsTie) +
+                (standing.matchesLost * ptsLoss);
         });
 
         // Sort standings
         const standings = Array.from(standingsMap.values()).sort((a, b) => {
-            // 1. Matches won (descending)
+            // 1. Points (descending)
+            if (b.points !== a.points) {
+                return b.points - a.points;
+            }
+            // 2. Matches won (descending)
             if (b.matchesWon !== a.matchesWon) {
                 return b.matchesWon - a.matchesWon;
             }
-            // 2. Set difference (descending)
+            // 3. Set difference (descending)
             if (b.setDifference !== a.setDifference) {
                 return b.setDifference - a.setDifference;
             }

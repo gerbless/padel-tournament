@@ -62,6 +62,7 @@ export interface Standing {
     gamesLost: number;
     gameDifference: number;
     position: number;
+    points: number;
 }
 
 
