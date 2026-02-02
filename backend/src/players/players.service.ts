@@ -582,9 +582,21 @@ export class PlayersService {
                     // For tournaments, calculate points from matches
                     let points = 0;
                     // Logic from recalculateTotalPoints
+                    // Logic from recalculateTotalPoints
                     const checkMatch = (match: any, teamId: string) => {
                         if (match.status === 'completed') {
-                            points += (match.winner?.id === teamId) ? 3 : 1;
+                            const config = t.tournament?.config || {};
+                            const ptsWin = config.pointsForWin ?? 3;
+                            const ptsTie = config.pointsForTie ?? 1;
+                            const ptsLoss = config.pointsForLoss ?? 0;
+
+                            if (match.winner?.id === teamId) {
+                                points += ptsWin;
+                            } else if (!match.winner) {
+                                points += ptsTie;
+                            } else {
+                                points += ptsLoss;
+                            }
                         }
                     };
                     t.matchesAsTeam1?.forEach(m => checkMatch(m, t.id));
