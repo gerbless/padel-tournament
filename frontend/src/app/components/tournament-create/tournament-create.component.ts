@@ -36,8 +36,8 @@ export class TournamentCreateComponent implements OnInit, OnDestroy {
             name: ['', [Validators.required, Validators.minLength(3)]],
             type: ['cuadrangular', Validators.required],
             config: this.fb.group({
-                strictScoring: [false], // Defaults to flexible as per user preference
-                allowTies: [true]       // Defaults to allowing ties
+                scoringMode: ['flexible', Validators.required], // 'strict' | 'flexible'
+                // We map this single value to the object expected by backend on submit
             }),
             teams: this.fb.array([])
         });
@@ -235,9 +235,21 @@ export class TournamentCreateComponent implements OnInit, OnDestroy {
         }
 
         this.submitting = true;
+        const formValue = this.tournamentForm.value;
+        const scoringMode = formValue.config.scoringMode;
+
+        // Map radio selection to backend config object
+        const config = {
+            strictScoring: scoringMode === 'strict',
+            allowTies: scoringMode === 'flexible'
+        };
+
         const formData = {
-            ...this.tournamentForm.value,
-            clubId: this.currentClubId || null  // Include current club or null
+            name: formValue.name,
+            type: formValue.type,
+            teams: formValue.teams,
+            config: config,
+            clubId: this.currentClubId || undefined
         };
         this.tournamentService.createTournament(formData).subscribe({
             next: (tournament: any) => {

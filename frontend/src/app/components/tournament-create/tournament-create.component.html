@@ -28,20 +28,29 @@
             </div>
 
             <!-- Configuration Section -->
+            <!-- Configuration Section -->
             <div class="form-group" formGroupName="config"
                 style="background: rgba(var(--primary-rgb), 0.05); padding: 1rem; border-radius: 0.5rem; border: 1px solid rgba(var(--primary-rgb), 0.1);">
-                <label class="label mb-2">Reglas de Juego</label>
+                <label class="label mb-2">Reglas de Puntuación</label>
                 <div class="flex flex-col gap-2">
-                    <label class="flex items-center gap-2" style="cursor: pointer; display: flex; align-items: center;">
-                        <input type="checkbox" formControlName="strictScoring" style="width: auto; margin-right: 8px;">
+                    <label class="flex items-center gap-2"
+                        style="cursor: pointer; display: flex; align-items: flex-start;">
+                        <input type="radio" formControlName="scoringMode" value="strict"
+                            style="width: auto; margin-right: 8px; margin-top: 4px;">
                         <span>
-                            <strong>Modo Estricto</strong> (Validar 6 juegos, diferencia de 2, tie-breaks)
+                            <strong>Modo Estricto</strong><br>
+                            <span style="font-size: 0.85em; color: var(--text-secondary);">Reglas oficiales: 6 juegos
+                                para ganar, diferencia de 2, tie-break en 6-6.</span>
                         </span>
                     </label>
-                    <label class="flex items-center gap-2" style="cursor: pointer; display: flex; align-items: center;">
-                        <input type="checkbox" formControlName="allowTies" style="width: auto; margin-right: 8px;">
+                    <label class="flex items-center gap-2"
+                        style="cursor: pointer; display: flex; align-items: flex-start;">
+                        <input type="radio" formControlName="scoringMode" value="flexible"
+                            style="width: auto; margin-right: 8px; margin-top: 4px;">
                         <span>
-                            <strong>Permitir Empates</strong> (Los partidos pueden terminar igualados)
+                            <strong>Modo Flexible</strong><br>
+                            <span style="font-size: 0.85em; color: var(--text-secondary);">Permite cualquier marcador
+                                (ej. 4-2, 1-0) y empates (ej. 5-5). Ideal para torneos sociales o por tiempo.</span>
                         </span>
                     </label>
                 </div>
