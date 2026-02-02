@@ -1,0 +1,158 @@
+<div class="stats-dashboard" *ngIf="!loading && stats">
+    <!-- Header con métricas principales -->
+    <div class="stats-grid">
+        <div class="stat-card highlight">
+            <div class="stat-icon">🏆</div>
+            <div class="stat-content">
+                <div class="stat-value">{{stats.winRate | number:'1.1-1'}}%</div>
+                <div class="stat-label">Win Rate</div>
+                <div class="stat-detail">{{stats.wins}}V - {{stats.losses}}D</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">⭐</div>
+            <div class="stat-content">
+                <div class="stat-value">{{stats.currentRating}}</div>
+                <div class="stat-label">Rating Actual</div>
+                <div class="stat-detail">Inicio: 1000</div>
+            </div>
+        </div>
+
+        <div class="stat-card" [ngClass]="getStreakClass()">
+            <div class="stat-icon">{{getStreakIcon()}}</div>
+            <div class="stat-content">
+                <div class="stat-value">{{stats.currentStreak}}</div>
+                <div class="stat-label">Racha Actual</div>
+                <div class="stat-detail">{{stats.streakType === 'win' ? 'Victorias' : stats.streakType === 'loss' ?
+                    'Derrotas' : 'N/A'}}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">🎾</div>
+            <div class="stat-content">
+                <div class="stat-value">{{stats.setWinRate | number:'1.1-1'}}%</div>
+                <div class="stat-label">Win Rate Sets</div>
+                <div class="stat-detail">{{stats.setsWon}}W - {{stats.setsLost}}L</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos principales -->
+    <div class="charts-grid">
+        <div class="chart-container">
+            <canvas baseChart [data]="categoryChartData" [options]="categoryChartOptions" [type]="categoryChartType">
+            </canvas>
+        </div>
+
+        <div class="chart-container">
+            <canvas baseChart [data]="evolutionChartData" [options]="evolutionChartOptions" [type]="evolutionChartType">
+            </canvas>
+        </div>
+    </div>
+
+    <!-- Métricas adicionales -->
+    <div class="additional-stats">
+        <div class="section-title">📊 Estadísticas Detalladas</div>
+
+        <div class="detail-grid">
+            <!-- Tie-breaks -->
+            <div class="detail-card" *ngIf="stats.tieBreaksPlayed > 0">
+                <div class="detail-header">
+                    <span class="detail-icon">⚡</span>
+                    <span class="detail-name">Tie-breaks</span>
+                </div>
+                <div class="detail-stats">
+                    <div class="detail-value">{{stats.tieBreakWinRate | number:'1.0-0'}}%</div>
+                    <div class="detail-sub">{{stats.tieBreaksWon}}/{{stats.tieBreaksPlayed}}</div>
+                </div>
+            </div>
+
+            <!-- Mejor victoria -->
+            <div class="detail-card success" *ngIf="stats.bestVictory">
+                <div class="detail-header">
+                    <span class="detail-icon">🌟</span>
+                    <span class="detail-name">Mejor Victoria</span>
+                </div>
+                <div class="detail-stats">
+                    <div class="detail-value">+{{stats.bestVictory.diff}} juegos</div>
+                    <div class="detail-sub">vs {{stats.bestVictory.rivals}}</div>
+                    <div class="detail-date">{{stats.bestVictory.date | date:'d MMM'}}</div>
+                </div>
+            </div>
+
+            <!-- Peor derrota -->
+            <div class="detail-card danger" *ngIf="stats.worstDefeat">
+                <div class="detail-header">
+                    <span class="detail-icon">💔</span>
+                    <span class="detail-name">Peor Derrota</span>
+                </div>
+                <div class="detail-stats">
+                    <div class="detail-value">{{stats.worstDefeat.diff}} juegos</div>
+                    <div class="detail-sub">vs {{stats.worstDefeat.rivals}}</div>
+                    <div class="detail-date">{{stats.worstDefeat.date | date:'d MMM'}}</div>
+                </div>
+            </div>
+
+            <!-- Juegos promedio -->
+            <div class="detail-card">
+                <div class="detail-header">
+                    <span class="detail-icon">📈</span>
+                    <span class="detail-name">Promedio Juegos/Set</span>
+                </div>
+                <div class="detail-stats">
+                    <div class="detail-value">{{stats.averageGamesPerSet | number:'1.1-1'}}</div>
+                    <div class="detail-sub">{{stats.totalGamesWon}}W - {{stats.totalGamesLost}}L</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mejores parejas y rivales difíciles -->
+    <div class="rankings-grid">
+        <!-- Mejores parejas -->
+        <div class="ranking-section" *ngIf="stats.partnerStats && stats.partnerStats.length > 0">
+            <div class="section-title">🤝 Mejores Parejas</div>
+            <div class="ranking-list">
+                <div class="ranking-item" *ngFor="let partner of stats.partnerStats; let i = index">
+                    <div class="ranking-position">{{i + 1}}</div>
+                    <div class="ranking-info">
+                        <div class="ranking-name">{{partner.name}}</div>
+                        <div class="ranking-detail">{{partner.wins}}V de {{partner.played}} partidos</div>
+                    </div>
+                    <div class="ranking-value">{{partner.winRate | number:'1.0-0'}}%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rivales más difíciles -->
+        <div class="ranking-section" *ngIf="stats.rivalStats && stats.rivalStats.length > 0">
+            <div class="section-title">⚔️ Rivales Más Difíciles</div>
+            <div class="ranking-list">
+                <div class="ranking-item" *ngFor="let rival of stats.rivalStats; let i = index">
+                    <div class="ranking-position">{{i + 1}}</div>
+                    <div class="ranking-info">
+                        <div class="ranking-name">{{rival.name}}</div>
+                        <div class="ranking-detail">
+                            <span class="category-badge">{{rival.category}}</span>
+                            {{rival.losses}}D de {{rival.played}} partidos
+                        </div>
+                    </div>
+                    <div class="ranking-value danger">{{rival.lossRate | number:'1.0-0'}}%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Cargando estadísticas...</p>
+</div>
+
+<div class="empty-state" *ngIf="!loading && stats && stats.totalMatches === 0">
+    <div class="empty-icon">📊</div>
+    <h3>Aún no tienes estadísticas</h3>
+    <p>Registra tu primer partido para comenzar a ver tus métricas</p>
+</div>

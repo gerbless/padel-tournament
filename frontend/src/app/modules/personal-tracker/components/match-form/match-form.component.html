@@ -1,0 +1,63 @@
+<div class="form-container">
+    <h2>Registrar Nuevo Partido</h2>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+        <div class="form-group">
+            <label>Fecha</label>
+            <input type="date" formControlName="date">
+        </div>
+
+        <div class="form-group">
+            <label>Tu Pareja</label>
+            <app-player-select formControlName="partnerId" mode="id" placeholder="Buscar o crear pareja..."
+                [excludeIds]="getExcludedIds()">
+            </app-player-select>
+        </div>
+
+        <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+                <label>Rival 1</label>
+                <app-player-select formControlName="rival1Id" mode="id" placeholder="Buscar rival 1..."
+                    [excludeIds]="getExcludedIds()">
+                </app-player-select>
+            </div>
+            <div>
+                <label>Rival 2</label>
+                <app-player-select formControlName="rival2Id" mode="id" placeholder="Buscar rival 2..."
+                    [excludeIds]="getExcludedIds()">
+                </app-player-select>
+            </div>
+        </div>
+
+        <h3>Marcador</h3>
+        <div class="sets-container" formArrayName="sets">
+            <div *ngFor="let set of sets.controls; let i=index" [formGroupName]="i" class="set-row">
+                <div style="font-weight: bold;">Set {{ i + 1 }}</div>
+                <div>
+                    <label style="font-size: 0.8rem;">Nosotros</label>
+                    <input type="number" formControlName="myScore">
+                </div>
+                <div>
+                    <label style="font-size: 0.8rem;">Ellos</label>
+                    <input type="number" formControlName="rivalScore">
+                </div>
+                <div *ngIf="i > 1">
+                    <button type="button" (click)="removeSet(i)"
+                        style="background:none; border:none; color: red;">🗑️</button>
+                </div>
+            </div>
+        </div>
+
+        <button *ngIf="sets.length < 3" type="button" (click)="addSet()"
+            style="margin-bottom: 2rem; background: rgba(255,255,255,0.1); border:none; color: var(--primary); padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+            + Agregar 3er Set
+        </button>
+
+        <div class="actions">
+            <button type="button" class="btn-cancel" (click)="cancel()">Cancelar</button>
+            <button type="submit" class="btn-submit" [disabled]="form.invalid || loading">
+                {{ loading ? 'Guardando...' : 'Guardar Partido' }}
+            </button>
+        </div>
+    </form>
+</div>

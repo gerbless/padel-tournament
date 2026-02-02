@@ -227,7 +227,9 @@ import { PlayerService, Player } from '../../services/player.service';
 export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
   @Input() placeholder = 'Seleccionar jugador...';
   @Input() currentClubId: string | null = null;
-  @Input() excludeNames: string[] = []; // Filter out players by name (since form uses names)
+  @Input() mode: 'id' | 'name' = 'id'; // Controls what value is emitted
+  @Input() excludeIds: string[] = []; // Filter out players by ID
+  @Input() excludeNames: string[] = []; // Filter out players by name (for backward compatibility)
   @Output() requestCreatePlayer = new EventEmitter<string>();
 
   private _allPlayers: Player[] = [];
@@ -293,7 +295,10 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
   filterPlayers() {
     let result = this._allPlayers;
 
-    // 1. Filter by Exclude List
+    // 1. Filter by Exclude List (by ID or Name)
+    if (this.excludeIds && this.excludeIds.length > 0) {
+      result = result.filter(p => !this.excludeIds.includes(p.id));
+    }
     if (this.excludeNames && this.excludeNames.length > 0) {
       result = result.filter(p => !this.excludeNames.includes(p.name));
     }
@@ -342,14 +347,19 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
   selectPlayer(player: Player) {
     this.searchTerm = player.name;
     this.showDropdown = false;
-    this.onChange(player.name);
+    const value = this.mode === 'id' ? player.id : player.name;
+    this.onChange(value);
+    this._selectedPlayerId = player.id;
   }
 
   clearSelection() {
     this.searchTerm = '';
     this.filterPlayers();
-    this.onChange('');
+    this.onChange(''); // Clear the model
+    this._selectedPlayerId = null;
   }
+
+  private _selectedPlayerId: string | null = null;
 
   // --- Create Modal Logic ---
 
@@ -388,7 +398,20 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
 
   writeValue(value: any): void {
     if (value !== undefined && value !== null) {
-      this.searchTerm = value;
+      // Value can be ID or name depending on mode
+      if (this.mode === 'id') {
+        this._selectedPlayerId = value;
+        const player = this._allPlayers.find(p => p.id === value);
+        this.searchTerm = player ? player.name : '';
+      } else {
+        // Name mode
+        const player = this._allPlayers.find(p => p.name === value);
+        this._selectedPlayerId = player ? player.id : null;
+        this.searchTerm = value;
+      }
+    } else {
+      this.searchTerm = '';
+      this._selectedPlayerId = null;
     }
   }
 

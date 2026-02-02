@@ -10,8 +10,8 @@ import { LeagueListComponent } from './modules/league/components/league-list/lea
 import { LeagueCreateComponent } from './modules/league/components/league-create/league-create.component';
 import { LeagueDashboardComponent } from './modules/league/components/league-dashboard/league-dashboard.component';
 import { ClubSelectionComponent } from './components/club-selection/club-selection.component';
-
 import { LoginComponent } from './components/login/login.component';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
     { path: '', component: ClubSelectionComponent },
@@ -25,5 +25,10 @@ export const routes: Routes = [
     { path: 'leagues/:id', component: LeagueDashboardComponent },
     { path: 'players', component: PlayerListComponent },
     { path: 'ranking', component: RankingComponent },
+    {
+        path: 'personal-tracker',
+        loadChildren: () => import('./modules/personal-tracker/personal-tracker.routes').then(m => m.PERSONAL_TRACKER_ROUTES),
+        canActivate: [authGuard]
+    },
     { path: 'categories', loadChildren: () => import('./modules/categories/categories.module').then(m => m.CategoriesModule) },
 ];

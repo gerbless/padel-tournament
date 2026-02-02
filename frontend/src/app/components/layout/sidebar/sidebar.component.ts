@@ -56,7 +56,12 @@ import { AuthService } from '../../../services/auth.service';
                 <span class="icon">🥇</span>
                 <span class="label" *ngIf="!isCollapsed">Ranking</span>
             </a>
-            
+
+            <a *ngIf="isLoggedIn" routerLink="/personal-tracker" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
+                <span class="icon">📈</span>
+                <span class="label" *ngIf="!isCollapsed">Mi Padel</span>
+            </a>
+
             <div class="divider" style="height: 1px; background: rgba(255,255,255,0.1); margin: 0.5rem 0;"></div>
 
             <a *ngIf="!isLoggedIn" routerLink="/login" class="nav-item" (click)="closeMobileMenu()" style="color: var(--primary);">

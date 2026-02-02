@@ -9,6 +9,8 @@ import { LeaguesModule } from './leagues/leagues.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ClubsModule } from './clubs/clubs.module';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { PersonalTrackerModule } from './personal-tracker/personal-tracker.module';
 
 @Module({
     imports: [
@@ -37,6 +39,8 @@ import { AuthModule } from './auth/auth.module';
         CategoriesModule,
         ClubsModule,
         AuthModule,
+        UsersModule,
+        PersonalTrackerModule,
     ],
 })
 export class AppModule { }
