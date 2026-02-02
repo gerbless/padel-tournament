@@ -294,13 +294,17 @@ export class PlayersService {
                     team.matchesAsTeam1?.forEach(match => {
                         if (match.status === 'completed') {
                             if (match.winner?.id === team.id) {
+                                // Win
                                 globalTournamentPoints += 3;
                                 globalMatchesWon++;
                                 clubStats.tournamentPoints += 3;
                                 clubStats.matchesWon++;
-                            } else {
+                            } else if (!match.winner) {
+                                // Draw
                                 globalTournamentPoints += 1;
                                 clubStats.tournamentPoints += 1;
+                            } else {
+                                // Loss
                                 clubStats.matchesLost++;
                             }
                         }
@@ -310,13 +314,17 @@ export class PlayersService {
                     team.matchesAsTeam2?.forEach(match => {
                         if (match.status === 'completed') {
                             if (match.winner?.id === team.id) {
+                                // Win
                                 globalTournamentPoints += 3;
                                 globalMatchesWon++;
                                 clubStats.tournamentPoints += 3;
                                 clubStats.matchesWon++;
-                            } else {
+                            } else if (!match.winner) {
+                                // Draw
                                 globalTournamentPoints += 1;
                                 clubStats.tournamentPoints += 1;
+                            } else {
+                                // Loss
                                 clubStats.matchesLost++;
                             }
                         }
