@@ -15,7 +15,7 @@ import { Player } from '../../services/player.service';
 })
 export class ClubSelectionComponent implements OnInit {
     clubs: Club[] = [];
-    globalTopPlayers: Player[] = [];
+    globalTopPlayers: (Player & { rank: number })[] = [];
     loading = true;
     searchTerm = '';
 
@@ -45,12 +45,24 @@ export class ClubSelectionComponent implements OnInit {
     loadGlobalTopPlayers(): void {
         this.clubService.getTopPlayersGlobal().subscribe({
             next: (players) => {
-                this.globalTopPlayers = players;
+                this.globalTopPlayers = this.calculateRanks(players);
             },
             error: (err) => {
                 console.error('Error loading global top players:', err);
             }
         });
+    }
+
+    private calculateRanks(players: Player[]): (Player & { rank: number })[] {
+        const rankedPlayers: (Player & { rank: number })[] = [];
+        for (let i = 0; i < players.length; i++) {
+            let rank = i + 1;
+            if (i > 0 && players[i].totalPoints === players[i - 1].totalPoints) {
+                rank = rankedPlayers[i - 1].rank;
+            }
+            rankedPlayers.push({ ...players[i], rank });
+        }
+        return rankedPlayers;
     }
 
     showAll = false;

@@ -52,9 +52,9 @@
                 <p class="stats-subtitle">Ranking acumulado entre todos los clubes</p>
 
                 <div class="top-players-list" *ngIf="globalTopPlayers.length > 0">
-                    <div class="player-item" *ngFor="let player of globalTopPlayers; let i = index"
-                        [class.gold]="i === 0" [class.silver]="i === 1" [class.bronze]="i === 2">
-                        <div class="rank">{{ i + 1 }}</div>
+                    <div class="player-item" *ngFor="let player of globalTopPlayers" [class.gold]="player.rank === 1"
+                        [class.silver]="player.rank === 2" [class.bronze]="player.rank === 3">
+                        <div class="rank">{{ player.rank }}</div>
                         <div class="player-avatar">{{ getPlayerInitials(player.name) }}</div>
                         <div class="player-info">
                             <div class="player-name">{{ player.name }}</div>
@@ -62,10 +62,10 @@
                                 {{ player.totalPoints }} pts • {{ player.matchesWon }} victorias
                             </div>
                         </div>
-                        <div class="trophy" *ngIf="i < 3">
-                            <span *ngIf="i === 0">🥇</span>
-                            <span *ngIf="i === 1">🥈</span>
-                            <span *ngIf="i === 2">🥉</span>
+                        <div class="trophy" *ngIf="player.rank <= 3">
+                            <span *ngIf="player.rank === 1">🥇</span>
+                            <span *ngIf="player.rank === 2">🥈</span>
+                            <span *ngIf="player.rank === 3">🥉</span>
                         </div>
                     </div>
                 </div>

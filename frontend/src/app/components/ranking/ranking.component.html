@@ -31,13 +31,13 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr *ngFor="let player of filteredPlayers; let i = index" [class.leader]="i < 3">
+                    <tr *ngFor="let player of filteredPlayers" [class.leader]="player.rank <= 3">
                         <td class="rank-cell" data-label="Pos">
-                            <div class="rank-badge" [attr.data-rank]="i + 1">
-                                <span *ngIf="i === 0">🥇</span>
-                                <span *ngIf="i === 1">🥈</span>
-                                <span *ngIf="i === 2">🥉</span>
-                                <span *ngIf="i > 2">{{ i + 1 }}</span>
+                            <div class="rank-badge" [attr.data-rank]="player.rank">
+                                <span *ngIf="player.rank === 1">🥇</span>
+                                <span *ngIf="player.rank === 2">🥈</span>
+                                <span *ngIf="player.rank === 3">🥉</span>
+                                <span *ngIf="player.rank > 3">{{ player.rank }}</span>
                             </div>
                         </td>
                         <td class="player-cell" data-label="Jugador">{{ player.name }}</td>

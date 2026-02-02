@@ -14,7 +14,7 @@ import { Subscription } from 'rxjs';
 })
 export class RankingComponent implements OnInit, OnDestroy {
     players: Player[] = [];
-    filteredPlayers: Player[] = [];
+    filteredPlayers: (Player & { rank: number })[] = [];
     loading = true;
     searchTerm = '';
     currentClubId: string | undefined;
@@ -52,13 +52,25 @@ export class RankingComponent implements OnInit, OnDestroy {
     }
 
     filterPlayers() {
-        if (!this.searchTerm) {
-            this.filteredPlayers = this.players;
-        } else {
+        let result = this.players;
+        if (this.searchTerm) {
             const term = this.searchTerm.toLowerCase();
-            this.filteredPlayers = this.players.filter(p =>
+            result = this.players.filter(p =>
                 p.name.toLowerCase().includes(term)
             );
         }
+        this.filteredPlayers = this.calculateRanks(result);
+    }
+
+    private calculateRanks(players: Player[]): (Player & { rank: number })[] {
+        const rankedPlayers: (Player & { rank: number })[] = [];
+        for (let i = 0; i < players.length; i++) {
+            let rank = i + 1;
+            if (i > 0 && players[i].totalPoints === players[i - 1].totalPoints) {
+                rank = rankedPlayers[i - 1].rank;
+            }
+            rankedPlayers.push({ ...players[i], rank });
+        }
+        return rankedPlayers;
     }
 }
