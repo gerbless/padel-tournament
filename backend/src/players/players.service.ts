@@ -290,21 +290,28 @@ export class PlayersService {
                         clubStats.tournamentIds.add(team.tournamentId);
                     }
 
+                    const config = team.tournament?.config || {};
+                    const ptsWin = config.pointsForWin ?? 3;
+                    const ptsTie = config.pointsForTie ?? 1;
+                    const ptsLoss = config.pointsForLoss ?? 0;
+
                     // Process matches where team was Team 1
                     team.matchesAsTeam1?.forEach(match => {
                         if (match.status === 'completed') {
                             if (match.winner?.id === team.id) {
                                 // Win
-                                globalTournamentPoints += 3;
+                                globalTournamentPoints += ptsWin;
                                 globalMatchesWon++;
-                                clubStats.tournamentPoints += 3;
+                                clubStats.tournamentPoints += ptsWin;
                                 clubStats.matchesWon++;
                             } else if (!match.winner) {
                                 // Draw
-                                globalTournamentPoints += 1;
-                                clubStats.tournamentPoints += 1;
+                                globalTournamentPoints += ptsTie;
+                                clubStats.tournamentPoints += ptsTie;
                             } else {
                                 // Loss
+                                globalTournamentPoints += ptsLoss;
+                                clubStats.tournamentPoints += ptsLoss;
                                 clubStats.matchesLost++;
                             }
                         }
@@ -315,16 +322,18 @@ export class PlayersService {
                         if (match.status === 'completed') {
                             if (match.winner?.id === team.id) {
                                 // Win
-                                globalTournamentPoints += 3;
+                                globalTournamentPoints += ptsWin;
                                 globalMatchesWon++;
-                                clubStats.tournamentPoints += 3;
+                                clubStats.tournamentPoints += ptsWin;
                                 clubStats.matchesWon++;
                             } else if (!match.winner) {
                                 // Draw
-                                globalTournamentPoints += 1;
-                                clubStats.tournamentPoints += 1;
+                                globalTournamentPoints += ptsTie;
+                                clubStats.tournamentPoints += ptsTie;
                             } else {
                                 // Loss
+                                globalTournamentPoints += ptsLoss;
+                                clubStats.tournamentPoints += ptsLoss;
                                 clubStats.matchesLost++;
                             }
                         }

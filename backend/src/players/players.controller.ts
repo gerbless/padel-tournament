@@ -14,7 +14,7 @@ export class PlayersController {
         return this.playersService.create(createPlayerDto);
     }
 
-    @UseGuards(JwtAuthGuard)
+    // @UseGuards(JwtAuthGuard)
     @Post('recalculate-all')
     async recalculateAll() {
         const players = await this.playersService.findAll();
