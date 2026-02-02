@@ -27,7 +27,7 @@ import { PersonalTrackerModule } from './personal-tracker/personal-tracker.modul
                 password: configService.get('DB_PASSWORD'),
                 database: configService.get('DB_DATABASE'),
                 entities: [__dirname + '/**/*.entity{.ts,.js}'],
-                synchronize: true, // Set to false in production
+                synchronize: false, // Set to false in production
             }),
             inject: [ConfigService],
         }),

@@ -9,6 +9,53 @@
         </button>
     </div>
 
+    <!-- In Progress Matches Section -->
+    <div class="in-progress-section" *ngIf="inProgressMatches.length > 0">
+        <h2>🏗️ Partidos Pendientes</h2>
+        <p class="section-subtitle">Continúa completando estos partidos</p>
+
+        <div class="matches-grid">
+            <div class="match-card" *ngFor="let match of inProgressMatches">
+                <div class="match-header">
+                    <span class="status-badge" [class.draft]="match.status === 'draft'"
+                        [class.in-progress]="match.status === 'in_progress'">
+                        {{ getStatusLabel(match.status) }}
+                    </span>
+                    <span class="match-date">{{ match.date | date:'dd/MM/yyyy' }}</span>
+                </div>
+
+                <div class="match-players">
+                    <div class="team">
+                        <span class="team-label">Mi equipo:</span>
+                        <span class="player-names">
+                            Yo + {{ match.partner?.name || 'Partner' }}
+                        </span>
+                    </div>
+                    <div class="vs">VS</div>
+                    <div class="team">
+                        <span class="team-label">Rivales:</span>
+                        <span class="player-names">
+                            {{ match.rival1?.name || 'Rival 1' }} + {{ match.rival2?.name || 'Rival 2' }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="match-info" *ngIf="match.sets && match.sets.length > 0">
+                    <span class="sets-count">{{ match.sets.length }} set(s) registrados</span>
+                </div>
+
+                <div class="match-actions">
+                    <button class="btn-edit" (click)="editMatch(match.id!)">
+                        ✏️ Continuar
+                    </button>
+                    <button class="btn-delete" (click)="deleteMatch(match.id!)">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats Dashboard Component -->
     <app-stats-dashboard></app-stats-dashboard>
 </div>
