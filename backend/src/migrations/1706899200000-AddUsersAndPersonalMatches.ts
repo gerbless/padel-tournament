@@ -13,9 +13,9 @@ export class AddUsersAndPersonalMatches1706899200000 implements MigrationInterfa
             END $$;
         `);
 
-        // Create User table
+        // Create User table (idempotent)
         await queryRunner.query(`
-            CREATE TABLE "users" (
+            CREATE TABLE IF NOT EXISTS "users" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
                 "email" character varying NOT NULL,
                 "password" character varying NOT NULL,
@@ -29,9 +29,9 @@ export class AddUsersAndPersonalMatches1706899200000 implements MigrationInterfa
             )
         `);
 
-        // Create PersonalMatch table
+        // Create PersonalMatch table (idempotent)
         await queryRunner.query(`
-            CREATE TABLE "personal_matches" (
+            CREATE TABLE IF NOT EXISTS "personal_matches" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
                 "date" TIMESTAMP NOT NULL,
                 "ownerId" uuid NOT NULL,
@@ -46,12 +46,42 @@ export class AddUsersAndPersonalMatches1706899200000 implements MigrationInterfa
             )
         `);
 
-        // Add FKs for PersonalMatch
-        await queryRunner.query(`ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Owner" FOREIGN KEY ("ownerId") REFERENCES "players"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Partner" FOREIGN KEY ("partnerId") REFERENCES "players"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Rival1" FOREIGN KEY ("rival1Id") REFERENCES "players"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Rival2" FOREIGN KEY ("rival2Id") REFERENCES "players"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Club" FOREIGN KEY ("clubId") REFERENCES "clubs"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        // Add FKs for PersonalMatch (idempotent)
+        await queryRunner.query(`
+            DO $$ BEGIN
+                ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Owner" FOREIGN KEY ("ownerId") REFERENCES "players"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        `);
+        await queryRunner.query(`
+            DO $$ BEGIN
+                ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Partner" FOREIGN KEY ("partnerId") REFERENCES "players"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        `);
+        await queryRunner.query(`
+            DO $$ BEGIN
+                ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Rival1" FOREIGN KEY ("rival1Id") REFERENCES "players"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        `);
+        await queryRunner.query(`
+            DO $$ BEGIN
+                ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Rival2" FOREIGN KEY ("rival2Id") REFERENCES "players"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        `);
+        await queryRunner.query(`
+            DO $$ BEGIN
+                ALTER TABLE "personal_matches" ADD CONSTRAINT "FK_PersonalMatches_Club" FOREIGN KEY ("clubId") REFERENCES "clubs"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

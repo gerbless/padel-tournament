@@ -52,11 +52,16 @@ export class PersonalMatch {
 
     // Score stored as JSON
     // Format: [{ "set": 1, "myScore": 6, "rivalScore": 4, "tieBreak": false }, ...]
-    @Column('jsonb')
+    @Column('jsonb', { default: [] })
     sets: any[];
 
-    @Column({ type: 'enum', enum: ['win', 'loss'] })
-    result: 'win' | 'loss';
+    // Status of the match: draft, in_progress, completed
+    @Column({ type: 'varchar', default: 'draft' })
+    status: 'draft' | 'in_progress' | 'completed';
+
+    // Result is nullable until match is completed
+    @Column({ type: 'enum', enum: ['win', 'loss'], nullable: true })
+    result: 'win' | 'loss' | null;
 
     @CreateDateColumn()
     createdAt: Date;

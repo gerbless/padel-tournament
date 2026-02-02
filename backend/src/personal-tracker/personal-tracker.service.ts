@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PersonalMatch } from './entities/personal-match.entity';
 import { CreatePersonalMatchDto } from './dto/create-personal-match.dto';
+import { UpdatePersonalMatchDto } from './dto/update-personal-match.dto';
 
 @Injectable()
 export class PersonalTrackerService {
@@ -12,22 +13,71 @@ export class PersonalTrackerService {
     ) { }
 
     async create(createDto: CreatePersonalMatchDto, ownerId: string): Promise<PersonalMatch> {
-        // Calculate result based on sets if not provided
-        let mySets = 0;
-        let rivalSets = 0;
+        const sets = createDto.sets || [];
+        const status = createDto.status || (sets.length === 0 ? 'draft' : 'in_progress');
 
-        createDto.sets.forEach(s => {
-            if (s.myScore > s.rivalScore) mySets++;
-            else if (s.rivalScore > s.myScore) rivalSets++;
-        });
+        let result: 'win' | 'loss' | null = null;
 
-        const result = mySets > rivalSets ? 'win' : 'loss';
+        // Only calculate result if status is completed or if we have sets
+        if (sets.length > 0) {
+            let mySets = 0;
+            let rivalSets = 0;
+
+            sets.forEach(s => {
+                if (s.myScore > s.rivalScore) mySets++;
+                else if (s.rivalScore > s.myScore) rivalSets++;
+            });
+
+            result = mySets > rivalSets ? 'win' : 'loss';
+        }
 
         const match = this.matchRepository.create({
             ...createDto,
             ownerId,
+            sets,
+            status,
             result
         });
+
+        return this.matchRepository.save(match);
+    }
+
+    async findOne(id: string, ownerId: string): Promise<PersonalMatch> {
+        const match = await this.matchRepository.findOne({
+            where: { id, ownerId },
+            relations: ['partner', 'rival1', 'rival2', 'club']
+        });
+
+        if (!match) {
+            throw new NotFoundException('Match not found');
+        }
+
+        return match;
+    }
+
+    async update(id: string, updateDto: UpdatePersonalMatchDto, ownerId: string): Promise<PersonalMatch> {
+        const match = await this.findOne(id, ownerId);
+
+        // Update sets if provided
+        if (updateDto.sets) {
+            match.sets = updateDto.sets;
+
+            // Recalculate result
+            let mySets = 0;
+            let rivalSets = 0;
+
+            updateDto.sets.forEach(s => {
+                if (s.myScore > s.rivalScore) mySets++;
+                else if (s.rivalScore > s.myScore) rivalSets++;
+            });
+
+            match.result = mySets > rivalSets ? 'win' : 'loss';
+        }
+
+        // Update status if provided
+        if (updateDto.status) {
+            match.status = updateDto.status;
+        }
 
         return this.matchRepository.save(match);
     }
@@ -35,6 +85,17 @@ export class PersonalTrackerService {
     async findAll(ownerId: string): Promise<PersonalMatch[]> {
         return this.matchRepository.find({
             where: { ownerId },
+            relations: ['partner', 'rival1', 'rival2', 'club'],
+            order: { date: 'DESC' }
+        });
+    }
+
+    async findInProgress(ownerId: string): Promise<PersonalMatch[]> {
+        return this.matchRepository.find({
+            where: [
+                { ownerId, status: 'draft' },
+                { ownerId, status: 'in_progress' }
+            ],
             relations: ['partner', 'rival1', 'rival2', 'club'],
             order: { date: 'DESC' }
         });

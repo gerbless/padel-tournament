@@ -1,7 +1,7 @@
 <div class="form-container">
-    <h2>Registrar Nuevo Partido</h2>
+    <h2>{{ isEditMode ? 'Editar Partido' : 'Registrar Nuevo Partido' }}</h2>
 
-    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+    <form [formGroup]="form">
         <div class="form-group">
             <label>Fecha</label>
             <input type="date" formControlName="date">
@@ -53,11 +53,17 @@
             + Agregar 3er Set
         </button>
 
+
         <div class="actions">
             <button type="button" class="btn-cancel" (click)="cancel()">Cancelar</button>
-            <button type="submit" class="btn-submit" [disabled]="form.invalid || loading">
-                {{ loading ? 'Guardando...' : 'Guardar Partido' }}
+            <button type="button" class="btn-draft" (click)="saveDraft()" [disabled]="loading">
+                💾 Guardar Borrador
+            </button>
+            <button type="button" class="btn-in-progress" (click)="saveInProgress()"
+                [disabled]="form.invalid || loading">
+                ⏳ Guardar en Progreso
+            </button>
+            <button type="button" class="btn-submit" (click)="completeMatch()" [disabled]="form.invalid || loading">
+                ✅ {{ loading ? 'Guardando...' : 'Finalizar Partido' }}
             </button>
         </div>
-    </form>
-</div>

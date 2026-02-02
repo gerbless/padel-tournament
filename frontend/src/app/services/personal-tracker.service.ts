@@ -11,6 +11,7 @@ export interface PersonalMatch {
     rival2Id: string;
     clubId?: string;
     sets: { set: number, myScore: number, rivalScore: number, tieBreak?: boolean }[];
+    status?: 'draft' | 'in_progress' | 'completed';
     result?: 'win' | 'loss';
 
     // Expanded properties from backend
@@ -40,12 +41,24 @@ export class PersonalTrackerService {
 
     constructor(private http: HttpClient) { }
 
-    createMatch(match: PersonalMatch): Observable<any> {
-        return this.http.post(this.apiUrl, match);
+    createMatch(match: Partial<PersonalMatch>): Observable<PersonalMatch> {
+        return this.http.post<PersonalMatch>(this.apiUrl, match);
+    }
+
+    getMatch(id: string): Observable<PersonalMatch> {
+        return this.http.get<PersonalMatch>(`${this.apiUrl}/${id}`);
+    }
+
+    updateMatch(id: string, updates: Partial<PersonalMatch>): Observable<PersonalMatch> {
+        return this.http.patch<PersonalMatch>(`${this.apiUrl}/${id}`, updates);
     }
 
     getHistory(): Observable<PersonalMatch[]> {
         return this.http.get<PersonalMatch[]>(`${this.apiUrl}/history`);
+    }
+
+    getInProgress(): Observable<PersonalMatch[]> {
+        return this.http.get<PersonalMatch[]>(`${this.apiUrl}/in-progress`);
     }
 
     getStats(): Observable<PersonalStats> {

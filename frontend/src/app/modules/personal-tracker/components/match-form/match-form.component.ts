@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { PlayerService, Player } from '../../../../services/player.service';
 import { PersonalTrackerService } from '../../../../services/personal-tracker.service';
 import { PlayerSelectComponent } from '../../../../components/player-select/player-select.component';
@@ -81,29 +81,78 @@ export class MatchFormComponent implements OnInit {
     form: FormGroup;
     players: Player[] = [];
     loading = false;
+    matchId: string | null = null;
+    isEditMode = false;
 
     constructor(
         private fb: FormBuilder,
         private playerService: PlayerService,
         private trackerService: PersonalTrackerService,
-        private router: Router
+        private router: Router,
+        private route: ActivatedRoute
     ) {
         this.form = this.fb.group({
             date: [new Date().toISOString().substring(0, 10), Validators.required],
             partnerId: ['', Validators.required],
             rival1Id: ['', Validators.required],
             rival2Id: ['', Validators.required],
-            sets: this.fb.array([this.createSetGroup(1), this.createSetGroup(2)])
+            sets: this.fb.array([])
         });
     }
 
     ngOnInit() {
-        // Assuming getRanking or findAll exists. PlayerService usually has findAll.
-        // I will check PlayerService definition again if getRanking exists. 
-        // Based on previous step, it has findAll. 
-        // I will use findAll() for now. If I need ranking I'll check if getRanking exists.
+        // Check if we're editing an existing match
+        this.route.params.subscribe(params => {
+            this.matchId = params['id'] || null;
+            if (this.matchId) {
+                this.isEditMode = true;
+                this.loadMatch();
+            } else {
+                // Create default sets for new match
+                this.addSet();
+                this.addSet();
+            }
+        });
+
         this.playerService.findAll().subscribe((players: Player[]) => {
             this.players = players;
+        });
+    }
+
+    loadMatch() {
+        if (!this.matchId) return;
+
+        this.loading = true;
+        this.trackerService.getMatch(this.matchId).subscribe({
+            next: (match) => {
+                this.form.patchValue({
+                    date: new Date(match.date).toISOString().substring(0, 10),
+                    partnerId: match.partnerId,
+                    rival1Id: match.rival1Id,
+                    rival2Id: match.rival2Id
+                });
+
+                // Load sets
+                this.sets.clear();
+                if (match.sets && match.sets.length > 0) {
+                    match.sets.forEach((set, index) => {
+                        const setGroup = this.createSetGroup(index + 1);
+                        setGroup.patchValue(set);
+                        this.sets.push(setGroup);
+                    });
+                } else {
+                    // No sets yet, add default ones
+                    this.addSet();
+                    this.addSet();
+                }
+
+                this.loading = false;
+            },
+            error: (err: any) => {
+                console.error(err);
+                this.loading = false;
+                this.router.navigate(['/personal-tracker']);
+            }
         });
     }
 
@@ -127,22 +176,102 @@ export class MatchFormComponent implements OnInit {
     }
 
     removeSet(index: number) {
-        this.sets.removeAt(index);
+        if (this.sets.length > 1) {
+            this.sets.removeAt(index);
+            // Re-number remaining sets
+            this.sets.controls.forEach((control, i) => {
+                control.patchValue({ set: i + 1 });
+            });
+        }
     }
 
-    onSubmit() {
+    saveDraft() {
+        if (this.form.get('partnerId')?.invalid ||
+            this.form.get('rival1Id')?.invalid ||
+            this.form.get('rival2Id')?.invalid) {
+            return;
+        }
+
+        this.loading = true;
+        const matchData = {
+            ...this.form.value,
+            status: 'draft',
+            sets: []
+        };
+
+        if (this.isEditMode && this.matchId) {
+            this.trackerService.updateMatch(this.matchId, matchData).subscribe({
+                next: () => this.router.navigate(['/personal-tracker']),
+                error: (err: any) => {
+                    console.error(err);
+                    this.loading = false;
+                }
+            });
+        } else {
+            this.trackerService.createMatch(matchData).subscribe({
+                next: () => this.router.navigate(['/personal-tracker']),
+                error: (err: any) => {
+                    console.error(err);
+                    this.loading = false;
+                }
+            });
+        }
+    }
+
+    saveInProgress() {
         if (this.form.invalid) return;
 
         this.loading = true;
-        this.trackerService.createMatch(this.form.value).subscribe({
-            next: () => {
-                this.router.navigate(['/personal-tracker']);
-            },
-            error: (err: any) => {
-                console.error(err);
-                this.loading = false;
-            }
-        });
+        const matchData = {
+            ...this.form.value,
+            status: 'in_progress'
+        };
+
+        if (this.isEditMode && this.matchId) {
+            this.trackerService.updateMatch(this.matchId, matchData).subscribe({
+                next: () => this.router.navigate(['/personal-tracker']),
+                error: (err: any) => {
+                    console.error(err);
+                    this.loading = false;
+                }
+            });
+        } else {
+            this.trackerService.createMatch(matchData).subscribe({
+                next: () => this.router.navigate(['/personal-tracker']),
+                error: (err: any) => {
+                    console.error(err);
+                    this.loading = false;
+                }
+            });
+        }
+    }
+
+    completeMatch() {
+        if (this.form.invalid) return;
+
+        this.loading = true;
+        const matchData = {
+            ...this.form.value,
+            status: 'completed'
+        };
+
+        if (this.isEditMode && this.matchId) {
+            this.trackerService.updateMatch(this.matchId, matchData).subscribe({
+                next: () => this.router.navigate(['/personal-tracker']),
+                error: (err: any) => {
+                    console.error(err);
+                    this.loading = false;
+                }
+            });
+        } else {
+            this.trackerService.createMatch(matchData).subscribe({
+                next: () => this.router.navigate(['/personal-tracker']),
+                error: (err: any) => {
+                    console.error(err);
+                    this.loading = false;
+                }
+            });
+        }
     }
 
     getExcludedIds(): string[] {

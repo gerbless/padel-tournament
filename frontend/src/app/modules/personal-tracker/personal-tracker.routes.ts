@@ -10,5 +10,9 @@ export const PERSONAL_TRACKER_ROUTES: Routes = [
     {
         path: 'new',
         component: MatchFormComponent
+    },
+    {
+        path: 'edit/:id',
+        component: MatchFormComponent
     }
 ];
