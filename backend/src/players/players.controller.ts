@@ -2,34 +2,40 @@ import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards } f
 import { PlayersService } from './players.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ClubRoleGuard } from '../auth/club-role.guard';
+import { ClubRoles } from '../auth/club-roles.decorator';
 
 @Controller('players')
 export class PlayersController {
     constructor(private readonly playersService: PlayersService) { }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('editor')
     @Post()
     create(@Body() createPlayerDto: CreatePlayerDto) {
         return this.playersService.create(createPlayerDto);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin')
     @Post('recalculate-all')
     async recalculateAll() {
-        const players = await this.playersService.findAll();
+        const result = await this.playersService.findAll();
+        const players = Array.isArray(result) ? result : result.data;
         const playerIds = players.map(p => p.id);
         await this.playersService.recalculateTotalPoints(playerIds);
         return { message: 'All player points recalculated successfully' };
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin')
     @Post('migrate-club-stats')
     async migrateClubStats() {
-        const players = await this.playersService.findAll();
+        const result = await this.playersService.findAll();
+        const players = Array.isArray(result) ? result : result.data;
         const playerIds = players.map(p => p.id);
-
-        console.log(`[Migration] Starting migration for ${playerIds.length} players`);
         await this.playersService.recalculateTotalPoints(playerIds);
 
         return {
@@ -39,8 +45,8 @@ export class PlayersController {
     }
 
     @Get()
-    findAll(@Query('clubId') clubId?: string) {
-        return this.playersService.findAll(clubId);
+    findAll(@Query('clubId') clubId?: string, @Query() pagination?: PaginationQueryDto) {
+        return this.playersService.findAll(clubId, pagination);
     }
 
     @Get('ranking')
@@ -83,13 +89,15 @@ export class PlayersController {
         return this.playersService.findOne(id);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('editor')
     @Patch(':id')
     update(@Param('id') id: string, @Body() updatePlayerDto: UpdatePlayerDto) {
         return this.playersService.update(id, updatePlayerDto);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('editor')
     @Delete(':id')
     remove(@Param('id') id: string) {
         return this.playersService.remove(id);

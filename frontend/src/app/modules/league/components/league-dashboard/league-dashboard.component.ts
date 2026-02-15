@@ -1,24 +1,30 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, DestroyRef, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LeagueService } from '../../services/league.service';
 import { League, Match, MatchResult, SetScore, Pair } from '../../../../models/league.model';
 
 import { AuthService } from '../../../../services/auth.service';
+import { ToastService } from '../../../../services/toast.service';
+import { LeagueBracketComponent } from '../league-bracket/league-bracket.component';
 
 @Component({
     selector: 'app-league-dashboard',
     standalone: true,
-    imports: [CommonModule, FormsModule],
+    imports: [CommonModule, FormsModule, LeagueBracketComponent],
     templateUrl: './league-dashboard.component.html',
-    styleUrls: ['./league-dashboard.component.css']
+    styleUrls: ['./league-dashboard.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LeagueDashboardComponent implements OnInit {
     league: League | null = null;
     loading = true;
-    activeTab: 'matches' | 'standings' | 'config' = 'matches';
+    activeTab: 'matches' | 'standings' | 'bracket' | 'config' = 'matches';
     isLoggedIn = false;
+    canEdit = false;
+    canAdmin = false;
 
     // Match result modal
     showResultModal = false;
@@ -76,12 +82,14 @@ export class LeagueDashboardComponent implements OnInit {
                 this.savingResult = false;
                 this.closeResultModal();
                 this.loadLeague(this.league!.id);
+                this.toast.success('Resultado guardado');
+                this.cdr.markForCheck();
             },
             error: (err) => {
                 this.savingResult = false;
-                console.error('Error saving result:', err);
                 const msg = err.error?.message || err.message || 'Error desconocido';
-                alert(`Error al guardar el resultado: ${msg}`);
+                this.toast.error(`Error al guardar: ${msg}`);
+                this.cdr.markForCheck();
             }
         });
     }
@@ -89,6 +97,11 @@ export class LeagueDashboardComponent implements OnInit {
     // Filters
     selectedRound: number = 0;
     selectedPhase: string = 'all';
+
+    private destroyRef = inject(DestroyRef);
+
+    private cdr = inject(ChangeDetectorRef);
+    private toast = inject(ToastService);
 
     constructor(
         private route: ActivatedRoute,
@@ -105,6 +118,16 @@ export class LeagueDashboardComponent implements OnInit {
         }
     }
 
+    private updatePermissions() {
+        if (this.league?.clubId) {
+            this.canEdit = this.authService.hasClubRole(this.league.clubId, 'editor');
+            this.canAdmin = this.authService.hasClubRole(this.league.clubId, 'admin');
+        } else {
+            this.canEdit = false;
+            this.canAdmin = false;
+        }
+    }
+
     availableRounds: number[] = [];
 
     loadLeague(id: string) {
@@ -115,15 +138,18 @@ export class LeagueDashboardComponent implements OnInit {
                 this.normalizePairs(league);
                 this.normalizeConfig(league);
                 this.league = league;
+                this.updatePermissions();
                 this.updateAvailableRounds();
                 this.loading = false;
                 if (league.currentRound) {
                     this.selectedRound = league.currentRound;
                 }
+                this.cdr.markForCheck();
             },
             error: (err) => {
                 console.error('Error loading league:', err);
                 this.loading = false;
+                this.cdr.markForCheck();
                 alert('Error al cargar la liga');
                 this.router.navigate(['/leagues']);
             }
@@ -203,6 +229,7 @@ export class LeagueDashboardComponent implements OnInit {
 
     private mapGroupToPhase(group: string | undefined): string {
         if (!group) return 'group';
+        if (group.includes('3rd')) return 'third_place';
         if (group.includes('Gold')) return 'gold';
         if (group.includes('Silver')) return 'silver';
         if (group.includes('Bronze')) return 'bronze';
@@ -220,10 +247,11 @@ export class LeagueDashboardComponent implements OnInit {
         else if (group.includes('Silver')) label += 'Copa Plata - ';
         else if (group.includes('Bronze')) label += 'Copa Bronce - ';
 
-        if (group.includes('QF')) label += 'Cuartos de Final';
+        if (group.includes('3rd')) label += 'Tercer Puesto';
+        else if (group.includes('QF')) label += 'Cuartos de Final';
         else if (group.includes('SF')) label += 'Semifinal';
         else if (group.includes('F') && !group.includes('QF') && !group.includes('SF')) label += 'Final';
-        else if (!label) label = 'Fase de Grupos'; // Fallback
+        else if (!label) label = 'Fase Regular';
 
         return label;
     }
@@ -333,8 +361,8 @@ export class LeagueDashboardComponent implements OnInit {
         const c = league.config as any;
         // Map backend names to frontend expected names if missing
         if (c.pointsWin === undefined) c.pointsWin = c.pointsForWin ?? 3; // Default 3
-        if (c.pointsLoss === undefined) c.pointsLoss = c.pointsForLoss ?? 1; // Default 1
-        if (c.pointsDraw === undefined) c.pointsDraw = 1; // Default
+        if (c.pointsLoss === undefined) c.pointsLoss = c.pointsForLoss ?? 0; // Default 0
+        if (c.pointsDraw === undefined) c.pointsDraw = c.pointsForDraw ?? 0; // Default 0 (padel has no draws)
 
         // Ensure other properties exist
         if (c.setsToWin === undefined) c.setsToWin = c.setsPerMatch || 2;
@@ -390,6 +418,34 @@ export class LeagueDashboardComponent implements OnInit {
             }));
         }
         return [{ title: '', pairs: this.standingsSorted }];
+    }
+
+    getStandingZoneStyle(index: number): string {
+        if (!this.league || this.league.type !== 'round_robin_playoff') return '';
+        const config = this.league.config as any;
+        const goldCount = config.goldPlayoffCount ?? 4;
+        const silverCount = config.silverPlayoffCount ?? 4;
+        const relegationCount = config.relegationCount ?? 0;
+        const totalPairs = this.standingsSorted.length;
+
+        if (index < goldCount) return '4px solid #FFD700';
+        if (index < goldCount + silverCount) return '4px solid #C0C0C0';
+        if (relegationCount > 0 && index >= totalPairs - relegationCount) return '4px solid #FF4444';
+        return '';
+    }
+
+    getStandingZoneLabel(index: number): string {
+        if (!this.league || this.league.type !== 'round_robin_playoff') return '';
+        const config = this.league.config as any;
+        const goldCount = config.goldPlayoffCount ?? 4;
+        const silverCount = config.silverPlayoffCount ?? 4;
+        const relegationCount = config.relegationCount ?? 0;
+        const totalPairs = this.standingsSorted.length;
+
+        if (index === 0) return '🥇 Liga Oro';
+        if (index === goldCount) return '🥈 Liga Plata';
+        if (relegationCount > 0 && index === totalPairs - relegationCount) return '⬇️ Descenso';
+        return '';
     }
 
     get completedMatchesCount(): number {
@@ -471,12 +527,12 @@ export class LeagueDashboardComponent implements OnInit {
         this.leagueService.generateSchedule(this.league.id).subscribe({
             next: () => {
                 this.loadLeague(this.league!.id);
-                // Optional: Show success toast/modal if needed, but UI update is usually enough
+                this.toast.success('Calendario generado exitosamente');
             },
             error: (err) => {
-                console.error('Error generating schedule:', err);
                 this.loading = false;
-                alert('Error al generar calendario'); // Keeping this alert for now as error fallback
+                this.toast.error('Error al generar calendario');
+                this.cdr.markForCheck();
             }
         });
     }
@@ -497,6 +553,7 @@ export class LeagueDashboardComponent implements OnInit {
                 }
                 this.suggestedMatch = match;
                 this.showSuggestionModal = true;
+                this.cdr.markForCheck();
             },
             error: (err) => {
                 console.error('Error suggesting match:', err);
@@ -526,11 +583,10 @@ export class LeagueDashboardComponent implements OnInit {
             if (!this.league) return;
             this.leagueService.completeLeague(this.league.id).subscribe({
                 next: () => {
-                    // Reload to get normalized data and update UI status
                     this.loadLeague(this.league!.id);
-                    alert('Liga finalizada exitosamente. ¡Felicidades a los campeones!');
+                    this.toast.success('¡Liga finalizada! Felicidades a los campeones 🏆');
                 },
-                error: (err) => console.error('Failed to complete league', err)
+                error: () => this.toast.error('Error al finalizar la liga')
             });
         }
     }
@@ -566,12 +622,9 @@ export class LeagueDashboardComponent implements OnInit {
         this.leagueService.generateTieBreaker(this.league!.id).subscribe({
             next: () => {
                 this.loadLeague(this.league!.id);
-                alert('Partidos de desempate generados exitosamente. Por favor juégalos para definir las posiciones.');
+                this.toast.success('Partidos de desempate generados. ¡Juégalos para definir posiciones!');
             },
-            error: (err) => {
-                console.error('Error generating tie-breaker', err);
-                alert('No se pudieron generar los partidos. Asegúrate de que realmente existan empates en el Top 3.');
-            }
+            error: () => this.toast.error('No se pudieron generar los partidos de desempate')
         });
     }
 }

@@ -1,0 +1,117 @@
+<!-- Progress Bar -->
+<div class="bracket-progress" *ngIf="totalMatches > 0">
+    <div class="progress-info">
+        <span class="progress-label">Progreso del torneo</span>
+        <span class="progress-count">{{ completedMatches }}/{{ totalMatches }} partidos ({{ progressPercent }}%)</span>
+    </div>
+    <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="progressPercent"></div>
+    </div>
+</div>
+
+<!-- Sections -->
+<div class="bracket-container" *ngIf="sections.length > 0">
+    <div *ngFor="let section of sections" class="bracket-section" [ngClass]="'section-' + section.cssClass">
+        <!-- Section Header -->
+        <div class="section-header">
+            <span class="section-icon">{{ section.titleIcon }}</span>
+            <h3 class="section-title">{{ section.title }}</h3>
+            <div class="champion-badge" *ngIf="section.champion">
+                🏆 {{ getPairName(section.champion) }}
+            </div>
+        </div>
+
+        <!-- Bracket Tree (horizontal for playoffs) -->
+        <div class="bracket-tree" *ngIf="section.cssClass !== 'regular' && section.cssClass !== 'tiebreaker'">
+            <div *ngFor="let round of section.rounds; let ri = index"
+                 class="bracket-round"
+                 [style.--round-index]="ri">
+                <div class="round-label">{{ round.label }}</div>
+                <div class="round-nodes">
+                    <div *ngFor="let node of round.nodes; let ni = index"
+                         class="bracket-node-wrapper"
+                         [class.has-connector]="ri < section.rounds.length - 1"
+                         [style.--node-spacing]="getNodeSpacing(section, ri)">
+
+                        <div class="bracket-node"
+                             [class.completed]="node.status === 'completed'"
+                             [class.pending]="node.status !== 'completed'"
+                             [class.is-third-place]="node.label === '3er Puesto'">
+                            <div class="node-label">{{ node.label }}</div>
+                            <div class="pair-row" [class.winner]="isWinner(node, 'A')" [class.loser]="isLoser(node, 'A')">
+                                <div class="pair-name" [title]="getPairName(node.pairA)">{{ getPairName(node.pairA) }}</div>
+                                <div class="pair-scores" *ngIf="node.status === 'completed' && node.scoreA">
+                                    <span *ngFor="let s of node.scoreA.split(' - ')" class="set-score" [class.won-set]="isWinner(node, 'A')">{{ s }}</span>
+                                </div>
+                                <div class="pair-scores empty" *ngIf="node.status !== 'completed'">
+                                    <span class="set-score placeholder">-</span>
+                                </div>
+                            </div>
+                            <div class="pair-divider"></div>
+                            <div class="pair-row" [class.winner]="isWinner(node, 'B')" [class.loser]="isLoser(node, 'B')">
+                                <div class="pair-name" [title]="getPairName(node.pairB)">{{ getPairName(node.pairB) }}</div>
+                                <div class="pair-scores" *ngIf="node.status === 'completed' && node.scoreB">
+                                    <span *ngFor="let s of node.scoreB.split(' - ')" class="set-score" [class.won-set]="isWinner(node, 'B')">{{ s }}</span>
+                                </div>
+                                <div class="pair-scores empty" *ngIf="node.status !== 'completed'">
+                                    <span class="set-score placeholder">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="connector-right" *ngIf="ri < section.rounds.length - 1"
+                             [class.connector-top]="ni % 2 === 0"
+                             [class.connector-bottom]="ni % 2 === 1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bracket-champion" *ngIf="section.champion">
+                <div class="champion-trophy">🏆</div>
+                <div class="champion-label-end">Campeón</div>
+                <div class="champion-name">{{ getPairName(section.champion) }}</div>
+            </div>
+        </div>
+
+        <!-- Round-by-round grid (for regular & tiebreaker) -->
+        <div class="rounds-grid" *ngIf="section.cssClass === 'regular' || section.cssClass === 'tiebreaker'">
+            <div *ngFor="let round of section.rounds; let ri = index" class="round-column">
+                <div class="round-header">
+                    <div class="round-header-label">{{ round.label }}</div>
+                    <div class="round-header-sub" *ngIf="round.sublabel">{{ round.sublabel }}</div>
+                </div>
+                <div class="round-matches">
+                    <div *ngFor="let node of round.nodes"
+                         class="match-card"
+                         [class.completed]="node.status === 'completed'"
+                         [class.pending]="node.status !== 'completed'">
+                        <div class="match-card-label" *ngIf="node.label">{{ node.label }}</div>
+                        <div class="match-pair" [class.winner]="isWinner(node, 'A')" [class.loser]="isLoser(node, 'A')">
+                            <span class="mp-name">{{ getPairName(node.pairA) }}</span>
+                            <span class="mp-scores" *ngIf="node.status === 'completed' && node.scoreA">
+                                <span *ngFor="let s of node.scoreA.split(' - ')" class="mp-set" [class.won-set]="isWinner(node, 'A')">{{ s }}</span>
+                            </span>
+                            <span class="mp-pending" *ngIf="node.status !== 'completed'">-</span>
+                        </div>
+                        <div class="match-vs-line"></div>
+                        <div class="match-pair" [class.winner]="isWinner(node, 'B')" [class.loser]="isLoser(node, 'B')">
+                            <span class="mp-name">{{ getPairName(node.pairB) }}</span>
+                            <span class="mp-scores" *ngIf="node.status === 'completed' && node.scoreB">
+                                <span *ngFor="let s of node.scoreB.split(' - ')" class="mp-set" [class.won-set]="isWinner(node, 'B')">{{ s }}</span>
+                            </span>
+                            <span class="mp-pending" *ngIf="node.status !== 'completed'">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Empty state -->
+<div class="bracket-empty" *ngIf="sections.length === 0">
+    <div class="empty-icon">🏟️</div>
+    <h3>Sin partidos generados</h3>
+    <p>Genera el calendario para ver el bracket con todas las rondas y el progreso de cada pareja.</p>
+</div>

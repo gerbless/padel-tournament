@@ -10,6 +10,12 @@
             <div class="section-header">
                 <h2>Selecciona tu Club</h2>
                 <div class="controls-wrapper">
+                    <button *ngIf="isLoggedIn && clubRoles.length > 0 && !isSuperAdmin"
+                        class="btn-filter"
+                        [class.active]="showOnlyMyClubs"
+                        (click)="toggleMyClubs()">
+                        {{ showOnlyMyClubs ? '🔓 Ver Todos' : '🔒 Mis Clubs' }}
+                    </button>
                     <input type="text" class="search-input" placeholder="🔍 Buscar club..." [(ngModel)]="searchTerm" />
                 </div>
             </div>
@@ -23,6 +29,9 @@
                     <div class="club-info">
                         <h3>{{ club.name }}</h3>
                         <p *ngIf="club.description">{{ club.description }}</p>
+                        <span class="role-badge" *ngIf="getClubRoleBadge(club.id)">
+                            {{ getClubRoleBadge(club.id) }}
+                        </span>
                     </div>
                     <div class="club-arrow">→</div>
                 </div>

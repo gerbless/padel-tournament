@@ -1,3 +1,39 @@
+/* ============================================
+   MAIN VIEW TABS (Partidos / 4eszzse44esz 8uhvvgy75)
+   ============================================ */
+.main-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--bg-tertiary);
+    border-radius: 0.75rem;
+    padding: 0.25rem;
+    border: 1px solid var(--border);
+    width: fit-content;
+}
+
+.main-tab-btn {
+    padding: 0.625rem 1.5rem;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.main-tab-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.main-tab-btn.active {
+    color: #fff;
+    background: var(--primary);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
 .matches-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -174,4 +210,113 @@
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================
+   GROUP TABS
+   ============================================ */
+.group-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+}
+
+.tab-btn {
+    padding: 0.625rem 1.25rem;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s ease;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.tab-btn:hover {
+    color: var(--primary);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: rgba(16, 185, 129, 0.08);
+}
+
+/* ============================================
+   ROUND SUB-TABS (second level under group tabs)
+   ============================================ */
+.round-subtabs {
+    display: flex;
+    gap: 0.375rem;
+    padding-left: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.subtab-btn {
+    padding: 0.375rem 0.875rem;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 1rem;
+    transition: all 0.2s ease;
+}
+
+.subtab-btn:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.subtab-btn.active {
+    color: #fff;
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+/* ============================================
+   MATCH HEADER (badges inside match card)
+   ============================================ */
+.match-header {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.badge-sm {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 0.375rem;
+    font-weight: 600;
+}
+
+/* ============================================
+   ELIMINATION CARD
+   ============================================ */
+.elimination-card {
+    border-color: rgba(245, 158, 11, 0.4) !important;
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(245, 158, 11, 0.05) 100%);
+}
+
+.elimination-card:hover {
+    border-color: #f59e0b !important;
+    box-shadow: 0 10px 20px -5px rgba(245, 158, 11, 0.3);
+}
+
+.btn-lg {
+    padding: 0.875rem 2rem;
+    font-size: 1.1rem;
 }

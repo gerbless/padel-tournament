@@ -8,16 +8,19 @@ import { Match } from '../matches/entities/match.entity';
 import { MatchesModule } from '../matches/matches.module';
 import { TeamsModule } from '../teams/teams.module';
 import { PlayersModule } from '../players/players.module';
+import { UsersModule } from '../users/users.module';
+import { ClubRoleGuard } from '../auth/club-role.guard';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Tournament, Team, Match]),
         MatchesModule,
         TeamsModule,
-        PlayersModule
+        PlayersModule,
+        UsersModule
     ],
     controllers: [TournamentsController],
-    providers: [TournamentsService],
+    providers: [TournamentsService, ClubRoleGuard],
     exports: [TournamentsService],
 })
 export class TournamentsModule { }

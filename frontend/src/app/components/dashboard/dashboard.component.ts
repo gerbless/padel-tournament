@@ -1,7 +1,8 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, DestroyRef, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NgChartsModule } from 'ng2-charts';
 import { ChartConfiguration, ChartOptions } from 'chart.js';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PlayerService, Player } from '../../services/player.service';
 import { TournamentService, Tournament } from '../../services/tournament.service';
 import { LeagueService } from '../../modules/league/services/league.service';
@@ -9,16 +10,16 @@ import { League } from '../../models/league.model';
 import { CategoryService } from '../../modules/categories/services/category.service';
 import { ClubService } from '../../services/club.service';
 import { FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
 
 @Component({
     selector: 'app-dashboard',
     standalone: true,
     imports: [CommonModule, NgChartsModule, FormsModule],
     templateUrl: './dashboard.component.html',
-    styleUrls: ['./dashboard.component.css']
+    styleUrls: ['./dashboard.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class DashboardComponent implements OnInit, OnDestroy {
+export class DashboardComponent implements OnInit {
     // Stats
     totalPlayers = 0;
     totalTournaments = 0;
@@ -112,7 +113,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     categories: any[] = [];
     selectedCategoryId: string = '';
     selectedClubId: string | null = null;
-    private clubSubscription?: Subscription;
+
+    private destroyRef = inject(DestroyRef);
+
+    private cdr = inject(ChangeDetectorRef);
 
     constructor(
         private playerService: PlayerService,
@@ -125,21 +129,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
     ngOnInit() {
         this.loadCategories();
         // Subscribe to selected club
-        this.clubSubscription = this.clubService.selectedClub$.subscribe(club => {
-            console.log('[Dashboard] Club changed:', club);
+        this.clubService.selectedClub$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(club => {
             this.selectedClubId = club?.id || null;
-            console.log('[Dashboard] selectedClubId:', this.selectedClubId);
             this.loadStats();
+            this.cdr.markForCheck();
         });
-    }
-
-    ngOnDestroy() {
-        this.clubSubscription?.unsubscribe();
     }
 
     loadCategories() {
         this.categoryService.findAll().subscribe(cats => {
             this.categories = cats;
+            this.cdr.markForCheck();
         });
     }
 
@@ -189,16 +191,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     loadStats() {
         const catId = this.selectedCategoryId || undefined;
         const clubId = this.selectedClubId || undefined;
-        console.log('[Dashboard] loadStats called with clubId:', clubId);
 
         // 1. Recommended Matches - filtered by club
         this.playerService.getRecommendedMatches(clubId).subscribe(matches => {
             this.recommendedMatches = matches;
+            this.cdr.markForCheck();
         });
 
         // 1b. Partner Recommendations - filtered by club
         this.playerService.getPartnerRecommendations(clubId).subscribe(partners => {
             this.partnerRecommendations = partners;
+            this.cdr.markForCheck();
         });
 
         // 2. Load Player Data - filtered by club and category
@@ -215,32 +218,38 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.pieChartData = { ...this.pieChartData };
 
             if (this.viewMode === 'players') this.updateCharts();
+            this.cdr.markForCheck();
         });
 
         this.playerService.getLeagueRanking(catId, clubId).subscribe(players => {
             this.leaguePlayers = players.slice(0, 5);
             if (this.viewMode === 'players') this.updateCharts();
+            this.cdr.markForCheck();
         });
 
         this.playerService.getTournamentRanking(catId, clubId).subscribe(players => {
             this.tournamentPlayers = players.slice(0, 5);
             if (this.viewMode === 'players') this.updateCharts();
+            this.cdr.markForCheck();
         });
 
         // 2. Load Pair Data - filtered by club and category
         this.playerService.getPairRanking('global', catId, clubId).subscribe(pairs => {
             this.globalPairs = pairs.slice(0, 10);
             if (this.viewMode === 'pairs') this.updateCharts();
+            this.cdr.markForCheck();
         });
 
         this.playerService.getPairRanking('league', catId, clubId).subscribe(pairs => {
             this.leaguePairs = pairs.slice(0, 5);
             if (this.viewMode === 'pairs') this.updateCharts();
+            this.cdr.markForCheck();
         });
 
         this.playerService.getPairRanking('tournament', catId, clubId).subscribe(pairs => {
             this.tournamentPairs = pairs.slice(0, 5);
             if (this.viewMode === 'pairs') this.updateCharts();
+            this.cdr.markForCheck();
         });
 
         // Load Tournaments & Leagues - filtered by club
@@ -254,6 +263,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
                 return acc + (t.matches ? t.matches.filter(m => m.status === 'completed').length : 0);
             }, 0);
             this.totalMatches = matchesCount;
+            this.cdr.markForCheck();
         });
 
         this.leagueService.getLeagues(clubId).subscribe((leagues: League[]) => {
@@ -264,6 +274,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
                 return acc + (l.matches ? l.matches.filter(m => m.status === 'completed').length : 0);
             }, 0);
             this.totalMatches = matchesCount;
+            this.cdr.markForCheck();
         });
     }
 

@@ -31,6 +31,9 @@ export class Team {
         return this.player2?.name || '';
     }
 
+    @Column({ type: 'int', nullable: true })
+    groupNumber: number;
+
     @Column()
     tournamentId: string;
 

@@ -1,30 +1,43 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { LeagueService } from '../../services/league.service';
 import { League } from '../../../../models/league.model';
 
 import { AuthService } from '../../../../services/auth.service';
+import { ToastService } from '../../../../services/toast.service';
+import { ClubService } from '../../../../services/club.service';
 
 @Component({
     selector: 'app-league-list',
     standalone: true,
     imports: [CommonModule, RouterLink],
     templateUrl: './league-list.component.html',
-    styleUrls: ['./league-list.component.css']
+    styleUrls: ['./league-list.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LeagueListComponent implements OnInit {
     leagues: League[] = [];
     loading = false;
     isLoggedIn = false;
+    canEdit = false;
+    canAdmin = false;
 
     constructor(
         private leagueService: LeagueService,
-        private authService: AuthService
+        private authService: AuthService,
+        private clubService: ClubService,
+        private cdr: ChangeDetectorRef,
+        private toast: ToastService
     ) { }
 
     ngOnInit() {
         this.isLoggedIn = this.authService.isAuthenticated();
+        const club = this.clubService.getSelectedClub();
+        if (club) {
+            this.canEdit = this.authService.hasClubRole(club.id, 'editor');
+            this.canAdmin = this.authService.hasClubRole(club.id, 'admin');
+        }
         this.loadLeagues();
     }
 
@@ -35,10 +48,12 @@ export class LeagueListComponent implements OnInit {
                 leagues.forEach((league: League) => this.normalizePairs(league));
                 this.leagues = leagues;
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (err: any) => {
                 console.error('Error loading leagues:', err);
                 this.loading = false;
+                this.cdr.markForCheck();
             }
         });
     }
@@ -90,11 +105,13 @@ export class LeagueListComponent implements OnInit {
                 this.deleting = false;
                 this.closeDeleteModal();
                 this.loadLeagues();
+                this.toast.success('Liga eliminada');
+                this.cdr.markForCheck();
             },
             error: (err: any) => {
-                console.error('Error deleting league:', err);
+                this.toast.error('Error al eliminar la liga: ' + (err.error?.message || 'Error desconocido'));
                 this.deleting = false;
-                // Optional: show error toast here if desired
+                this.cdr.markForCheck();
             }
         });
     }

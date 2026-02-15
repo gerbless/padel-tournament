@@ -1,7 +1,8 @@
 export interface League {
     id: string;
     name: string;
-    type: 'round_robin' | 'groups_playoff';
+    clubId?: string;
+    type: 'round_robin' | 'groups_playoff' | 'round_robin_playoff';
     startDate: Date;
     endDate?: Date;
     category?: string;
@@ -44,6 +45,13 @@ export interface LeagueConfig {
     numberOfGroups?: number;
     teamsAdvancePerGroup?: number; // e.g., top 2 advance to playoffs
     enableMultiTierPlayoffs?: boolean; // Gold/Silver/Bronze cups
+
+    // Round Robin + Playoff specific
+    goldPlayoffCount?: number; // pairs going to Gold playoff (default 4)
+    silverPlayoffCount?: number; // pairs going to Silver playoff (default 4)
+    relegationCount?: number; // pairs that get relegated (default 0)
+    skipExhibitionSets?: boolean; // Don't count 3rd set when match won 2-0
+    challengeRoundNumber?: number; // Which round is the challenge round
 }
 
 export interface Pair {
@@ -127,7 +135,7 @@ export interface Group {
 // Request/Response DTOs
 export interface CreateLeagueRequest {
     name: string;
-    type: 'round_robin' | 'groups_playoff';
+    type: 'round_robin' | 'groups_playoff' | 'round_robin_playoff';
     startDate: string;
     category?: string;
     config: LeagueConfig;

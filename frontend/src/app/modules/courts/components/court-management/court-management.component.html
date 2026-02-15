@@ -1,0 +1,234 @@
+<div class="container fade-in">
+    <div class="page-header">
+        <h1>🏟️ Gestión de Canchas</h1>
+        <p style="color: var(--text-secondary);">Administra las canchas y configura precios</p>
+    </div>
+
+    <!-- Club Selector -->
+    <div class="club-selector" *ngIf="clubs.length > 1">
+        <label>Club:</label>
+        <select [(ngModel)]="selectedClubId" (ngModelChange)="onClubChange()" class="form-control">
+            <option value="">Selecciona un club</option>
+            <option *ngFor="let club of clubs" [value]="club.id">{{ club.name }}</option>
+        </select>
+    </div>
+
+    <!-- Pricing Toggle -->
+    <div class="pricing-toggle" *ngIf="selectedClubId && canAdmin">
+        <label class="toggle-label" (click)="togglePricing()">
+            <div class="toggle-switch" [class.active]="enablePricing">
+                <div class="toggle-knob"></div>
+            </div>
+            <div class="toggle-text">
+                <span class="toggle-title">💰 Control de Precios y Pagos</span>
+                <span class="toggle-desc">Registra precios por bloque horario y controla pagos de cada reserva</span>
+            </div>
+        </label>
+    </div>
+
+    <!-- Courts Grid -->
+    <div *ngIf="selectedClubId && !loading">
+        <div class="section-header">
+            <h2>Canchas ({{ courts.length }})</h2>
+            <div class="header-actions">
+                <button *ngIf="courts.length > 0" (click)="openDailyView()" class="btn btn-secondary btn-sm">
+                    📅 Vista Diaria
+                </button>
+                <button *ngIf="enablePricing && canAdmin && courts.length > 0" (click)="openAddPriceGlobal()" class="btn btn-secondary btn-sm">
+                    💰 Precio para Todas
+                </button>
+                <button *ngIf="canAdmin" (click)="openAddCourt()" class="btn btn-primary">
+                    + Agregar Cancha
+                </button>
+            </div>
+        </div>
+
+        <div class="courts-grid">
+            <div *ngFor="let court of courts" class="court-card" [class.inactive]="!court.isActive">
+                <div class="court-header">
+                    <div class="court-number">{{ court.courtNumber }}</div>
+                    <div class="court-info">
+                        <h3>{{ court.name }}</h3>
+                        <span class="badge" [class.badge-success]="court.isActive" [class.badge-muted]="!court.isActive">
+                            {{ court.isActive ? 'Activa' : 'Inactiva' }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="court-details">
+                    <span *ngIf="court.surfaceType" class="detail-tag">🏟️ {{ court.surfaceType }}</span>
+                </div>
+
+                <!-- Price Blocks -->
+                <div class="price-section" *ngIf="enablePricing && court.priceBlocks && court.priceBlocks.length > 0">
+                    <h4>Precios por bloque</h4>
+                    <div *ngFor="let block of court.priceBlocks" class="price-row">
+                        <div class="price-time">
+                            <span class="price-days">{{ formatDays(block.daysOfWeek) }}</span>
+                            <span class="price-hours">{{ block.startTime }} - {{ block.endTime }}</span>
+                        </div>
+                        <div class="price-values">
+                            <span class="price-full" title="Cancha completa">🏟️ {{ formatPrice(block.priceFullCourt) }}</span>
+                            <span class="price-player" title="Por jugador" *ngIf="block.pricePerPlayer">👤 {{ formatPrice(block.pricePerPlayer) }}</span>
+                        </div>
+                        <div class="price-actions" *ngIf="canAdmin">
+                            <button (click)="openEditPrice(block)" class="btn-icon" title="Editar">✏️</button>
+                            <button (click)="deletePrice(block)" class="btn-icon btn-danger" title="Eliminar">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="court-actions">
+                    <button (click)="openCalendar(court)" class="btn btn-primary btn-sm">
+                        📅 Calendario
+                    </button>
+                    <button *ngIf="enablePricing && canAdmin" (click)="openAddPrice(court.id)" class="btn btn-secondary btn-sm">
+                        💰 Agregar Precio
+                    </button>
+                    <button *ngIf="canAdmin" (click)="openEditCourt(court)" class="btn btn-secondary btn-sm">
+                        ✏️ Editar
+                    </button>
+                    <button *ngIf="canAdmin" (click)="deleteCourt(court)" class="btn btn-danger btn-sm">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div *ngIf="courts.length === 0" class="empty-state">
+            <div class="empty-icon">🏟️</div>
+            <h3>No hay canchas configuradas</h3>
+            <p>Agrega tu primera cancha para comenzar a gestionar reservas</p>
+            <button *ngIf="isLoggedIn" (click)="openAddCourt()" class="btn btn-primary">
+                + Agregar Primera Cancha
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="loading" class="loading-container">
+        <div class="spinner"></div>
+    </div>
+</div>
+
+<!-- Court Modal -->
+<div class="modal-overlay" *ngIf="showCourtModal" (click)="showCourtModal = false">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>{{ editingCourt ? 'Editar Cancha' : 'Nueva Cancha' }}</h2>
+            <button class="modal-close" (click)="showCourtModal = false">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-grid">
+                <div class="form-group col-span-full">
+                    <label>Nombre</label>
+                    <input type="text" [(ngModel)]="courtForm.name" class="form-control" placeholder="Ej: Cancha 1">
+                </div>
+                <div class="form-group">
+                    <label>Número de Cancha</label>
+                    <input type="number" [(ngModel)]="courtForm.courtNumber" min="1" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Superficie</label>
+                    <select [(ngModel)]="courtForm.surfaceType" class="form-control">
+                        <option value="">Sin especificar</option>
+                        <option value="Cristal">Cristal</option>
+                        <option value="Muro">Muro</option>
+                        <option value="Césped Sintético">Césped Sintético</option>
+                        <option value="Hormigón">Hormigón</option>
+                    </select>
+                </div>
+                <div class="form-group col-span-full">
+                    <label class="checkbox-label">
+                        <input type="checkbox" [(ngModel)]="courtForm.isActive">
+                        <span>Cancha activa (disponible para reservas)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button (click)="showCourtModal = false" class="btn btn-secondary">Cancelar</button>
+            <button (click)="saveCourt()" class="btn btn-primary">
+                {{ editingCourt ? 'Guardar Cambios' : 'Crear Cancha' }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Price Block Modal -->
+<div class="modal-overlay" *ngIf="showPriceModal" (click)="showPriceModal = false">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>{{ editingPriceBlock ? 'Editar Bloque de Precio' : 'Nuevo Bloque de Precio' }}</h2>
+            <button class="modal-close" (click)="showPriceModal = false">×</button>
+        </div>
+        <div class="modal-body">
+            <!-- Apply to all toggle (only when creating new) -->
+            <div class="apply-target" *ngIf="!editingPriceBlock">
+                <div class="target-options">
+                    <button class="target-btn" [class.active]="!applyPriceToAll" (click)="applyPriceToAll = false">
+                        🏟️ Una cancha
+                    </button>
+                    <button class="target-btn" [class.active]="applyPriceToAll" (click)="applyPriceToAll = true">
+                        📋 Todas las canchas
+                    </button>
+                </div>
+                <p class="target-hint" *ngIf="applyPriceToAll">Se creará este bloque de precio en las {{ courts.length }} canchas activas</p>
+                <div class="form-group" *ngIf="!applyPriceToAll && !priceCourtId">
+                    <label>Seleccionar cancha</label>
+                    <select [(ngModel)]="priceCourtId" class="form-control">
+                        <option value="">-- Selecciona --</option>
+                        <option *ngFor="let c of courts" [value]="c.id">{{ c.name }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group col-span-full">
+                    <label>Días de la semana</label>
+                    <div class="day-selector">
+                        <button *ngFor="let day of [0,1,2,3,4,5,6]"
+                            class="day-btn"
+                            [class.selected]="isDaySelected(day)"
+                            (click)="toggleDay(day)">
+                            {{ dayLabels[day] }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Hora inicio</label>
+                    <input type="time" [(ngModel)]="priceForm.startTime" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Hora fin</label>
+                    <input type="time" [(ngModel)]="priceForm.endTime" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label>Precio Cancha Completa</label>
+                    <div class="input-with-suffix">
+                        <input type="number" [(ngModel)]="priceForm.priceFullCourt" min="0"
+                            class="form-control" (ngModelChange)="onFullCourtPriceChange()">
+                        <span class="suffix">$</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Precio por Jugador (1/4)</label>
+                    <div class="input-with-suffix">
+                        <input type="number" [(ngModel)]="priceForm.pricePerPlayer" min="0"
+                            class="form-control" readonly>
+                        <span class="suffix">$</span>
+                    </div>
+                    <small>Se calcula automáticamente (Cancha / 4)</small>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button (click)="showPriceModal = false" class="btn btn-secondary">Cancelar</button>
+            <button (click)="savePrice()" class="btn btn-primary">
+                {{ editingPriceBlock ? 'Guardar' : 'Crear Bloque' }}
+            </button>
+        </div>
+    </div>
+</div>

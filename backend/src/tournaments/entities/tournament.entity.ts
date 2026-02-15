@@ -4,14 +4,22 @@ import { Match } from '../../matches/entities/match.entity';
 import { Club } from '../../clubs/entities/club.entity';
 
 export enum TournamentType {
-    CUADRANGULAR = 'cuadrangular', // 4 teams
-    HEXAGONAL = 'hexagonal' // 6 teams
+    CUADRANGULAR = 'cuadrangular', // 4 teams (1 court)
+    HEXAGONAL = 'hexagonal',       // 6 teams (1 court)
+    OCTAGONAL = 'octagonal',       // 8 teams (2 courts)
+    DECAGONAL = 'decagonal',       // 10 teams (2 courts)
+    DODECAGONAL = 'dodecagonal',   // 12 teams (3 courts)
 }
 
 export enum TournamentStatus {
     DRAFT = 'draft',
     IN_PROGRESS = 'in_progress',
     COMPLETED = 'completed'
+}
+
+export enum DurationMode {
+    FIXED = 'fixed',       // 1:30 fixed time — groups with N matches each
+    FREE = 'free',         // Free time — progressive elimination
 }
 
 @Entity('tournaments')
@@ -34,6 +42,25 @@ export class Tournament {
         default: TournamentStatus.DRAFT
     })
     status: TournamentStatus;
+
+    @Column({ type: 'int', default: 1 })
+    courts: number;
+
+    @Column({
+        type: 'enum',
+        enum: DurationMode,
+        default: DurationMode.FREE
+    })
+    durationMode: DurationMode;
+
+    @Column({ type: 'int', nullable: true })
+    durationMinutes: number;
+
+    @Column({ type: 'int', nullable: true })
+    matchesPerTeam: number;
+
+    @Column({ type: 'int', nullable: true })
+    totalGroups: number;
 
     @OneToMany(() => Team, team => team.tournament, { cascade: true })
     teams: Team[];

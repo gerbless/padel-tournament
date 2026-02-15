@@ -56,8 +56,6 @@ export class MatchesService {
             status: MatchStatus.COMPLETED
         });
 
-        console.log(`[DEBUG] Updated match ${id} with winner ${winnerId}`);
-
         return this.findOne(id);
     }
 

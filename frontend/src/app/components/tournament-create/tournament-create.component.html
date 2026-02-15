@@ -1,93 +1,86 @@
 <div class="container fade-in">
     <div class="flex-between mb-4">
         <h1>Crear Nuevo Torneo</h1>
-        <a routerLink="/tournaments" class="btn btn-secondary">
-            ← Volver
-        </a>
+        <a routerLink="/tournaments" class="btn btn-secondary">← Volver</a>
     </div>
 
-    <div class="card">
+    <!-- Wizard Step Indicator -->
+    <div class="wizard-steps mb-4">
+        <ng-container *ngFor="let step of [1,2,3,4,5,6]">
+            <div *ngIf="isStepVisible(step)" class="wizard-step"
+                [class.active]="currentStep === step"
+                [class.completed]="currentStep > step"
+                (click)="goToStep(step)">
+                <div class="step-circle">
+                    <span *ngIf="currentStep <= step">{{ step }}</span>
+                    <span *ngIf="currentStep > step">✓</span>
+                </div>
+                <span class="step-label">{{ getStepLabel(step) }}</span>
+            </div>
+        </ng-container>
+    </div>
+
+    <div class="card wizard-card">
         <form [formGroup]="tournamentForm" (ngSubmit)="onSubmit()">
-            <!-- Tournament Name -->
-            <div class="form-group">
-                <label class="label">Nombre del Torneo</label>
-                <input type="text" class="input" formControlName="name" placeholder="Ej: Torneo de Verano 2026" />
-                <div *ngIf="tournamentForm.get('name')?.invalid && tournamentForm.get('name')?.touched"
-                    style="color: var(--error); margin-top: var(--spacing-sm); font-size: 0.875rem;">
-                    El nombre es requerido (mínimo 3 caracteres)
+
+            <!-- ==================== STEP 1: Nombre ==================== -->
+            <div class="wizard-step-content" *ngIf="currentStep === 1">
+                <h2 class="step-title">📝 Nombre del Torneo</h2>
+                <p class="step-description">Ingresa un nombre identificativo para tu torneo.</p>
+                <div class="form-group">
+                    <label class="label">Nombre</label>
+                    <input type="text" class="input input-lg" formControlName="name"
+                        placeholder="Ej: Torneo de Verano 2026" autofocus />
+                    <div *ngIf="tournamentForm.get('name')?.invalid && tournamentForm.get('name')?.touched"
+                        class="field-error">
+                        El nombre es requerido (mínimo 3 caracteres)
+                    </div>
                 </div>
             </div>
 
-            <!-- Tournament Type -->
-            <div class="form-group">
-                <label class="label">Tipo de Torneo</label>
-                <select class="input" formControlName="type" (change)="onTypeChange()">
-                    <option value="cuadrangular">Cuadrangular (4 parejas)</option>
-                    <option value="hexagonal">Hexagonal (6 parejas)</option>
-                </select>
-            </div>
+            <!-- ==================== STEP 2: Parejas ==================== -->
+            <div class="wizard-step-content" *ngIf="currentStep === 2">
+                <h2 class="step-title">👥 Parejas</h2>
+                <p class="step-description">
+                    Agrega las parejas del torneo. Necesitas al menos 2 parejas.
+                </p>
 
-            <!-- Configuration Section -->
-            <!-- Configuration Section -->
-            <div class="form-group" formGroupName="config"
-                style="background: rgba(var(--primary-rgb), 0.05); padding: 1rem; border-radius: 0.5rem; border: 1px solid rgba(var(--primary-rgb), 0.1);">
-                <label class="label mb-2">Reglas de Puntuación</label>
-                <div class="flex flex-col gap-2">
-                    <label class="flex items-center gap-2"
-                        style="cursor: pointer; display: flex; align-items: flex-start;">
-                        <input type="radio" formControlName="scoringMode" value="strict"
-                            style="width: auto; margin-right: 8px; margin-top: 4px;">
-                        <span>
-                            <strong>Modo Estricto</strong><br>
-                            <span style="font-size: 0.85em; color: var(--text-secondary);">Reglas oficiales: 6 juegos
-                                para ganar, diferencia de 2, tie-break en 6-6.</span>
-                        </span>
-                    </label>
-                    <label class="flex items-center gap-2"
-                        style="cursor: pointer; display: flex; align-items: flex-start;">
-                        <input type="radio" formControlName="scoringMode" value="flexible"
-                            style="width: auto; margin-right: 8px; margin-top: 4px;">
-                        <span>
-                            <strong>Modo Flexible</strong><br>
-                            <span style="font-size: 0.85em; color: var(--text-secondary);">Permite cualquier marcador
-                                (ej. 4-2, 1-0) y empates (ej. 5-5). Ideal para torneos sociales o por tiempo.</span>
-                        </span>
-                    </label>
+                <div class="flex-between mb-3">
+                    <span class="badge badge-info">{{ totalTeams }} parejas · {{ totalTeams * 2 }} jugadores</span>
+                    <div class="flex gap-2">
+                        <button type="button" class="btn btn-info btn-sm" (click)="autoGenerateTeams()">
+                            🎲 Generar Aleatorias
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm" (click)="addTeam()">
+                            ➕ Agregar Pareja
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Player Datalist for Autocomplete -->
-            <datalist id="playerList">
-                <option *ngFor="let player of existingPlayers" [value]="player.name"></option>
-            </datalist>
-
-            <!-- Teams -->
-            <div class="form-group">
-                <div class="flex-between" style="margin-bottom: var(--spacing-sm);">
-                    <label class="label" style="margin-bottom: 0;">Parejas</label>
-                    <button type="button" class="btn btn-sm btn-info" (click)="autoGenerateTeams()"
-                        title="Generar parejas aleatorias respetando posiciones">
-                        🎲 Generar Parejas Aleatorias
-                    </button>
-                </div>
-                <div class="grid grid-2">
-                    <div *ngFor="let team of teams.controls; let i = index" [formGroup]="$any(team)" class="card"
-                        [style.z-index]="100 - i"
-                        style="padding: var(--spacing-lg); position: relative; overflow: visible;">
-                        <h3 style="font-size: 1.125rem; margin-bottom: var(--spacing-md);">
-                            Pareja {{ i + 1 }}
-                        </h3>
-                        <div style="margin-bottom: var(--spacing-md);">
-                            <label class="label" style="font-size: 0.75rem;">Jugador 1</label>
-                            <app-player-select #pSelect1 formControlName="player1Name" [currentClubId]="currentClubId"
+                <div *ngFor="let teamCtrl of teams.controls; let i = index" [formGroup]="$any(teamCtrl)"
+                    class="card team-card mb-2" [style.z-index]="200 - i">
+                    <div class="flex-between mb-2">
+                        <h4 class="team-title">Pareja {{ i + 1 }}</h4>
+                        <button type="button" class="btn btn-danger btn-sm"
+                            (click)="removeTeam(i)" [disabled]="teams.length <= 2"
+                            style="padding: 2px 8px; font-size: 0.75rem;">✕</button>
+                    </div>
+                    <div class="grid grid-2">
+                        <div>
+                            <label class="label label-sm">Jugador 1</label>
+                            <app-player-select #pSelect1 formControlName="player1Name"
+                                mode="name"
+                                [currentClubId]="currentClubId"
                                 [excludeNames]="getSelectedPlayerNames('player1Name', i)"
                                 (requestCreatePlayer)="openCreateModal($event, pSelect1)"
                                 placeholder="Buscar Jugador 1...">
                             </app-player-select>
                         </div>
                         <div>
-                            <label class="label" style="font-size: 0.75rem;">Jugador 2</label>
-                            <app-player-select #pSelect2 formControlName="player2Name" [currentClubId]="currentClubId"
+                            <label class="label label-sm">Jugador 2</label>
+                            <app-player-select #pSelect2 formControlName="player2Name"
+                                mode="name"
+                                [currentClubId]="currentClubId"
                                 [excludeNames]="getSelectedPlayerNames('player2Name', i)"
                                 (requestCreatePlayer)="openCreateModal($event, pSelect2)"
                                 placeholder="Buscar Jugador 2...">
@@ -97,14 +90,289 @@
                 </div>
             </div>
 
-            <!-- Submit Button -->
-            <div class="flex gap-2 mt-4">
-                <button type="submit" class="btn btn-primary" [disabled]="submitting" style="flex: 1;">
+            <!-- ==================== STEP 3: Canchas ==================== -->
+            <div class="wizard-step-content" *ngIf="currentStep === 3">
+                <h2 class="step-title">🏟️ Número de Canchas</h2>
+                <p class="step-description">
+                    Indica cuántas canchas tienes disponibles para jugar simultáneamente.
+                </p>
+
+                <div class="court-input-wrapper">
+                    <div class="court-input-group">
+                        <button type="button" class="court-btn" (click)="decrementCourts()" [disabled]="cachedCourts <= 1">−</button>
+                        <div class="court-value">
+                            <span class="court-number">{{ cachedCourts }}</span>
+                            <span class="court-unit">cancha{{ cachedCourts > 1 ? 's' : '' }}</span>
+                        </div>
+                        <button type="button" class="court-btn" (click)="incrementCourts()" [disabled]="cachedCourts >= 10">+</button>
+                    </div>
+                </div>
+
+                <div class="info-box mt-4">
+                    <strong>📋 Info:</strong>
+                    {{ cachedCourts }} cancha{{ cachedCourts > 1 ? 's' : '' }} disponible{{ cachedCourts > 1 ? 's' : '' }}.
+                    Se podrán jugar hasta {{ cachedCourts }} partido{{ cachedCourts > 1 ? 's' : '' }} en simultáneo.
+                </div>
+            </div>
+
+            <!-- ==================== STEP 4: Rondas ==================== -->
+            <div class="wizard-step-content" *ngIf="currentStep === 4">
+                <h2 class="step-title">🎯 Generación de Rondas</h2>
+                <p class="step-description">
+                    Elige cómo calcular las rondas de la fase de grupos.
+                </p>
+
+                <!-- Auto vs Custom toggle -->
+                <div class="duration-selector mb-4">
+                    <div class="duration-option" [class.selected]="autoRounds"
+                        (click)="toggleAutoRounds(true)">
+                        <div class="duration-icon">🔄</div>
+                        <div class="duration-title">Automático</div>
+                        <div class="duration-desc">Todos contra todos (round-robin completo). Cada pareja juega contra todas las demás.</div>
+                    </div>
+                    <div class="duration-option" [class.selected]="!autoRounds"
+                        (click)="toggleAutoRounds(false)">
+                        <div class="duration-icon">🎯</div>
+                        <div class="duration-title">Personalizado</div>
+                        <div class="duration-desc">Tú decides cuántos partidos juega cada pareja. Ideal para torneos con tiempo limitado.</div>
+                    </div>
+                </div>
+
+                <!-- Custom matches per team selector (only in custom mode) -->
+                <div *ngIf="!autoRounds" class="fade-in">
+                    <h3 class="step-title" style="font-size: 1.1rem;">📊 Partidos por pareja</h3>
+                    <div class="court-input-wrapper">
+                        <div class="court-input-group">
+                            <button type="button" class="court-btn" (click)="decrementMatchesPerTeam()"
+                                [disabled]="tournamentForm.get('matchesPerTeam')?.value <= 1">−</button>
+                            <div class="court-value">
+                                <span class="court-number">{{ tournamentForm.get('matchesPerTeam')?.value }}</span>
+                                <span class="court-unit">partido{{ tournamentForm.get('matchesPerTeam')?.value > 1 ? 's' : '' }}</span>
+                            </div>
+                            <button type="button" class="court-btn" (click)="incrementMatchesPerTeam()"
+                                [disabled]="tournamentForm.get('matchesPerTeam')?.value >= 30">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info box -->
+                <div class="info-box mt-4">
+                    <strong>📋 Resumen:</strong>
+                    <span *ngIf="autoRounds">
+                        Cada pareja jugará contra <strong>todas las demás</strong> de su grupo (round-robin completo).
+                    </span>
+                    <span *ngIf="!autoRounds">
+                        Cada pareja jugará <strong>{{ tournamentForm.get('matchesPerTeam')?.value }}</strong> partido(s).
+                        Eso significa <strong>{{ tournamentForm.get('matchesPerTeam')?.value }}</strong> ronda(s).
+                    </span>
+                </div>
+
+                <!-- Smart suggestion box -->
+                <div class="info-box mt-3" style="border-left: 3px solid var(--primary);">
+                    <strong>💡 Sugerencia para {{ cachedCourts }} cancha{{ cachedCourts > 1 ? 's' : '' }}:</strong>
+                    <ul style="margin: 0.5rem 0 0 1rem; padding: 0; list-style: disc; font-size: 0.85rem; color: var(--text-secondary);">
+                        <li>
+                            Para mantener <strong>{{ cachedCourts > 1 ? 'las ' + cachedCourts + ' canchas' : 'la cancha' }}</strong>
+                            ocupada{{ cachedCourts > 1 ? 's' : '' }} simultáneamente necesitas al menos
+                            <strong>{{ minTeamsForFullCourts }} parejas</strong> ({{ cachedCourts }} partido{{ cachedCourts > 1 ? 's' : '' }} por ronda).
+                        </li>
+                        <li *ngIf="!autoRounds">
+                            Con {{ cachedCourts }} cancha{{ cachedCourts > 1 ? 's' : '' }}, se sugiere al menos
+                            <strong>{{ suggestedMatchesPerTeam }} partido{{ suggestedMatchesPerTeam > 1 ? 's' : '' }}</strong> por pareja
+                            para aprovechar todas las canchas.
+                            <button *ngIf="tournamentForm.get('matchesPerTeam')?.value !== suggestedMatchesPerTeam"
+                                type="button" class="btn btn-info btn-sm" style="margin-left: 0.5rem; padding: 2px 10px; font-size: 0.75rem;"
+                                (click)="tournamentForm.get('matchesPerTeam')?.setValue(suggestedMatchesPerTeam)">
+                                Aplicar sugerencia
+                            </button>
+                        </li>
+                        <li *ngIf="!autoRounds && totalTeams >= 2">
+                            Con <strong>{{ totalTeams }} parejas</strong> y <strong>{{ tournamentForm.get('matchesPerTeam')?.value }}</strong> partidos/pareja
+                            se generarán aprox. <strong>{{ estimatedTotalMatches }}</strong> partidos totales.
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Group toggle -->
+                <div class="mt-4">
+                    <h3 class="step-title" style="font-size: 1.1rem;">📊 ¿Deseas organizar por grupos?</h3>
+                    <p class="step-description" style="font-size: 0.85rem;">Los grupos permiten que subconjuntos de parejas jueguen su propio round-robin antes de una fase eliminatoria.</p>
+                    <div class="duration-selector">
+                        <div class="duration-option" [class.selected]="!useGroups"
+                            (click)="toggleGroups(false)">
+                            <div class="duration-icon">👥</div>
+                            <div class="duration-title">Sin Grupos</div>
+                            <div class="duration-desc">Todas las parejas juegan entre sí en un solo grupo.</div>
+                        </div>
+                        <div class="duration-option" [class.selected]="useGroups"
+                            (click)="toggleGroups(true)">
+                            <div class="duration-icon">📊</div>
+                            <div class="duration-title">Con Grupos</div>
+                            <div class="duration-desc">Divide las parejas en grupos. Cada grupo juega su propio round-robin.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- K-regular graph validation warning (when not using groups) -->
+                <div *ngIf="!autoRounds && !useGroups && totalTeams >= 2 && !kRegularErrors.global.valid"
+                    class="k-regular-warning mt-3">
+                    <strong>⚠️ Validación matemática ({{ totalTeams }} parejas, {{ tournamentForm.get('matchesPerTeam')?.value }} partidos/pareja):</strong>
+                    <ul style="margin: 0.25rem 0 0 1rem; padding: 0; list-style: disc;">
+                        <li *ngFor="let reason of kRegularErrors.global.reasons">{{ reason }}</li>
+                    </ul>
+                    <p style="margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                        💡 Valores válidos de partidos/pareja para {{ totalTeams }} parejas:
+                        <strong>{{ getSuggestedK(totalTeams).join(', ') }}</strong>
+                    </p>
+                </div>
+                <div *ngIf="!autoRounds && !useGroups && totalTeams >= 2 && kRegularErrors.global.valid"
+                    class="k-regular-ok mt-3">
+                    <strong>✅ Fixture válido:</strong>
+                    {{ totalTeams }} parejas × {{ tournamentForm.get('matchesPerTeam')?.value }} partidos = fixture equilibrado garantizado.
+                </div>
+            </div>
+
+            <!-- ==================== STEP 5: Grupos (solo si useGroups) ==================== -->
+            <div class="wizard-step-content" *ngIf="currentStep === 5">
+                <h2 class="step-title">📊 Configuración de Grupos</h2>
+                <p class="step-description">
+                    Define cuántos grupos tendrá tu torneo y asigna cada pareja a su grupo.
+                </p>
+
+                <div class="court-input-wrapper">
+                    <div class="court-input-group">
+                        <button type="button" class="court-btn" (click)="decrementGroups()" [disabled]="cachedTotalGroups <= 2">−</button>
+                        <div class="court-value">
+                            <span class="court-number">{{ cachedTotalGroups }}</span>
+                            <span class="court-unit">grupo{{ cachedTotalGroups > 1 ? 's' : '' }}</span>
+                        </div>
+                        <button type="button" class="court-btn" (click)="incrementGroups()" [disabled]="cachedTotalGroups >= 10">+</button>
+                    </div>
+                </div>
+
+                <!-- Team group assignment -->
+                <h3 class="step-title mt-4" style="font-size: 1.1rem;">👥 Asignación de parejas</h3>
+                <div *ngFor="let teamCtrl of teams.controls; let i = index"
+                    class="card team-card-compact mb-2">
+                    <div class="flex-between">
+                        <h4 class="team-title" style="margin: 0;">
+                            Pareja {{ i + 1 }}:
+                            <span style="font-weight: 400; color: var(--text-secondary);">
+                                {{ $any(teamCtrl).get('player1Name')?.value || '?' }} / {{ $any(teamCtrl).get('player2Name')?.value || '?' }}
+                            </span>
+                        </h4>
+                        <div class="flex gap-2" style="align-items: center;">
+                            <span class="label label-sm" style="margin: 0;">Grupo:</span>
+                            <div class="group-selector">
+                                <button *ngFor="let gn of cachedGroupNumbers" type="button"
+                                    class="group-btn"
+                                    [class.active]="$any(teamCtrl).get('groupNumber')?.value === gn"
+                                    (click)="setTeamGroup(i, gn)">
+                                    {{ gn }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Group summary -->
+                <div class="info-box mt-3">
+                    <strong>📊 Resumen de Grupos:</strong>
+                    <div class="mt-2">
+                        <span *ngFor="let gn of cachedGroupNumbers" class="badge ml-1"
+                            [class.badge-success]="getTeamsForGroup(gn).length >= 2"
+                            [class.badge-danger]="getTeamsForGroup(gn).length < 2">
+                            Grupo {{ gn }}: {{ getTeamsForGroup(gn).length }} pareja(s)
+                        </span>
+                    </div>
+                </div>
+
+                <!-- K-regular validation per group -->
+                <div *ngIf="!autoRounds" class="mt-3">
+                    <ng-container *ngFor="let gn of cachedGroupNumbers">
+                        <div *ngIf="!kRegularErrors.perGroup.get(gn)?.valid"
+                            class="k-regular-warning mt-2">
+                            <strong>⚠️ Grupo {{ gn }} ({{ getTeamsForGroup(gn).length }} parejas, {{ tournamentForm.get('matchesPerTeam')?.value }} partidos/pareja):</strong>
+                            <ul style="margin: 0.25rem 0 0 1rem; padding: 0; list-style: disc;">
+                                <li *ngFor="let reason of kRegularErrors.perGroup.get(gn)?.reasons">{{ reason }}</li>
+                            </ul>
+                            <p style="margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                💡 Valores válidos: <strong>{{ getSuggestedK(getTeamsForGroup(gn).length).join(', ') }}</strong>
+                            </p>
+                        </div>
+                        <div *ngIf="kRegularErrors.perGroup.get(gn)?.valid && getTeamsForGroup(gn).length >= 2"
+                            class="k-regular-ok mt-2">
+                            ✅ Grupo {{ gn }} ({{ getTeamsForGroup(gn).length }} parejas): fixture válido.
+                        </div>
+                    </ng-container>
+                </div>
+            </div>
+
+            <!-- ==================== STEP 6: Reglas ==================== -->
+            <div class="wizard-step-content" *ngIf="currentStep === 6">
+                <h2 class="step-title">📐 Reglas de Puntuación</h2>
+                <p class="step-description">
+                    Selecciona cómo se contabilizan los sets y juegos.
+                </p>
+
+                <div class="scoring-selector" formGroupName="config">
+                    <label class="scoring-option" [class.selected]="tournamentForm.get('config.scoringMode')?.value === 'strict'">
+                        <input type="radio" formControlName="scoringMode" value="strict" />
+                        <div class="scoring-content">
+                            <strong>🏆 Modo Estricto</strong>
+                            <span class="scoring-desc">Reglas oficiales: 6 juegos para ganar, diferencia de 2, tie-break en 6-6.</span>
+                        </div>
+                    </label>
+                    <label class="scoring-option" [class.selected]="tournamentForm.get('config.scoringMode')?.value === 'flexible'">
+                        <input type="radio" formControlName="scoringMode" value="flexible" />
+                        <div class="scoring-content">
+                            <strong>🎉 Modo Flexible</strong>
+                            <span class="scoring-desc">Permite cualquier marcador (ej. 4-2, 1-0) y empates (ej. 5-5). Ideal para torneos sociales.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Duration config -->
+                <div class="mt-4">
+                    <h3 class="step-title" style="font-size: 1.1rem;">⏱️ Modo de Duración</h3>
+                    <div class="duration-selector">
+                        <div class="duration-option" [class.selected]="durationMode === 'fixed'"
+                            (click)="tournamentForm.get('durationMode')?.setValue('fixed')">
+                            <div class="duration-icon">⏰</div>
+                            <div class="duration-title">Tiempo Fijo</div>
+                            <div class="duration-desc">Ideal para torneos con horario definido.</div>
+                        </div>
+                        <div class="duration-option" [class.selected]="durationMode === 'free'"
+                            (click)="tournamentForm.get('durationMode')?.setValue('free')">
+                            <div class="duration-icon">♾️</div>
+                            <div class="duration-title">Tiempo Libre</div>
+                            <div class="duration-desc">Sin límite de tiempo. Eliminación al final.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div *ngIf="durationMode === 'fixed'" class="sub-config fade-in mt-3">
+                    <div class="form-group">
+                        <label class="label">Duración total (minutos)</label>
+                        <input type="number" class="input" formControlName="durationMinutes" min="30" max="300" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== WIZARD NAVIGATION ==================== -->
+            <div class="wizard-nav mt-4">
+                <button type="button" class="btn btn-secondary" (click)="prevStep()" *ngIf="currentStep > 1">
+                    ← Anterior
+                </button>
+                <div class="flex-grow"></div>
+                <button type="button" class="btn btn-primary" (click)="nextStep()" *ngIf="currentStep < totalSteps"
+                    [disabled]="!isStepValid()">
+                    Siguiente →
+                </button>
+                <button type="submit" class="btn btn-success btn-lg" *ngIf="currentStep === totalSteps"
+                    [disabled]="submitting || tournamentForm.invalid">
                     {{ submitting ? '⏳ Creando...' : '✅ Crear Torneo' }}
                 </button>
-                <a routerLink="/tournaments" class="btn btn-secondary">
-                    Cancelar
-                </a>
             </div>
         </form>
     </div>

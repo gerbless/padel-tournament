@@ -8,6 +8,7 @@ import { PlayersModule } from './players/players.module';
 import { LeaguesModule } from './leagues/leagues.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ClubsModule } from './clubs/clubs.module';
+import { CourtsModule } from './courts/courts.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PersonalTrackerModule } from './personal-tracker/personal-tracker.module';
@@ -38,6 +39,7 @@ import { PersonalTrackerModule } from './personal-tracker/personal-tracker.modul
         LeaguesModule,
         CategoriesModule,
         ClubsModule,
+        CourtsModule,
         AuthModule,
         UsersModule,
         PersonalTrackerModule,

@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, DestroyRef, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LayoutService } from '../../../services/layout.service';
 import { ClubService } from '../../../services/club.service';
 import { Club } from '../../../models/club.model';
@@ -10,6 +11,7 @@ import { AuthService } from '../../../services/auth.service';
     selector: 'app-sidebar',
     standalone: true,
     imports: [CommonModule, RouterLink, RouterLinkActive],
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
     <div class="sidebar-overlay" *ngIf="isMobileOpen" (click)="closeMobileMenu()"></div>
     <aside class="sidebar" [class.collapsed]="isCollapsed" [class.mobile-open]="isMobileOpen">
@@ -26,6 +28,7 @@ import { AuthService } from '../../../services/auth.service';
                 
                 <div class="club-info" *ngIf="selectedClub">
                     <span class="club-name" title="{{ selectedClub.name }}">{{ selectedClub.name }}</span>
+                    <span class="club-role-badge" *ngIf="clubRole">{{ clubRole === 'admin' ? '🔑 Admin' : clubRole === 'editor' ? '✏️ Editor' : '👁️' }}</span>
                     <a class="change-link" (click)="clearClub()">Cambiar Club</a>
                 </div>
             </div>
@@ -48,6 +51,10 @@ import { AuthService } from '../../../services/auth.service';
                 <span class="icon">🏆</span>
                 <span class="label" *ngIf="!isCollapsed">Ligas</span>
             </a>
+            <a routerLink="/courts" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
+                <span class="icon">🏟️</span>
+                <span class="label" *ngIf="!isCollapsed">Canchas</span>
+            </a>
             <a routerLink="/players" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
                 <span class="icon">👥</span>
                 <span class="label" *ngIf="!isCollapsed">Jugadores</span>
@@ -56,11 +63,15 @@ import { AuthService } from '../../../services/auth.service';
                 <span class="icon">🥇</span>
                 <span class="label" *ngIf="!isCollapsed">Ranking</span>
             </a>
+            <a routerLink="/estadisticas" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
+                <span class="icon">📅</span>
+                <span class="label" *ngIf="!isCollapsed">Ranking Mensual</span>
+            </a>
 
-            <a *ngIf="isLoggedIn" routerLink="/personal-tracker" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
+            <!--<a *ngIf="isLoggedIn" routerLink="/personal-tracker" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
                 <span class="icon">📈</span>
                 <span class="label" *ngIf="!isCollapsed">Mi Padel</span>
-            </a>
+            </a> -->
 
             <div class="divider" style="height: 1px; background: rgba(255,255,255,0.1); margin: 0.5rem 0;"></div>
 
@@ -173,6 +184,17 @@ import { AuthService } from '../../../services/auth.service';
 
         .change-link:hover {
             color: var(--primary);
+        }
+
+        .club-role-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.1rem 0.4rem;
+            border-radius: 999px;
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--primary);
+            margin-top: 0.15rem;
         }
 
         .toggle-btn {
@@ -300,6 +322,11 @@ export class SidebarComponent implements OnInit {
     selectedClub: Club | null = null;
 
     isLoggedIn = false;
+    clubRole: string | null = null;
+
+    private destroyRef = inject(DestroyRef);
+
+    private cdr = inject(ChangeDetectorRef);
 
     constructor(
         private layoutService: LayoutService,
@@ -307,21 +334,52 @@ export class SidebarComponent implements OnInit {
         private authService: AuthService,
         private router: Router
     ) {
-        this.layoutService.sidebarCollapsed$.subscribe(
-            (collapsed: boolean) => this.isCollapsed = collapsed
+        this.layoutService.sidebarCollapsed$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(
+            (collapsed: boolean) => {
+                this.isCollapsed = collapsed;
+                this.cdr.markForCheck();
+            }
         );
-        this.layoutService.mobileMenuOpen$.subscribe(
-            (open: boolean) => this.isMobileOpen = open
+        this.layoutService.mobileMenuOpen$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(
+            (open: boolean) => {
+                this.isMobileOpen = open;
+                this.cdr.markForCheck();
+            }
         );
-        this.authService.currentUser$.subscribe((user: any) => {
+        this.authService.currentUser$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe((user: any) => {
             this.isLoggedIn = !!user;
+            this.cdr.markForCheck();
         });
     }
 
     ngOnInit() {
-        this.clubService.selectedClub$.subscribe(club => {
+        this.clubService.selectedClub$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(club => {
             this.selectedClub = club;
+            this.updateClubRole();
+            this.cdr.markForCheck();
         });
+        this.authService.currentUser$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(() => {
+            this.updateClubRole();
+            this.cdr.markForCheck();
+        });
+    }
+
+    private updateClubRole(): void {
+        if (this.selectedClub && this.isLoggedIn) {
+            this.clubRole = this.authService.getClubRole(this.selectedClub.id);
+        } else {
+            this.clubRole = null;
+        }
     }
 
     logout() {

@@ -1,25 +1,40 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CategoryService } from '../../services/category.service';
 import { PlayerService } from '../../../../services/player.service';
+import { AuthService } from '../../../../services/auth.service';
+import { ToastService } from '../../../../services/toast.service';
+import { ClubService } from '../../../../services/club.service';
 
 @Component({
     selector: 'app-promotion-dashboard',
     templateUrl: './promotion-dashboard.component.html',
     styleUrls: ['./promotion-dashboard.component.css'],
     standalone: true,
-    imports: [CommonModule]
+    imports: [CommonModule],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PromotionDashboardComponent implements OnInit {
     analysis: { promotions: any[], relegations: any[] } = { promotions: [], relegations: [] };
     loading = false;
+    isLoggedIn = false;
+    canAdmin = false;
 
     constructor(
         private categoryService: CategoryService,
-        private playerService: PlayerService
+        private playerService: PlayerService,
+        private cdr: ChangeDetectorRef,
+        private toast: ToastService,
+        private authService: AuthService,
+        private clubService: ClubService
     ) { }
 
     ngOnInit(): void {
+        this.isLoggedIn = this.authService.isAuthenticated();
+        const club = this.clubService.getSelectedClub();
+        if (club) {
+            this.canAdmin = this.authService.hasClubRole(club.id, 'admin');
+        }
         this.loadAnalysis();
     }
 
@@ -28,34 +43,21 @@ export class PromotionDashboardComponent implements OnInit {
         this.categoryService.getAnalysis().subscribe(data => {
             this.analysis = data;
             this.loading = false;
+            this.cdr.markForCheck();
         });
     }
 
     applyChange(item: any, type: 'promotion' | 'relegation') {
         if (!confirm(`¿Aplicar cambio de categoría para ${item.player}?`)) return;
 
-        // We need the Category entity or ID. The analysis returns "suggestedCategory" (name).
-        // Ideally backend returns ID. Let's assume backend returns name for display.
-        // We need to fetch categories to find ID? Or update backend to return ID.
-        // Creating a quick lookup is better.
+        if (!item.playerId || !item.suggestedCategoryId) {
+            console.error('Missing playerId or suggestedCategoryId in analysis item');
+            return;
+        }
 
-        this.categoryService.findAll().subscribe(categories => {
-            const targetCategory = categories.find(c => c.name === item.suggestedCategory);
-            if (targetCategory && targetCategory.id) {
-                // Find player by ID? The analysis should return player ID too!
-                // Updating backend service to return player ID is needed.
-                // For now, let's assume item has .player (name). We need ID.
-                // Wait, looking at backend service:
-                // promotions.push({ player: player.name, ... }) -> It ONLY returns name!
-                // I need to fix Backend Service to return Player ID.
-
-                // I will fix Backend Service first? Or just do it now in parallel?
-                // Proceeding assuming I will fix backend to return playerId.
-
-                this.playerService.updatePlayer(item.playerId, { category: targetCategory.id }).subscribe(() => {
-                    this.loadAnalysis(); // Reload to remove item
-                });
-            }
+        this.playerService.updatePlayer(item.playerId, { categoryId: item.suggestedCategoryId }).subscribe({
+            next: () => { this.loadAnalysis(); this.toast.success(`Categoría de ${item.player} actualizada`); },
+            error: () => this.toast.error('Error al aplicar el cambio de categoría')
         });
     }
 }

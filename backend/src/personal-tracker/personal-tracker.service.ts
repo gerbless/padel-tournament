@@ -101,6 +101,11 @@ export class PersonalTrackerService {
         });
     }
 
+    async remove(id: string, ownerId: string): Promise<void> {
+        const match = await this.findOne(id, ownerId);
+        await this.matchRepository.remove(match);
+    }
+
     async getStats(ownerId: string) {
         const matches = await this.findAll(ownerId);
 

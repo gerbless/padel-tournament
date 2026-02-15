@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PlayerService, Player } from '../../services/player.service';
@@ -10,7 +10,8 @@ import { Subscription } from 'rxjs';
     standalone: true,
     imports: [CommonModule, FormsModule],
     templateUrl: './ranking.component.html',
-    styleUrls: ['./ranking.component.css']
+    styleUrls: ['./ranking.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class RankingComponent implements OnInit, OnDestroy {
     players: Player[] = [];
@@ -22,12 +23,14 @@ export class RankingComponent implements OnInit, OnDestroy {
 
     constructor(
         private playerService: PlayerService,
-        private clubService: ClubService
+        private clubService: ClubService,
+        private cdr: ChangeDetectorRef
     ) { }
 
     ngOnInit() {
         this.clubSubscription = this.clubService.selectedClub$.subscribe(club => {
             this.currentClubId = club?.id;
+            this.cdr.markForCheck();
             this.loadRanking();
         });
     }
@@ -43,10 +46,12 @@ export class RankingComponent implements OnInit, OnDestroy {
                 this.players = players;
                 this.filterPlayers();
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (error) => {
                 console.error('Error loading ranking:', error);
                 this.loading = false;
+                this.cdr.markForCheck();
             }
         });
     }

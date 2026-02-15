@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Player } from '../players/entities/player.entity';
 
 @Injectable()
@@ -29,7 +30,7 @@ export class CategoriesService {
         return this.categoryRepository.findOne({ where: { id } });
     }
 
-    update(id: string, updateCategoryDto: any) {
+    update(id: string, updateCategoryDto: UpdateCategoryDto) {
         return this.categoryRepository.update(id, updateCategoryDto);
     }
 
@@ -53,10 +54,12 @@ export class CategoriesService {
                 const higherCategory = categories.find(c => c.level === player.category.level - 1);
                 if (higherCategory) {
                     promotions.push({
+                        playerId: player.id,
                         player: player.name,
                         currentCategory: player.category.name,
                         points: player.totalPoints,
                         suggestedCategory: higherCategory.name,
+                        suggestedCategoryId: higherCategory.id,
                         threshold: player.category.maxPoints
                     });
                 }
@@ -68,10 +71,12 @@ export class CategoriesService {
                 const lowerCategory = categories.find(c => c.level === player.category.level + 1);
                 if (lowerCategory) {
                     relegations.push({
+                        playerId: player.id,
                         player: player.name,
                         currentCategory: player.category.name,
                         points: player.totalPoints,
                         suggestedCategory: lowerCategory.name,
+                        suggestedCategoryId: lowerCategory.id,
                         threshold: player.category.minPoints
                     });
                 }

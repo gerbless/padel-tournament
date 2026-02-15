@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, forwardRef, OnInit, OnChanges, SimpleChanges, HostListener, ElementRef } from '@angular/core';
+import { Component, EventEmitter, Input, Output, forwardRef, OnInit, OnChanges, SimpleChanges, HostListener, ElementRef, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NG_VALUE_ACCESSOR, ControlValueAccessor } from '@angular/forms';
 import { PlayerService, Player } from '../../services/player.service';
@@ -8,6 +8,7 @@ import { PlayerService, Player } from '../../services/player.service';
   selector: 'app-player-select',
   standalone: true,
   imports: [CommonModule, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -244,7 +245,7 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
   onChange: any = () => { };
   onTouched: any = () => { };
 
-  constructor(private playerService: PlayerService) { }
+  constructor(private playerService: PlayerService, private cdr: ChangeDetectorRef) { }
 
   ngOnInit() {
     this.loadPlayers();
@@ -257,10 +258,12 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
         this._allPlayers = players;
         this.filterPlayers();
         this.loading = false;
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error loading players', err);
         this.loading = false;
+        this.cdr.markForCheck();
       }
     });
   }

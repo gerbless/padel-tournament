@@ -33,6 +33,7 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
       DB_DATABASE: padel_tournament
+      JWT_SECRET: ${JWT_SECRET:-cambiar-este-secreto-en-produccion}
       PORT: 3000
       NODE_ENV: production
     ports:

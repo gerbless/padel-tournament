@@ -1,38 +1,33 @@
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
 
 import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class AuthService {
+    private readonly logger = new Logger(AuthService.name);
+
     constructor(
         private jwtService: JwtService,
         private usersService: UsersService
     ) { }
 
     async validateUser(username: string, pass: string): Promise<any> {
-        // Fallback for demo if users table empty? No, let's force DB usage.
-        // Wait, current migration system might need a seed.
-        // I will keep the hardcoded Admin for safety if DB lookup fails, 
-        // BUT prioritize DB user.
+        const user = await this.usersService.findOne(username);
 
-        try {
-            const user = await this.usersService.findOne(username);
-
-            if (user && user.password === pass) {
-                // Return user object strictly
-                const { password, ...result } = user;
-                return result;
-            }
-        } catch (e) {
-            console.warn('DB Auth failed', e);
+        if (!user) {
+            return null;
         }
 
-        // Hardcoded fallback for now so I don't lock myself out during dev
-        if (username === 'admin@padel.com' && pass === 'admin') {
-            return { id: 'admin-id', email: username, role: 'admin' };
+        const isPasswordValid = await bcrypt.compare(pass, user.password);
+
+        if (isPasswordValid) {
+            const { password, ...result } = user;
+            return result;
         }
+
         return null;
     }
 
@@ -48,12 +43,21 @@ export class AuthService {
             playerId: user.playerId || (user.player ? user.player.id : null)
         };
 
+        // Build club roles array for the response
+        const clubRoles = (user.clubRoles || []).map((ucr: any) => ({
+            clubId: ucr.clubId,
+            clubName: ucr.club?.name || '',
+            role: ucr.role,
+        }));
+
         return {
             access_token: this.jwtService.sign(payload),
             user: {
+                id: user.id,
                 username: user.email,
                 role: user.role,
-                playerId: payload.playerId
+                playerId: payload.playerId,
+                clubRoles,
             }
         };
     }

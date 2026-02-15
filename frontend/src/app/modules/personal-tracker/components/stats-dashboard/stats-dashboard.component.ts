@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NgChartsModule } from 'ng2-charts';
 import { ChartConfiguration, ChartData, ChartType } from 'chart.js';
@@ -9,7 +9,8 @@ import { PersonalTrackerService } from '../../../../services/personal-tracker.se
     standalone: true,
     imports: [CommonModule, NgChartsModule],
     templateUrl: './stats-dashboard.component.html',
-    styleUrls: ['./stats-dashboard.component.css']
+    styleUrls: ['./stats-dashboard.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StatsDashboardComponent implements OnInit {
     stats: any = null;
@@ -149,7 +150,7 @@ export class StatsDashboardComponent implements OnInit {
 
     evolutionChartType: ChartType = 'line';
 
-    constructor(private trackerService: PersonalTrackerService) { }
+    constructor(private trackerService: PersonalTrackerService, private cdr: ChangeDetectorRef) { }
 
     ngOnInit() {
         this.loadStats();
@@ -162,10 +163,12 @@ export class StatsDashboardComponent implements OnInit {
                 this.stats = data;
                 this.prepareCharts();
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (err: any) => {
                 console.error('Error loading stats', err);
                 this.loading = false;
+                this.cdr.markForCheck();
             }
         });
     }

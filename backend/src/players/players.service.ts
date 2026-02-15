@@ -1,10 +1,13 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Player } from './entities/player.entity';
 import { PlayerClubStats } from './entities/player-club-stats.entity';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
+import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
+import { PlayerRankingService } from './player-ranking.service';
+import { PlayerRecommendationService } from './player-recommendation.service';
 
 @Injectable()
 export class PlayersService {
@@ -13,6 +16,8 @@ export class PlayersService {
         private playerRepository: Repository<Player>,
         @InjectRepository(PlayerClubStats)
         private playerClubStatsRepository: Repository<PlayerClubStats>,
+        private rankingService: PlayerRankingService,
+        private recommendationService: PlayerRecommendationService,
     ) { }
 
     async create(createPlayerDto: CreatePlayerDto): Promise<Player> {
@@ -81,13 +86,19 @@ export class PlayersService {
         return this.create({ name });
     }
 
-    async findAll(clubId?: string): Promise<Player[]> {
+    async findAll(clubId?: string, pagination?: PaginationQueryDto): Promise<PaginatedResult<Player> | Player[]> {
+        const page = pagination?.page || 1;
+        const limit = pagination?.limit || 50;
+        const skip = (page - 1) * limit;
+
         if (!clubId) {
-            // Return all players with their club associations
-            return this.playerRepository.find({
+            const [data, total] = await this.playerRepository.findAndCount({
                 relations: ['category', 'clubs'],
-                order: { name: 'ASC' }
+                order: { name: 'ASC' },
+                skip,
+                take: limit,
             });
+            return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
         }
 
         // When filtering by club:
@@ -110,7 +121,10 @@ export class PlayersService {
         // Combine and deduplicate
         const playerMap = new Map();
         [...playersInClub, ...playersWithoutClubs].forEach(p => playerMap.set(p.id, p));
-        return Array.from(playerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+        const all = Array.from(playerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+        const total = all.length;
+        const paginated = all.slice(skip, skip + limit);
+        return { data: paginated, total, page, limit, totalPages: Math.ceil(total / limit) };
     }
 
     async findOne(id: string): Promise<Player> {
@@ -153,53 +167,7 @@ export class PlayersService {
     }
 
     async getRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
-        console.log('[PlayersService.getRanking] Called with categoryId:', categoryId, 'clubId:', clubId);
-
-        if (!clubId) {
-            // No club filter: return all players sorted by global points
-            let query = this.playerRepository.createQueryBuilder('player')
-                .leftJoinAndSelect('player.category', 'category');
-
-            if (categoryId) {
-                query = query.where('player.categoryId = :categoryId', { categoryId });
-            }
-
-            return query
-                .orderBy('player.totalPoints', 'DESC')
-                .addOrderBy('player.matchesWon', 'DESC')
-                .getMany();
-        }
-
-        // With club filter: get stats from PlayerClubStats
-        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
-            .leftJoinAndSelect('stats.player', 'player')
-            .leftJoinAndSelect('player.category', 'category')
-            .where('stats.club.id = :clubId', { clubId });
-
-        if (categoryId) {
-            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
-        }
-
-        // Only show players with points in this club
-        statsQuery = statsQuery.andWhere('stats.totalPoints > 0');
-
-        const stats = await statsQuery
-            .orderBy('stats.totalPoints', 'DESC')
-            .addOrderBy('stats.matchesWon', 'DESC')
-            .getMany();
-
-        // Map to players with club-specific stats
-        const players = stats.map(s => {
-            const player = s.player;
-            // Override with club-specific stats
-            player.totalPoints = s.totalPoints;
-            player.leaguePoints = s.leaguePoints;
-            player.tournamentPoints = s.tournamentPoints;
-            player.matchesWon = s.matchesWon;
-            return player;
-        });
-
-        return players;
+        return this.rankingService.getRanking(categoryId, clubId);
     }
 
     async updateStats(id: string, stats: Partial<Player>): Promise<void> {
@@ -230,23 +198,32 @@ export class PlayersService {
     }
 
     async recalculateTotalPoints(playerIds: string[]) {
-        for (const playerId of new Set(playerIds)) {
-            const player = await this.playerRepository.findOne({
-                where: { id: playerId },
-                relations: [
-                    'teamsAsPlayer1', 'teamsAsPlayer1.tournament',
-                    'teamsAsPlayer1.matchesAsTeam1', 'teamsAsPlayer1.matchesAsTeam1.winner',
-                    'teamsAsPlayer1.matchesAsTeam2', 'teamsAsPlayer1.matchesAsTeam2.winner',
-                    'teamsAsPlayer2', 'teamsAsPlayer2.tournament',
-                    'teamsAsPlayer2.matchesAsTeam1', 'teamsAsPlayer2.matchesAsTeam1.winner',
-                    'teamsAsPlayer2.matchesAsTeam2', 'teamsAsPlayer2.matchesAsTeam2.winner',
-                    'leagueTeamsAsPlayer1', 'leagueTeamsAsPlayer1.league',
-                    'leagueTeamsAsPlayer2', 'leagueTeamsAsPlayer2.league',
-                    'clubs'
-                ]
-            });
+        const uniqueIds = [...new Set(playerIds)];
+        if (uniqueIds.length === 0) return;
 
-            if (!player) continue;
+        // Single query: load ALL players with ALL relations at once (eliminates N+1)
+        const players = await this.playerRepository.createQueryBuilder('player')
+            .leftJoinAndSelect('player.teamsAsPlayer1', 'tp1')
+            .leftJoinAndSelect('tp1.tournament', 'tp1_tournament')
+            .leftJoinAndSelect('tp1.matchesAsTeam1', 'tp1_m1')
+            .leftJoinAndSelect('tp1_m1.winner', 'tp1_m1_winner')
+            .leftJoinAndSelect('tp1.matchesAsTeam2', 'tp1_m2')
+            .leftJoinAndSelect('tp1_m2.winner', 'tp1_m2_winner')
+            .leftJoinAndSelect('player.teamsAsPlayer2', 'tp2')
+            .leftJoinAndSelect('tp2.tournament', 'tp2_tournament')
+            .leftJoinAndSelect('tp2.matchesAsTeam1', 'tp2_m1')
+            .leftJoinAndSelect('tp2_m1.winner', 'tp2_m1_winner')
+            .leftJoinAndSelect('tp2.matchesAsTeam2', 'tp2_m2')
+            .leftJoinAndSelect('tp2_m2.winner', 'tp2_m2_winner')
+            .leftJoinAndSelect('player.leagueTeamsAsPlayer1', 'ltp1')
+            .leftJoinAndSelect('ltp1.league', 'ltp1_league')
+            .leftJoinAndSelect('player.leagueTeamsAsPlayer2', 'ltp2')
+            .leftJoinAndSelect('ltp2.league', 'ltp2_league')
+            .leftJoinAndSelect('player.clubs', 'club')
+            .where('player.id IN (:...ids)', { ids: uniqueIds })
+            .getMany();
+
+        for (const player of players) {
 
             // Global stats
             let globalTotalPoints = 0;
@@ -393,7 +370,7 @@ export class PlayersService {
                     continue;
                 }
 
-                const clubStats = await this.getOrCreatePlayerClubStats(playerId, stats.clubId);
+                const clubStats = await this.getOrCreatePlayerClubStats(player.id, stats.clubId);
                 if (clubStats) {
                     clubStats.totalPoints = stats.totalPoints;
                     clubStats.leaguePoints = stats.leaguePoints;
@@ -410,291 +387,27 @@ export class PlayersService {
     }
 
     async getLeagueRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
-        if (!clubId) {
-            let query = this.playerRepository.createQueryBuilder('player')
-                .leftJoinAndSelect('player.category', 'category');
-
-            if (categoryId) {
-                query = query.where('player.categoryId = :categoryId', { categoryId });
-            }
-
-            return query
-                .orderBy('player.leaguePoints', 'DESC')
-                .addOrderBy('player.totalPoints', 'DESC')
-                .addOrderBy('player.matchesWon', 'DESC')
-                .getMany();
-        }
-
-        // With club filter: query PlayerClubStats
-        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
-            .leftJoinAndSelect('stats.player', 'player')
-            .leftJoinAndSelect('player.category', 'category')
-            .where('stats.club.id = :clubId', { clubId })
-            .andWhere('stats.leaguePoints > 0'); // Filter active in leagues
-
-        if (categoryId) {
-            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
-        }
-
-        const stats = await statsQuery
-            .orderBy('stats.leaguePoints', 'DESC')
-            .addOrderBy('stats.totalPoints', 'DESC')
-            .addOrderBy('stats.matchesWon', 'DESC')
-            .getMany();
-
-        // Map to players with club-specific stats
-        return stats.map(s => {
-            const player = s.player;
-            player.totalPoints = s.totalPoints;
-            player.leaguePoints = s.leaguePoints;
-            player.tournamentPoints = s.tournamentPoints;
-            player.matchesWon = s.matchesWon;
-            return player;
-        });
+        return this.rankingService.getLeagueRanking(categoryId, clubId);
     }
 
     async getTournamentRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
-        if (!clubId) {
-            let query = this.playerRepository.createQueryBuilder('player')
-                .leftJoinAndSelect('player.category', 'category');
-
-            if (categoryId) {
-                query = query.where('player.categoryId = :categoryId', { categoryId });
-            }
-
-            return query
-                .orderBy('player.tournamentPoints', 'DESC')
-                .addOrderBy('player.totalPoints', 'DESC')
-                .addOrderBy('player.matchesWon', 'DESC')
-                .getMany();
-        }
-
-        // With club filter: query PlayerClubStats
-        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
-            .leftJoinAndSelect('stats.player', 'player')
-            .leftJoinAndSelect('player.category', 'category')
-            .where('stats.club.id = :clubId', { clubId })
-            .andWhere('stats.tournamentPoints > 0'); // Filter active in tournaments
-
-        if (categoryId) {
-            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
-        }
-
-        const stats = await statsQuery
-            .orderBy('stats.tournamentPoints', 'DESC')
-            .addOrderBy('stats.totalPoints', 'DESC')
-            .addOrderBy('stats.matchesWon', 'DESC')
-            .getMany();
-
-        // Map to players with club-specific stats
-        return stats.map(s => {
-            const player = s.player;
-            player.totalPoints = s.totalPoints;
-            player.leaguePoints = s.leaguePoints;
-            player.tournamentPoints = s.tournamentPoints;
-            player.matchesWon = s.matchesWon;
-            return player;
-        });
+        return this.rankingService.getTournamentRanking(categoryId, clubId);
     }
 
     async getPairRankings(type: 'global' | 'league' | 'tournament', categoryId?: string, clubId?: string): Promise<any[]> {
-        // 1. Fetch all players (filtered by Category and Club if needed)
-        let players: Player[];
-
-        if (!clubId) {
-            let query = this.playerRepository.createQueryBuilder('player')
-                .leftJoinAndSelect('player.category', 'category');
-
-            if (categoryId) {
-                query = query.where('player.categoryId = :categoryId', { categoryId });
-            }
-
-            players = await query.getMany();
-        } else {
-            // Get players in club OR without clubs
-            let baseQuery = this.playerRepository.createQueryBuilder('player')
-                .leftJoinAndSelect('player.category', 'category')
-                .leftJoinAndSelect('player.clubs', 'club');
-
-            if (categoryId) {
-                baseQuery = baseQuery.where('player.categoryId = :categoryId', { categoryId });
-            }
-
-            const playersInClub = await baseQuery
-                .andWhere('club.id = :clubId', { clubId })
-                .getMany();
-
-            let noClubQuery = this.playerRepository.createQueryBuilder('player')
-                .leftJoinAndSelect('player.category', 'category')
-                .leftJoin('player.clubs', 'club')
-                .where('club.id IS NULL');
-
-            if (categoryId) {
-                noClubQuery = noClubQuery.andWhere('player.categoryId = :categoryId', { categoryId });
-            }
-
-            const playersWithoutClubs = await noClubQuery.getMany();
-
-            const playerMap = new Map();
-            [...playersInClub, ...playersWithoutClubs].forEach(p => playerMap.set(p.id, p));
-            players = Array.from(playerMap.values());
-        }
-
-        // If no players found for category/club, return empty
-        if (players.length === 0) return [];
-
-        const playerMap = new Map(players.map(p => [p.id, p]));
-        const validPlayerIds = new Set(players.map(p => p.id));
-
-        const pairMap = new Map<string, { p1: Player, p2: Player, points: number }>();
-
-        // Helper to process teams
-        const processTeams = (teams: any[], isTournament: boolean) => {
-            teams.forEach(t => {
-                if (!t.player1Id || !t.player2Id) return;
-
-                // RESTRICTION: Player cannot form a pair with themselves
-                if (t.player1Id === t.player2Id) return;
-
-                // FILTER: Both players must be in the valid list (i.e., match the category)
-                // The user said "todo debe ser segmentado". Usually pairs are in same category.
-                // If one is not, maybe exclude? Or include if at least one?
-                // Strict segment: Both must be in category.
-                if (!validPlayerIds.has(t.player1Id) || !validPlayerIds.has(t.player2Id)) {
-                    return;
-                }
-
-                // Create unique key for the pair (sorted IDs)
-                const [id1, id2] = [t.player1Id, t.player2Id].sort();
-                const key = `${id1}_${id2}`;
-
-                if (!pairMap.has(key)) {
-                    pairMap.set(key, {
-                        p1: playerMap.get(id1),
-                        p2: playerMap.get(id2),
-                        points: 0
-                    });
-                }
-
-                const entry = pairMap.get(key);
-
-                if (isTournament) {
-                    // For tournaments, calculate points from matches
-                    let points = 0;
-                    // Logic from recalculateTotalPoints
-                    // Logic from recalculateTotalPoints
-                    const checkMatch = (match: any, teamId: string) => {
-                        if (match.status === 'completed') {
-                            const config = t.tournament?.config || {};
-                            const ptsWin = config.pointsForWin ?? 3;
-                            const ptsTie = config.pointsForTie ?? 1;
-                            const ptsLoss = config.pointsForLoss ?? 0;
-
-                            if (match.winner?.id === teamId) {
-                                points += ptsWin;
-                            } else if (!match.winner) {
-                                points += ptsTie;
-                            } else {
-                                points += ptsLoss;
-                            }
-                        }
-                    };
-                    t.matchesAsTeam1?.forEach(m => checkMatch(m, t.id));
-                    t.matchesAsTeam2?.forEach(m => checkMatch(m, t.id));
-
-                    if (type === 'global' || type === 'tournament') {
-                        entry.points += points;
-                    }
-                } else {
-                    // For leagues, take stored points
-                    if (type === 'global' || type === 'league') {
-                        entry.points += (t.points || 0);
-                    }
-                }
-            });
-        };
-
-        // 2. Fetch Data based on type (optimized to fetch relations only needed)
-        // We'll fetch everything for simplicity in first iteration, similar to recalculate logic
-        // But better to use QueryBuilder for performance if dataset grows. 
-        // For now, reuse repository fetches.
-        // NOTE: We fetch ALL teams, but filter inside processTeams using validPlayerIds
-
-        if (type === 'global' || type === 'tournament') {
-            // Fetch tournament teams, filtered by tournament's clubId if applicable
-            let tournamentTeamsQuery = this.playerRepository.manager.getRepository('Team')
-                .createQueryBuilder('team')
-                .leftJoinAndSelect('team.matchesAsTeam1', 'matchesAsTeam1')
-                .leftJoinAndSelect('matchesAsTeam1.winner', 'winner1')
-                .leftJoinAndSelect('team.matchesAsTeam2', 'matchesAsTeam2')
-                .leftJoinAndSelect('matchesAsTeam2.winner', 'winner2')
-                .leftJoin('team.tournament', 'tournament');
-
-            if (clubId) {
-                tournamentTeamsQuery = tournamentTeamsQuery.where('tournament.clubId = :clubId OR tournament.clubId IS NULL', { clubId });
-            }
-
-            const tournamentTeams = await tournamentTeamsQuery.getMany();
-            processTeams(tournamentTeams, true);
-        }
-
-        if (type === 'global' || type === 'league') {
-            // Fetch league teams, filtered by league's clubId if applicable
-            let leagueTeamsQuery = this.playerRepository.manager.getRepository('LeagueTeam')
-                .createQueryBuilder('leagueTeam')
-                .leftJoin('leagueTeam.league', 'league');
-
-            if (clubId) {
-                leagueTeamsQuery = leagueTeamsQuery.where('league.clubId = :clubId OR league.clubId IS NULL', { clubId });
-            }
-
-            const leagueTeams = await leagueTeamsQuery.getMany();
-            processTeams(leagueTeams, false);
-        }
-
-        // 3. Convert Map to Array and Sort
-        return Array.from(pairMap.values())
-            .sort((a, b) => b.points - a.points);
+        return this.rankingService.getPairRankings(type, categoryId, clubId);
     }
 
     async getRecommendedMatches(clubId?: string): Promise<any[]> {
-        // 1. Get Global Pair Rankings filtered by club
-        const rankings = await this.getPairRankings('global', undefined, clubId);
-        const recommendations = [];
+        return this.recommendationService.getRecommendedMatches(clubId);
+    }
 
-        // 2. iterate to find balanced matches
-        for (let i = 0; i < rankings.length - 1; i++) {
-            const pairA = rankings[i];
+    async getAllPartnerRecommendations(clubId?: string): Promise<any[]> {
+        return this.recommendationService.getAllPartnerRecommendations(clubId);
+    }
 
-            // Look at the next few pairs (e.g., next 3) to find a valid opponent
-            for (let j = i + 1; j < Math.min(i + 4, rankings.length); j++) {
-                const pairB = rankings[j];
-
-                // Check for player intersection
-                const playersA = [pairA.p1.id, pairA.p2.id];
-                const playersB = [pairB.p1.id, pairB.p2.id];
-                const intersection = playersA.filter(id => playersB.includes(id));
-
-                if (intersection.length === 0) {
-                    // Valid Matchup
-                    const pointDiff = Math.abs(pairA.points - pairB.points);
-
-                    recommendations.push({
-                        pair1: pairA,
-                        pair2: pairB,
-                        pointDiff: pointDiff
-                    });
-
-                    // Break inner loop to avoid recommending the same pair multiple times too aggressively
-                    // (Optional: keep strictly one recommendation per "lead" pair)
-                    break;
-                }
-            }
-        }
-
-        // Return top 5 most balanced matches based on point difference (or just top 5 high-level matches)
-        // Here we prioritize high-ranking matches that are balanced
-        return recommendations.slice(0, 5);
+    async getGlobalTopPlayers(limit: number = 10): Promise<Player[]> {
+        return this.rankingService.getGlobalTopPlayers(limit);
     }
 
     async cleanupOrphanedPlayers(playerIds: string[]): Promise<void> {
@@ -713,109 +426,6 @@ export class PlayersService {
         const players = await this.playerRepository.find();
         const ids = players.map(p => p.id);
         await this.recalculateTotalPoints(ids);
-    }
-
-    async getAllPartnerRecommendations(clubId?: string): Promise<any[]> {
-        // Get all players with category and position, filtered by club if provided
-        let eligiblePlayers: Player[];
-
-        if (!clubId) {
-            eligiblePlayers = await this.playerRepository.createQueryBuilder('player')
-                .leftJoinAndSelect('player.category', 'category')
-                .where('player.position IS NOT NULL')
-                .andWhere('player.categoryId IS NOT NULL')
-                .getMany();
-        } else {
-            // Get players in club OR without clubs
-            const playersInClub = await this.playerRepository.createQueryBuilder('player')
-                .leftJoinAndSelect('player.category', 'category')
-                .innerJoin('player.clubs', 'club')
-                .where('player.position IS NOT NULL')
-                .andWhere('player.categoryId IS NOT NULL')
-                .andWhere('club.id = :clubId', { clubId })
-                .getMany();
-
-            const playersWithoutClubs = await this.playerRepository.createQueryBuilder('player')
-                .leftJoinAndSelect('player.category', 'category')
-                .leftJoin('player.clubs', 'club')
-                .where('player.position IS NOT NULL')
-                .andWhere('player.categoryId IS NOT NULL')
-                .andWhere('club.id IS NULL')
-                .getMany();
-
-            const playerMap = new Map();
-            [...playersInClub, ...playersWithoutClubs].forEach(p => playerMap.set(p.id, p));
-            eligiblePlayers = Array.from(playerMap.values());
-        }
-
-        // Helper function to check position compatibility
-        const isPositionCompatible = (pos1: string, pos2: string): boolean => {
-            if (pos1 === 'mixto' || pos2 === 'mixto') return true;
-            if (pos1 === 'reves' && pos2 === 'drive') return true;
-            if (pos1 === 'drive' && pos2 === 'reves') return true;
-            return false;
-        };
-
-        const recommendations = [];
-
-        // For each player, find compatible partners
-        for (let i = 0; i < eligiblePlayers.length; i++) {
-            const player1 = eligiblePlayers[i];
-
-            for (let j = i + 1; j < eligiblePlayers.length; j++) {
-                const player2 = eligiblePlayers[j];
-
-                // Safety check: ensure not the same player
-                if (player1.id === player2.id) continue;
-
-                // Check if they are in the same category and have compatible positions
-                if (player1.category.id === player2.category.id &&
-                    isPositionCompatible(player1.position, player2.position)) {
-
-                    const pointDiff = Math.abs(player1.totalPoints - player2.totalPoints);
-                    const avgPoints = Math.round((player1.totalPoints + player2.totalPoints) / 2);
-
-                    recommendations.push({
-                        player1: {
-                            id: player1.id,
-                            name: player1.name,
-                            position: player1.position,
-                            totalPoints: player1.totalPoints
-                        },
-                        player2: {
-                            id: player2.id,
-                            name: player2.name,
-                            position: player2.position,
-                            totalPoints: player2.totalPoints
-                        },
-                        category: player1.category.name,
-                        pointDifference: pointDiff,
-                        averagePoints: avgPoints,
-                        compatibility: 100 - Math.min(pointDiff, 100)
-                    });
-                }
-            }
-        }
-
-        // Sort by compatibility (highest first) and return top 10
-        recommendations.sort((a, b) => b.compatibility - a.compatibility);
-        return recommendations.slice(0, 10);
-    }
-
-    async getGlobalTopPlayers(limit: number = 10): Promise<Player[]> {
-        // Get top players across all clubs (aggregated stats)
-        // Only return players who have actually played (totalPoints > 0)
-        return this.playerRepository.find({
-            relations: ['category'],
-            where: {
-                totalPoints: MoreThan(0)
-            },
-            order: {
-                totalPoints: 'DESC',
-                matchesWon: 'DESC'
-            },
-            take: limit
-        });
     }
 
     // ==================== Player Club Stats Methods ====================

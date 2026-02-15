@@ -6,9 +6,26 @@
         📍 Club: <strong>{{ currentClubName }}</strong>
       </p>
     </div>
-    <a routerLink="/tournaments/create" class="btn btn-primary" *ngIf="isLoggedIn">
+    <a routerLink="/tournaments/create" class="btn btn-primary" *ngIf="canAdmin">
       ➕ Crear Torneo
     </a>
+  </div>
+
+  <!-- Month Navigator -->
+  <div class="month-nav mb-4">
+    <div class="month-nav-inner">
+      <button type="button" class="btn btn-icon" (click)="prevMonth()" [disabled]="showAll">←</button>
+      <div class="month-display" [class.dimmed]="showAll">
+        <span class="month-name">{{ monthNames[selectedMonth - 1] }}</span>
+        <span class="month-year">{{ selectedYear }}</span>
+      </div>
+      <button type="button" class="btn btn-icon" (click)="nextMonth()" [disabled]="showAll">→</button>
+    </div>
+    <button type="button" class="btn btn-sm"
+      [class.btn-primary]="showAll" [class.btn-secondary]="!showAll"
+      (click)="toggleShowAll()">
+      {{ showAll ? '📅 Filtrar por mes' : '📋 Ver todos' }}
+    </button>
   </div>
 
   <div *ngIf="loading" class="flex-center" style="min-height: 400px;">
@@ -16,14 +33,56 @@
   </div>
 
   <div *ngIf="!loading && tournaments.length === 0" class="card text-center">
-    <h3>No hay torneos creados</h3>
+    <h3>No hay torneos {{ showAll ? 'creados' : 'en ' + monthNames[selectedMonth - 1] + ' ' + selectedYear }}</h3>
     <p style="color: var(--text-muted); margin-top: var(--spacing-md);">
-      Crea tu primer torneo para comenzar
+      {{ showAll ? 'Crea tu primer torneo para comenzar' : 'Intenta con otro mes o crea un nuevo torneo' }}
     </p>
   </div>
 
-  <div *ngIf="!loading && tournaments.length > 0" class="grid grid-2">
-    <div *ngFor="let tournament of tournaments" class="card slide-up">
+  <!-- Grouped by month view (when showAll) -->
+  <ng-container *ngIf="!loading && showAll && groupedTournaments.length > 0">
+    <div *ngFor="let group of groupedTournaments" class="month-group mb-4">
+      <h2 class="month-group-title">📅 {{ group.label }}</h2>
+      <div class="grid grid-2">
+        <div *ngFor="let tournament of group.tournaments" class="card slide-up tournament-card">
+          <div class="flex-between mb-2">
+            <h3>{{ tournament.name }}</h3>
+            <span class="badge" [ngClass]="getStatusBadgeClass(tournament.status)">
+              {{ getStatusText(tournament.status) }}
+            </span>
+          </div>
+
+          <div class="tournament-date">
+            📅 {{ formatDate(tournament.createdAt) }}
+          </div>
+
+          <div style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
+            <p>
+              <strong>Canchas:</strong> {{ tournament.courts || 1 }}
+              · <strong>Parejas:</strong> {{ tournament.teams?.length || 0 }}
+            </p>
+            <p>
+              <strong>Partidos:</strong> {{ tournament.matches?.length || 0 }}
+            </p>
+          </div>
+
+          <div class="flex gap-2 mt-3">
+            <a [routerLink]="['/tournaments', tournament.id]" class="btn btn-primary" style="flex: 1;">
+              Ver Torneo
+            </a>
+            <button *ngIf="tournament.status !== 'completed' && canAdmin"
+              (click)="deleteTournament(tournament.id, $event)" class="btn btn-danger">
+              🗑️
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- Single month view -->
+  <div *ngIf="!loading && !showAll && tournaments.length > 0" class="grid grid-2">
+    <div *ngFor="let tournament of tournaments" class="card slide-up tournament-card">
       <div class="flex-between mb-2">
         <h3>{{ tournament.name }}</h3>
         <span class="badge" [ngClass]="getStatusBadgeClass(tournament.status)">
@@ -31,14 +90,17 @@
         </span>
       </div>
 
+      <div class="tournament-date">
+        📅 {{ formatDate(tournament.createdAt) }}
+      </div>
+
       <div style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
         <p>
-          <strong>Tipo:</strong>
-          {{ tournament.type === 'cuadrangular' ? 'Cuadrangular' : 'Hexagonal' }}
-          ({{ getTeamCount(tournament.type) }} parejas)
+          <strong>Canchas:</strong> {{ tournament.courts || 1 }}
+          · <strong>Parejas:</strong> {{ tournament.teams?.length || 0 }}
         </p>
         <p>
-          <strong>Partidos:</strong> {{ tournament.matches.length || 0 }}
+          <strong>Partidos:</strong> {{ tournament.matches?.length || 0 }}
         </p>
       </div>
 
@@ -46,7 +108,7 @@
         <a [routerLink]="['/tournaments', tournament.id]" class="btn btn-primary" style="flex: 1;">
           Ver Torneo
         </a>
-        <button *ngIf="tournament.status !== 'completed' && isLoggedIn"
+        <button *ngIf="tournament.status !== 'completed' && canAdmin"
           (click)="deleteTournament(tournament.id, $event)" class="btn btn-danger">
           🗑️
         </button>

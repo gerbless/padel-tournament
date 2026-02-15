@@ -1,15 +1,17 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { StatsDashboardComponent } from './components/stats-dashboard/stats-dashboard.component';
 import { PersonalTrackerService, PersonalMatch } from '../../services/personal-tracker.service';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
     selector: 'app-personal-tracker',
     standalone: true,
     imports: [CommonModule, RouterModule, StatsDashboardComponent],
     templateUrl: './personal-tracker.component.html',
-    styleUrls: ['./personal-tracker.component.css']
+    styleUrls: ['./personal-tracker.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PersonalTrackerComponent implements OnInit {
     inProgressMatches: PersonalMatch[] = [];
@@ -17,7 +19,9 @@ export class PersonalTrackerComponent implements OnInit {
 
     constructor(
         private trackerService: PersonalTrackerService,
-        private router: Router
+        private router: Router,
+        private cdr: ChangeDetectorRef,
+        private toast: ToastService
     ) { }
 
     ngOnInit() {
@@ -30,10 +34,12 @@ export class PersonalTrackerComponent implements OnInit {
             next: (matches) => {
                 this.inProgressMatches = matches;
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (err: any) => {
                 console.error('Error loading in-progress matches:', err);
                 this.loading = false;
+                this.cdr.markForCheck();
             }
         });
     }
@@ -44,8 +50,10 @@ export class PersonalTrackerComponent implements OnInit {
 
     deleteMatch(matchId: string) {
         if (confirm('¿Estás seguro de eliminar este partido?')) {
-            // TODO: Implementar eliminación
-            console.log('Delete match:', matchId);
+            this.trackerService.deleteMatch(matchId).subscribe({
+                next: () => { this.loadInProgressMatches(); this.toast.success('Partido eliminado'); },
+                error: () => this.toast.error('Error al eliminar el partido')
+            });
         }
     }
 

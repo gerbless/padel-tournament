@@ -3,6 +3,7 @@ export interface Club {
     name: string;
     description?: string;
     logo?: string;
+    enableCourtPricing?: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -17,4 +18,5 @@ export interface UpdateClubDto {
     name?: string;
     description?: string;
     logo?: string;
+    enableCourtPricing?: boolean;
 }

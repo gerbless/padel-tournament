@@ -1,15 +1,17 @@
-import { Component, EventEmitter, Input, Output, HostListener, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, Output, HostListener, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { PlayerService, Player } from '../../services/player.service';
 import { CategoryService } from '../../modules/categories/services/category.service';
 import { ClubService } from '../../services/club.service';
 import { Club } from '../../models/club.model';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-player-create-modal',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="modal-overlay" (click)="cancel()">
       <div class="modal-content" (click)="$event.stopPropagation()">
@@ -343,7 +345,9 @@ export class PlayerCreateModalComponent implements OnInit {
     private fb: FormBuilder,
     private playerService: PlayerService,
     private categoryService: CategoryService,
-    private clubService: ClubService
+    private clubService: ClubService,
+    private cdr: ChangeDetectorRef,
+    private toast: ToastService
   ) {
     this.playerForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2)]],
@@ -426,7 +430,10 @@ export class PlayerCreateModalComponent implements OnInit {
   }
 
   loadMetadata() {
-    this.categoryService.findAll().subscribe(cats => this.categories = cats);
+    this.categoryService.findAll().subscribe(cats => {
+      this.categories = cats;
+      this.cdr.markForCheck();
+    });
     this.clubService.getClubs().subscribe(clubs => {
       this.clubs = clubs;
 
@@ -441,6 +448,7 @@ export class PlayerCreateModalComponent implements OnInit {
       }
 
       this.sortClubs();
+      this.cdr.markForCheck();
     });
   }
 
@@ -543,11 +551,13 @@ export class PlayerCreateModalComponent implements OnInit {
         this.creating = false;
         this.playerCreated.emit(player);
         this.close.emit();
+        this.toast.success('Jugador creado exitosamente');
+        this.cdr.markForCheck();
       },
       error: (err) => {
-        console.error('Error creating player', err);
         this.creating = false;
-        alert('Error al crear el jugador');
+        this.toast.error('Error al crear el jugador: ' + (err.error?.message || 'Error desconocido'));
+        this.cdr.markForCheck();
       }
     });
   }

@@ -17,14 +17,27 @@
             <div>
                 <h1>{{ tournament.name }}</h1>
                 <p style="color: var(--text-muted);">
-                    {{ tournament.type === 'cuadrangular' ? 'Cuadrangular' : 'Hexagonal' }}
+                    🏟️ {{ tournament.courts }} Cancha{{ tournament.courts > 1 ? 's' : '' }}
                     · {{ tournament.teams.length }} Parejas
                     · {{ tournament.matches.length }} Partidos
+                    <span *ngIf="hasGroups"> · {{ tournament.totalGroups }} Grupos</span>
+                    <span *ngIf="tournament.matchesPerTeam && tournament.matchesPerTeam > 0"> · {{ tournament.matchesPerTeam }} partidos/pareja</span>
+                    <span *ngIf="!tournament.matchesPerTeam || tournament.matchesPerTeam === 0"> · Todos contra todos</span>
+                    · {{ getDurationModeLabel() }}
                     <span *ngIf="tournament.status === 'completed'" class="badge badge-success ml-2">Finalizado</span>
                 </p>
             </div>
             <div class="flex gap-2">
-                <button *ngIf="canCloseTournament()" (click)="confirmCloseTournament()" class="btn btn-success">
+                <!-- Generate Elimination (free mode only) -->
+                <button *ngIf="canEdit && isFreeModeWithGroups && allGroupMatchesCompleted && !hasEliminationMatches && tournament.status !== 'completed'"
+                    (click)="generateElimination()" class="btn btn-info">
+                    ⚔️ Generar Semifinales
+                </button>
+                <button *ngIf="canEdit && canGenerateFinal"
+                    (click)="generateElimination()" class="btn btn-warning">
+                    🏆 Generar Final
+                </button>
+                <button *ngIf="canCloseTournament() && canAdmin" (click)="confirmCloseTournament()" class="btn btn-success">
                     🏆 Finalizar Torneo
                 </button>
                 <a routerLink="/tournaments" class="btn btn-secondary">
@@ -33,22 +46,87 @@
             </div>
         </div>
 
+        <!-- Main View Tabs -->
+        <div class="main-tabs mb-4">
+            <button class="main-tab-btn" [class.active]="activeMainTab === 'matches'" (click)="activeMainTab = 'matches'">
+                📋 Partidos
+            </button>
+            <button class="main-tab-btn" [class.active]="activeMainTab === 'bracket'" (click)="activeMainTab = 'bracket'">
+                🏆 Mapa
+            </button>
+        </div>
+
+        <!-- ===== BRACKET VIEW ===== -->
+        <div *ngIf="activeMainTab === 'bracket'" class="card" style="grid-column: 1 / -1; padding: 0; overflow: hidden;">
+            <app-tournament-bracket
+                [tournament]="tournament"
+                [standings]="standings">
+            </app-tournament-bracket>
+        </div>
+
+        <!-- ===== MATCHES VIEW ===== -->
+        <ng-container *ngIf="activeMainTab === 'matches'">
+
+        <!-- Group Tabs (when multi-group) -->
+        <div *ngIf="hasGroups" class="group-tabs mb-4">
+            <button class="tab-btn" [class.active]="activeGroupTab === 0" (click)="setActiveGroup(0)">
+                Todos
+            </button>
+            <button *ngFor="let g of groupNumbers" class="tab-btn" [class.active]="activeGroupTab === g"
+                (click)="setActiveGroup(g)">
+                Grupo {{ g }}
+            </button>
+        </div>
+
+        <!-- Round Sub-Tabs (when a specific group is selected) -->
+        <div *ngIf="hasGroups && activeGroupTab > 0 && activeGroupRounds.length > 1" class="round-subtabs mb-4">
+            <button class="subtab-btn" [class.active]="activeRoundTab === 0" (click)="activeRoundTab = 0">
+                Todas
+            </button>
+            <button *ngFor="let r of activeGroupRounds" class="subtab-btn" [class.active]="activeRoundTab === r"
+                (click)="activeRoundTab = r">
+                Ronda {{ r }}
+            </button>
+        </div>
+
+        <!-- Round Tabs (when single group, filter by round) -->
+        <div *ngIf="!hasGroups && totalRounds > 1" class="group-tabs mb-4">
+            <button class="tab-btn" [class.active]="activeGroupTab === 0" (click)="activeGroupTab = 0">
+                Todas las Rondas
+            </button>
+            <button *ngFor="let r of roundNumbers" class="tab-btn" [class.active]="activeGroupTab === r"
+                (click)="activeGroupTab = r">
+                Ronda {{ r }}
+            </button>
+        </div>
+
         <div class="grid grid-2">
-            <!-- Matches Section -->
+            <!-- ===== ROUND-ROBIN MATCHES ===== -->
             <div class="card" style="grid-column: 1 / -1;">
                 <h2>📋 Partidos</h2>
                 <div class="matches-grid">
-                    <div *ngFor="let match of tournament.matches" class="match-card"
-                        (click)="openMatchScoreModal(match)">
+                    <div *ngFor="let match of getGroupPhaseMatches()" class="match-card"
+                        [class.clickable]="isLoggedIn && match.status !== 'completed'"
+                        [hidden]="isMatchHidden(match)"
+                        (click)="isLoggedIn ? openMatchScoreModal(match) : null">
+                        <div class="match-header">
+                            <span class="badge badge-primary badge-sm" *ngIf="hasGroups && match.groupNumber">
+                                Grupo {{ match.groupNumber }}
+                            </span>
+                            <span class="badge badge-secondary badge-sm" *ngIf="match.round">
+                                Ronda {{ match.round }}
+                            </span>
+                            <span class="badge badge-info badge-sm" *ngIf="match.courtNumber">
+                                Cancha {{ match.courtNumber }}
+                            </span>
+                        </div>
                         <div class="match-teams">
                             <div class="team" [ngClass]="getMatchWinnerClass(match, match.team1Id)">
-                                <span class="team-name">{{ match.team1?.player1?.name }} & {{ match.team1?.player2?.name
-                                    }}</span>
+                                <span class="team-name">{{ match.team1?.player1?.name }} & {{ match.team1?.player2?.name }}</span>
                             </div>
                             <div class="vs">vs</div>
                             <div class="team" [ngClass]="getMatchWinnerClass(match, match.team2Id)">
-                                <span class="team-name">{{ match.team2?.player1?.name }} & {{ match.team2?.player2?.name
-                                    }}</span>
+                                <span class="team-name">{{ match.team2?.player1?.name }} & {{ match.team2?.player2?.name }}</span>
                             </div>
                         </div>
                         <div class="match-score">
@@ -58,24 +136,77 @@
                 </div>
             </div>
 
-            <!-- Standings Section -->
-            <div class="card" style="grid-column: 1 / -1;">
-                <h2>🏆 Clasificación</h2>
+            <!-- ===== ELIMINATION MATCHES ===== -->
+            <div *ngIf="hasEliminationMatches" class="card" style="grid-column: 1 / -1;">
+                <h2>⚔️ Fase de Eliminación</h2>
+                <div class="matches-grid">
+                    <div *ngFor="let match of getEliminationMatches()" class="match-card elimination-card"
+                        [class.clickable]="canEdit && match.status !== 'completed'"
+                        (click)="canEdit ? openMatchScoreModal(match) : null">
+                        <div class="match-header">
+                            <span class="badge badge-sm" [ngClass]="match.round === 2 ? 'badge-success' : 'badge-warning'">{{ getEliminationLabel(match) }}</span>
+                            <span class="badge badge-info badge-sm" *ngIf="match.courtNumber">
+                                Cancha {{ match.courtNumber }}
+                            </span>
+                        </div>
+                        <div class="match-teams">
+                            <div class="team" [ngClass]="getMatchWinnerClass(match, match.team1Id)">
+                                <span class="team-name">{{ match.team1?.player1?.name }} & {{ match.team1?.player2?.name }}</span>
+                            </div>
+                            <div class="vs">vs</div>
+                            <div class="team" [ngClass]="getMatchWinnerClass(match, match.team2Id)">
+                                <span class="team-name">{{ match.team2?.player1?.name }} & {{ match.team2?.player2?.name }}</span>
+                            </div>
+                        </div>
+                        <div class="match-score">
+                            <span class="badge badge-info">{{ getMatchDisplay(match) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info: generate elimination prompt -->
+            <div *ngIf="canEdit && isFreeModeWithGroups && allGroupMatchesCompleted && !hasEliminationMatches && tournament.status !== 'completed'"
+                class="card" style="grid-column: 1 / -1; text-align: center; padding: 2rem;">
+                <p style="font-size: 1.1rem; margin-bottom: 1rem;">
+                    ✅ Todos los partidos del round-robin están completados.
+                </p>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                    Genera las semifinales entre los 4 mejores clasificados.
+                </p>
+                <button (click)="generateElimination()" class="btn btn-primary btn-lg">
+                    ⚔️ Generar Semifinales
+                </button>
+            </div>
+
+            <!-- Info: generate final prompt -->
+            <div *ngIf="canEdit && canGenerateFinal"
+                class="card" style="grid-column: 1 / -1; text-align: center; padding: 2rem;">
+                <p style="font-size: 1.1rem; margin-bottom: 1rem;">
+                    ✅ Ambas semifinales están completadas.
+                </p>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                    Genera la gran final entre los ganadores de las semifinales.
+                </p>
+                <button (click)="generateElimination()" class="btn btn-warning btn-lg">
+                    🏆 Generar la Final
+                </button>
+            </div>
+
+            <!-- ===== CLASIFICACIÓN GENERAL (when elimination exists) ===== -->
+            <div *ngIf="hasEliminationMatches" class="card" style="grid-column: 1 / -1;">
+                <h2>🏆 Clasificación General <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(incluye fase de grupos + eliminación)</span></h2>
                 <table class="table mobile-card-table">
                     <thead>
                         <tr>
                             <th>Pos</th>
                             <th>Pareja</th>
+                            <th class="text-center">Fase</th>
                             <th class="text-center" title="Partidos Jugados">PJ</th>
                             <th class="text-center" title="Partidos Ganados">PG</th>
-                            <th class="text-center" title="Partidos Empatados">PE</th>
                             <th class="text-center" title="Partidos Perdidos">PP</th>
                             <th class="text-center" style="color: var(--primary);">Pts</th>
-                            <th class="text-center">SG</th>
-                            <th class="text-center">SP</th>
                             <th class="text-center">DS</th>
-                            <th class="text-center">JG</th>
-                            <th class="text-center">JP</th>
                             <th class="text-center">DJ</th>
                         </tr>
                     </thead>
@@ -83,45 +214,128 @@
                         <tr *ngFor="let standing of standings" [class.winner-row]="standing.position === 1">
                             <td data-label="Pos">
                                 <strong>{{ standing.position }}</strong>
-                                <span *ngIf="standing.position === 1" style="margin-left: 0.5rem;">🥇</span>
-                                <span *ngIf="standing.position === 2" style="margin-left: 0.5rem;">🥈</span>
-                                <span *ngIf="standing.position === 3" style="margin-left: 0.5rem;">🥉</span>
+                                <span *ngIf="standing.position === 1" style="margin-left: 0.25rem;">🥇</span>
+                                <span *ngIf="standing.position === 2" style="margin-left: 0.25rem;">🥈</span>
+                                <span *ngIf="standing.position === 3" style="margin-left: 0.25rem;">🥉</span>
                             </td>
                             <td data-label="Pareja">
                                 <strong>{{ standing.player1Name }}</strong> &
                                 <strong>{{ standing.player2Name }}</strong>
                             </td>
+                            <td data-label="Fase" class="text-center">
+                                <span *ngIf="getEliminationBadge(standing.teamId)" class="badge badge-sm"
+                                    [ngClass]="{
+                                        'badge-success': getEliminationBadge(standing.teamId).includes('Campeón'),
+                                        'badge-warning': getEliminationBadge(standing.teamId).includes('Finalista'),
+                                        'badge-info': getEliminationBadge(standing.teamId).includes('Semi')
+                                    }">
+                                    {{ getEliminationBadge(standing.teamId) }}
+                                </span>
+                                <span *ngIf="!getEliminationBadge(standing.teamId) && getEliminationPendingBadge(standing.teamId)"
+                                    class="badge badge-secondary badge-sm">
+                                    {{ getEliminationPendingBadge(standing.teamId) }}
+                                </span>
+                                <span *ngIf="!getEliminationBadge(standing.teamId) && !getEliminationPendingBadge(standing.teamId)"
+                                    style="color: var(--text-muted); font-size: 0.75rem;">Grupos</span>
+                            </td>
                             <td data-label="PJ" class="text-center">{{ standing.matchesPlayed }}</td>
                             <td data-label="PG" class="text-center">{{ standing.matchesWon }}</td>
-                            <td data-label="PE" class="text-center">{{ standing.matchesDrawn }}</td>
                             <td data-label="PP" class="text-center">{{ standing.matchesLost }}</td>
-                            <td data-label="Pts" class="text-center" style="color: var(--primary); font-weight: bold;">
-                                {{ standing.points }}</td>
-                            <td data-label="SG (Sets Ganados)" class="text-center">{{ standing.setsWon }}</td>
-                            <td data-label="SP (Sets Perdidos)" class="text-center">{{ standing.setsLost }}</td>
-                            <td data-label="DS (Dif. Sets)" class="text-center"
+                            <td data-label="Pts" class="text-center" style="color: var(--primary); font-weight: bold;">{{ standing.points }}</td>
+                            <td data-label="DS" class="text-center"
                                 [style.color]="standing.setDifference >= 0 ? 'var(--success)' : 'var(--error)'">
                                 {{ standing.setDifference > 0 ? '+' : '' }}{{ standing.setDifference }}
                             </td>
-                            <td data-label="JG (Juegos Ganados)" class="text-center">{{ standing.gamesWon }}</td>
-                            <td data-label="JP (Juegos Perdidos)" class="text-center">{{ standing.gamesLost }}</td>
-                            <td data-label="DJ (Dif. Juegos)" class="text-center"
+                            <td data-label="DJ" class="text-center"
                                 [style.color]="standing.gameDifference >= 0 ? 'var(--success)' : 'var(--error)'">
                                 {{ standing.gameDifference > 0 ? '+' : '' }}{{ standing.gameDifference }}
                             </td>
                         </tr>
                     </tbody>
                 </table>
-                <div style="margin-top: var(--spacing-md); color: var(--text-muted); font-size: 0.875rem;">
-                    <strong>Leyenda:</strong> PG=Partidos Ganados, PE=Partidos Empatados, PP=Partidos Perdidos, SG=Sets
-                    Ganados, SP=Sets
-                    Perdidos,
-                    DS=Diferencia Sets, JG=Juegos Ganados, JP=Juegos Perdidos, DJ=Diferencia Juegos
+                <div style="margin-top: var(--spacing-sm); color: var(--text-muted); font-size: 0.8rem;">
+                    📊 Esta tabla incluye los resultados de <strong>todas las fases</strong> del torneo (grupos + semifinales + final).
                 </div>
             </div>
+
+            <!-- ===== STANDINGS (single group, no elimination) ===== -->
+            <div *ngIf="!hasGroups && !hasEliminationMatches" class="card" style="grid-column: 1 / -1;">
+                <h2>🏆 Clasificación</h2>
+                <ng-container *ngTemplateOutlet="standingsTable; context: { standings: standings }"></ng-container>
+            </div>
+
+            <!-- ===== STANDINGS (multi-group) ===== -->
+            <ng-container *ngIf="hasGroups">
+                <div *ngFor="let g of groupNumbers" class="card" style="grid-column: 1 / -1;"
+                    [hidden]="activeGroupTab > 0 && activeGroupTab !== g">
+                    <h2>📋 Clasificación — Grupo {{ g }} <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: normal;">(solo fase de grupos)</span></h2>
+                    <ng-container *ngTemplateOutlet="standingsTable; context: { standings: getStandingsForGroup(g) }"></ng-container>
+                </div>
+            </ng-container>
         </div>
+
+        </ng-container><!-- /matches view -->
     </div>
 </div>
+
+<!-- STANDINGS TABLE TEMPLATE -->
+<ng-template #standingsTable let-standings="standings">
+    <table class="table mobile-card-table">
+        <thead>
+            <tr>
+                <th>Pos</th>
+                <th>Pareja</th>
+                <th class="text-center" title="Partidos Jugados">PJ</th>
+                <th class="text-center" title="Partidos Ganados">PG</th>
+                <th class="text-center" title="Partidos Empatados">PE</th>
+                <th class="text-center" title="Partidos Perdidos">PP</th>
+                <th class="text-center" style="color: var(--primary);">Pts</th>
+                <th class="text-center">SG</th>
+                <th class="text-center">SP</th>
+                <th class="text-center">DS</th>
+                <th class="text-center">JG</th>
+                <th class="text-center">JP</th>
+                <th class="text-center">DJ</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let standing of standings" [class.winner-row]="standing.position === 1">
+                <td data-label="Pos">
+                    <strong>{{ standing.position }}</strong>
+                    <span *ngIf="standing.position === 1" style="margin-left: 0.5rem;">🥇</span>
+                    <span *ngIf="standing.position === 2" style="margin-left: 0.5rem;">🥈</span>
+                    <span *ngIf="standing.position === 3" style="margin-left: 0.5rem;">🥉</span>
+                </td>
+                <td data-label="Pareja">
+                    <strong>{{ standing.player1Name }}</strong> &
+                    <strong>{{ standing.player2Name }}</strong>
+                </td>
+                <td data-label="PJ" class="text-center">{{ standing.matchesPlayed }}</td>
+                <td data-label="PG" class="text-center">{{ standing.matchesWon }}</td>
+                <td data-label="PE" class="text-center">{{ standing.matchesDrawn }}</td>
+                <td data-label="PP" class="text-center">{{ standing.matchesLost }}</td>
+                <td data-label="Pts" class="text-center" style="color: var(--primary); font-weight: bold;">
+                    {{ standing.points }}</td>
+                <td data-label="SG" class="text-center">{{ standing.setsWon }}</td>
+                <td data-label="SP" class="text-center">{{ standing.setsLost }}</td>
+                <td data-label="DS" class="text-center"
+                    [style.color]="standing.setDifference >= 0 ? 'var(--success)' : 'var(--error)'">
+                    {{ standing.setDifference > 0 ? '+' : '' }}{{ standing.setDifference }}
+                </td>
+                <td data-label="JG" class="text-center">{{ standing.gamesWon }}</td>
+                <td data-label="JP" class="text-center">{{ standing.gamesLost }}</td>
+                <td data-label="DJ" class="text-center"
+                    [style.color]="standing.gameDifference >= 0 ? 'var(--success)' : 'var(--error)'">
+                    {{ standing.gameDifference > 0 ? '+' : '' }}{{ standing.gameDifference }}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <div style="margin-top: var(--spacing-md); color: var(--text-muted); font-size: 0.875rem;">
+        <strong>Leyenda:</strong> PG=Partidos Ganados, PE=Partidos Empatados, PP=Partidos Perdidos, SG=Sets Ganados, SP=Sets Perdidos,
+        DS=Diferencia Sets, JG=Juegos Ganados, JP=Juegos Perdidos, DJ=Diferencia Juegos
+    </div>
+</ng-template>
 
 <!-- Score Modal -->
 <div *ngIf="selectedMatch" class="modal-overlay" (click)="closeModal()">
@@ -129,6 +343,10 @@
         <h2>Ingresar Resultado</h2>
         <div class="match-info mb-2 text-center text-muted">
             Ingresa el resultado por sets
+            <div *ngIf="selectedMatch.courtNumber" class="mt-1">
+                <span class="badge badge-info">Cancha {{ selectedMatch.courtNumber }}</span>
+                <span *ngIf="selectedMatch.phase === 'elimination'" class="badge badge-warning ml-1">Eliminación</span>
+            </div>
         </div>
 
         <form [formGroup]="scoreForm" (ngSubmit)="saveScore()">
@@ -142,43 +360,33 @@
                     style="border-bottom: 1px solid #eee; padding-bottom: 1rem;">
                     <label class="label text-center mb-2">Set {{ i + 1 }}</label>
                     <div class="flex gap-2 align-items-center justify-content-center">
-                        <!-- Team 1 Input Group -->
                         <div style="flex: 1; text-align: center;">
                             <label class="label" style="font-size: 0.8rem; margin-bottom: 4px;">
                                 {{ selectedMatch.team1?.player1?.name }} & {{ selectedMatch.team1?.player2?.name }}
                             </label>
-                            <input type="number" class="input text-center" formControlName="team1Games" placeholder="0"
-                                min="0" />
+                            <input type="number" class="input text-center" formControlName="team1Games" placeholder="0" min="0" />
                         </div>
-
                         <span style="font-weight: bold; font-size: 1.2rem;">-</span>
-
-                        <!-- Team 2 Input Group -->
                         <div style="flex: 1; text-align: center;">
                             <label class="label" style="font-size: 0.8rem; margin-bottom: 4px;">
                                 {{ selectedMatch.team2?.player1?.name }} & {{ selectedMatch.team2?.player2?.name }}
                             </label>
-                            <input type="number" class="input text-center" formControlName="team2Games" placeholder="0"
-                                min="0" />
+                            <input type="number" class="input text-center" formControlName="team2Games" placeholder="0" min="0" />
                         </div>
                     </div>
 
-                    <!-- Tie-break Inputs (Conditional) -->
+                    <!-- Tie-break -->
                     <div *ngIf="isTieBreakNeeded(i)" class="tiebreak-container fade-in">
                         <div class="tiebreak-label">Tie-break</div>
                         <div class="tiebreak-inputs">
-                            <input type="number" class="input text-center" formControlName="tiebreakTeam1"
-                                placeholder="0" />
+                            <input type="number" class="input text-center" formControlName="tiebreakTeam1" placeholder="0" />
                             <span class="tiebreak-separator">vs</span>
-                            <input type="number" class="input text-center" formControlName="tiebreakTeam2"
-                                placeholder="0" />
+                            <input type="number" class="input text-center" formControlName="tiebreakTeam2" placeholder="0" />
                         </div>
                     </div>
 
                     <div class="text-center mt-2" *ngIf="sets.length > 1">
-                        <button type="button" class="btn btn-danger btn-sm" (click)="removeSet(i)">
-                            Eliminar Set
-                        </button>
+                        <button type="button" class="btn btn-danger btn-sm" (click)="removeSet(i)">Eliminar Set</button>
                     </div>
                 </div>
             </div>
@@ -188,12 +396,8 @@
             </button>
 
             <div class="flex gap-2 mt-4">
-                <button type="submit" class="btn btn-primary" style="flex: 1;">
-                    💾 Guardar Resultado
-                </button>
-                <button type="button" class="btn btn-secondary" (click)="closeModal()">
-                    Cancelar
-                </button>
+                <button type="submit" class="btn btn-primary" style="flex: 1;">💾 Guardar Resultado</button>
+                <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancelar</button>
             </div>
         </form>
     </div>
@@ -215,12 +419,8 @@
         </div>
 
         <div class="flex gap-2 mt-4">
-            <button class="btn btn-success" style="flex: 1;" (click)="finalizeTournament()">
-                🏆 Finalizar
-            </button>
-            <button class="btn btn-secondary" (click)="cancelCloseTournament()">
-                Cancelar
-            </button>
+            <button class="btn btn-success" style="flex: 1;" (click)="finalizeTournament()">🏆 Finalizar</button>
+            <button class="btn btn-secondary" (click)="cancelCloseTournament()">Cancelar</button>
         </div>
     </div>
 </div>

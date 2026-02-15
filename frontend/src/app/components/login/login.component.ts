@@ -1,5 +1,5 @@
 
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -10,7 +10,8 @@ import { AuthService } from '../../services/auth.service';
     standalone: true,
     imports: [CommonModule, FormsModule],
     templateUrl: './login.component.html',
-    styleUrls: ['./login.component.css']
+    styleUrls: ['./login.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LoginComponent {
     username = '';
@@ -20,7 +21,8 @@ export class LoginComponent {
 
     constructor(
         private authService: AuthService,
-        private router: Router
+        private router: Router,
+        private cdr: ChangeDetectorRef
     ) { }
 
     login() {
@@ -30,12 +32,14 @@ export class LoginComponent {
         this.authService.login(this.username, this.password).subscribe({
             next: () => {
                 this.loading = false;
+                this.cdr.markForCheck();
                 this.router.navigate(['/leagues']);
             },
             error: (err) => {
                 console.error(err);
                 this.loading = false;
                 this.error = 'Credenciales inválidas o error en el servidor';
+                this.cdr.markForCheck();
             }
         });
     }

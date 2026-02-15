@@ -6,7 +6,7 @@
                 Gestiona tus ligas y torneos de larga duración
             </p>
         </div>
-        <a routerLink="/leagues/create" class="btn btn-primary" *ngIf="isLoggedIn">+ Nueva Liga</a>
+        <a routerLink="/leagues/create" class="btn btn-primary" *ngIf="canAdmin">+ Nueva Liga</a>
     </div>
 
     <!-- Empty State -->
@@ -16,7 +16,7 @@
         <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
             Comienza creando tu primera liga para gestionar una temporada completa de competición.
         </p>
-        <a routerLink="/leagues/create" class="btn btn-primary" *ngIf="isLoggedIn">Crear Liga</a>
+        <a routerLink="/leagues/create" class="btn btn-primary" *ngIf="canAdmin">Crear Liga</a>
     </div>
 
     <!-- Loading State -->
@@ -36,7 +36,7 @@
                 }">
                     {{ getStatusLabel(league.status) }}
                 </span>
-                <button *ngIf="league.status !== 'completed' && isLoggedIn"
+                <button *ngIf="league.status !== 'completed' && canAdmin"
                     (click)="deleteLeague(league.id); $event.stopPropagation()" class="btn-icon btn-danger"
                     title="Eliminar liga">
                     🗑️

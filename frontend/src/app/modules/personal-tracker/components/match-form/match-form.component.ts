@@ -1,15 +1,18 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, DestroyRef, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PlayerService, Player } from '../../../../services/player.service';
 import { PersonalTrackerService } from '../../../../services/personal-tracker.service';
 import { PlayerSelectComponent } from '../../../../components/player-select/player-select.component';
+import { ToastService } from '../../../../services/toast.service';
 
 @Component({
     selector: 'app-match-form',
     standalone: true,
     imports: [CommonModule, ReactiveFormsModule, PlayerSelectComponent],
+    changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './match-form.component.html',
     styles: [`
         .form-container {
@@ -84,12 +87,17 @@ export class MatchFormComponent implements OnInit {
     matchId: string | null = null;
     isEditMode = false;
 
+    private destroyRef = inject(DestroyRef);
+
+    private cdr = inject(ChangeDetectorRef);
+
     constructor(
         private fb: FormBuilder,
         private playerService: PlayerService,
         private trackerService: PersonalTrackerService,
         private router: Router,
-        private route: ActivatedRoute
+        private route: ActivatedRoute,
+        private toast: ToastService
     ) {
         this.form = this.fb.group({
             date: [new Date().toISOString().substring(0, 10), Validators.required],
@@ -102,7 +110,9 @@ export class MatchFormComponent implements OnInit {
 
     ngOnInit() {
         // Check if we're editing an existing match
-        this.route.params.subscribe(params => {
+        this.route.params.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(params => {
             this.matchId = params['id'] || null;
             if (this.matchId) {
                 this.isEditMode = true;
@@ -112,10 +122,14 @@ export class MatchFormComponent implements OnInit {
                 this.addSet();
                 this.addSet();
             }
+            this.cdr.markForCheck();
         });
 
-        this.playerService.findAll().subscribe((players: Player[]) => {
+        this.playerService.findAll().pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe((players: Player[]) => {
             this.players = players;
+            this.cdr.markForCheck();
         });
     }
 
@@ -147,10 +161,12 @@ export class MatchFormComponent implements OnInit {
                 }
 
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (err: any) => {
                 console.error(err);
                 this.loading = false;
+                this.cdr.markForCheck();
                 this.router.navigate(['/personal-tracker']);
             }
         });
@@ -201,19 +217,13 @@ export class MatchFormComponent implements OnInit {
 
         if (this.isEditMode && this.matchId) {
             this.trackerService.updateMatch(this.matchId, matchData).subscribe({
-                next: () => this.router.navigate(['/personal-tracker']),
-                error: (err: any) => {
-                    console.error(err);
-                    this.loading = false;
-                }
+                next: () => { this.toast.success('Borrador guardado'); this.router.navigate(['/personal-tracker']); },
+                error: () => { this.toast.error('Error al guardar borrador'); this.loading = false; }
             });
         } else {
             this.trackerService.createMatch(matchData).subscribe({
-                next: () => this.router.navigate(['/personal-tracker']),
-                error: (err: any) => {
-                    console.error(err);
-                    this.loading = false;
-                }
+                next: () => { this.toast.success('Borrador creado'); this.router.navigate(['/personal-tracker']); },
+                error: () => { this.toast.error('Error al crear borrador'); this.loading = false; }
             });
         }
     }
@@ -229,19 +239,13 @@ export class MatchFormComponent implements OnInit {
 
         if (this.isEditMode && this.matchId) {
             this.trackerService.updateMatch(this.matchId, matchData).subscribe({
-                next: () => this.router.navigate(['/personal-tracker']),
-                error: (err: any) => {
-                    console.error(err);
-                    this.loading = false;
-                }
+                next: () => { this.toast.success('Partido guardado'); this.router.navigate(['/personal-tracker']); },
+                error: () => { this.toast.error('Error al guardar partido'); this.loading = false; }
             });
         } else {
             this.trackerService.createMatch(matchData).subscribe({
-                next: () => this.router.navigate(['/personal-tracker']),
-                error: (err: any) => {
-                    console.error(err);
-                    this.loading = false;
-                }
+                next: () => { this.toast.success('Partido creado'); this.router.navigate(['/personal-tracker']); },
+                error: () => { this.toast.error('Error al crear partido'); this.loading = false; }
             });
         }
     }
@@ -257,19 +261,13 @@ export class MatchFormComponent implements OnInit {
 
         if (this.isEditMode && this.matchId) {
             this.trackerService.updateMatch(this.matchId, matchData).subscribe({
-                next: () => this.router.navigate(['/personal-tracker']),
-                error: (err: any) => {
-                    console.error(err);
-                    this.loading = false;
-                }
+                next: () => { this.toast.success('Partido completado'); this.router.navigate(['/personal-tracker']); },
+                error: () => { this.toast.error('Error al completar partido'); this.loading = false; }
             });
         } else {
             this.trackerService.createMatch(matchData).subscribe({
-                next: () => this.router.navigate(['/personal-tracker']),
-                error: (err: any) => {
-                    console.error(err);
-                    this.loading = false;
-                }
+                next: () => { this.toast.success('Partido registrado'); this.router.navigate(['/personal-tracker']); },
+                error: () => { this.toast.error('Error al registrar partido'); this.loading = false; }
             });
         }
     }

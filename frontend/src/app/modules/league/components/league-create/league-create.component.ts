@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -6,6 +6,7 @@ import { LeagueService } from '../../services/league.service';
 import { CreateLeagueRequest, LeagueConfig } from '../../../../models/league.model';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../../environments/environment';
+import { ToastService } from '../../../../services/toast.service';
 
 interface Player {
     id: string;
@@ -17,7 +18,8 @@ interface Player {
     standalone: true,
     imports: [CommonModule, FormsModule],
     templateUrl: './league-create.component.html',
-    styleUrls: ['./league-create.component.css']
+    styleUrls: ['./league-create.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LeagueCreateComponent implements OnInit {
     currentStep = 1;
@@ -25,14 +27,14 @@ export class LeagueCreateComponent implements OnInit {
 
     // Form data
     leagueName = '';
-    leagueType: 'round_robin' | 'groups_playoff' | null = null;
+    leagueType: 'round_robin' | 'groups_playoff' | 'round_robin_playoff' | null = null;
     startDate = '';
     category = '';
 
     // Configuration
     config: LeagueConfig = {
         pointsWin: 3,
-        pointsDraw: 1,
+        pointsDraw: 0,
         pointsLoss: 0,
         setsToWin: 2,
         gamesPerSet: 6,
@@ -41,7 +43,11 @@ export class LeagueCreateComponent implements OnInit {
         rounds: 1,
         numberOfGroups: 2,
         teamsAdvancePerGroup: 2,
-        enableMultiTierPlayoffs: true
+        enableMultiTierPlayoffs: true,
+        goldPlayoffCount: 4,
+        silverPlayoffCount: 4,
+        relegationCount: 2,
+        skipExhibitionSets: true
     };
 
     // Player selection
@@ -62,7 +68,9 @@ export class LeagueCreateComponent implements OnInit {
     constructor(
         private leagueService: LeagueService,
         private router: Router,
-        private http: HttpClient
+        private http: HttpClient,
+        private cdr: ChangeDetectorRef,
+        private toast: ToastService
     ) { }
 
     ngOnInit() {
@@ -77,14 +85,16 @@ export class LeagueCreateComponent implements OnInit {
 
     loadPlayers() {
         this.loading = true;
-        this.http.get<Player[]>(`${environment.apiUrl}/players`).subscribe({
-            next: (players: Player[]) => {
-                this.availablePlayers = players;
+        this.http.get<any>(`${environment.apiUrl}/players`).subscribe({
+            next: (res: any) => {
+                this.availablePlayers = Array.isArray(res) ? res : res.data;
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (err: any) => {
                 console.error('Error loading players:', err);
                 this.loading = false;
+                this.cdr.markForCheck();
             }
         });
     }
@@ -231,13 +241,14 @@ export class LeagueCreateComponent implements OnInit {
         this.leagueService.createLeague(request).subscribe({
             next: (league: any) => {
                 this.creatingLeague = false;
-                // alert('Liga creada exitosamente'); // Removed as per request
+                this.toast.success('Liga creada exitosamente');
+                this.cdr.markForCheck();
                 this.router.navigate(['/leagues', league.id]);
             },
             error: (err: any) => {
-                console.error('Error creating league:', err);
-                alert('Error al crear la liga: ' + (err.error?.message || err.message));
+                this.toast.error('Error al crear la liga: ' + (err.error?.message || err.message));
                 this.creatingLeague = false;
+                this.cdr.markForCheck();
             }
         });
     }
@@ -249,8 +260,11 @@ export class LeagueCreateComponent implements OnInit {
     get estimatedMatches(): number {
         const pairs = this.estimatedPairs;
         if (this.leagueType === 'round_robin') {
-            // n*(n-1)/2 * rounds
             return (pairs * (pairs - 1) / 2) * (this.config.rounds || 1);
+        } else if (this.leagueType === 'round_robin_playoff') {
+            const regularMatches = (pairs * (pairs - 1) / 2) * (this.config.rounds || 1);
+            const playoffMatches = 8; // Gold SF(2)+F(1)+3rd(1) + Silver SF(2)+F(1)+3rd(1)
+            return regularMatches + playoffMatches;
         } else {
             // Groups + playoffs estimate
             const matchesPerGroup = (pairs / (this.config.numberOfGroups || 2)) *

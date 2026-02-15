@@ -12,13 +12,13 @@
                 }">
                     {{ league.status === 'active' ? 'Activa' : league.status === 'draft' ? 'Borrador' : 'Finalizada' }}
                 </span>
-                <span class="meta-item">🏷️ {{ league.type === 'round_robin' ? 'Round Robin' : 'Grupos + Playoffs'
+                <span class="meta-item">🏷️ {{ league.type === 'round_robin' ? 'Round Robin' : league.type === 'round_robin_playoff' ? 'Todos vs Todos + Playoffs' : 'Grupos + Playoffs'
                     }}</span>
                 <span class="meta-item">📅 {{ league.startDate | date:'mediumDate' }}</span>
             </div>
         </div>
 
-        <div class="header-actions" *ngIf="isLoggedIn">
+        <div class="header-actions" *ngIf="canEdit">
             <!-- Generate Schedule: Disabled if matches exist, Visible only in draft -->
             <button (click)="generateSchedule()" class="btn btn-secondary" *ngIf="league.status === 'draft'"
                 [disabled]="league.matches && league.matches.length > 0"
@@ -107,6 +107,9 @@
         <button class="tab" [class.active]="activeTab === 'standings'" (click)="activeTab = 'standings'">
             🏆 Clasificación
         </button>
+        <button class="tab" [class.active]="activeTab === 'bracket'" (click)="activeTab = 'bracket'">
+            🏟️ Bracket
+        </button>
         <button class="tab" [class.active]="activeTab === 'config'" (click)="activeTab = 'config'">
             ⚙️ Configuración
         </button>
@@ -124,14 +127,15 @@
                 </select>
             </div>
 
-            <div class="filter-group" *ngIf="league.type === 'groups_playoff'">
+            <div class="filter-group" *ngIf="league.type === 'groups_playoff' || league.type === 'round_robin_playoff'">
                 <label>Fase:</label>
                 <select [(ngModel)]="selectedPhase" class="filter-select">
                     <option value="all">Todas las fases</option>
-                    <option value="group">Fase de Grupos</option>
+                    <option value="group">Fase Regular</option>
                     <option value="gold">Copa Oro</option>
                     <option value="silver">Copa Plata</option>
-                    <option value="bronze">Copa Bronce</option>
+                    <option value="bronze" *ngIf="league.type === 'groups_playoff'">Copa Bronce</option>
+                    <option value="third_place" *ngIf="league.type === 'round_robin_playoff'">Tercer Puesto</option>
                 </select>
             </div>
         </div>
@@ -205,7 +209,7 @@
                     <span *ngIf="match.scheduledAt" class="match-date">
                         📅 {{ match.scheduledAt | date:'short' }}
                     </span>
-                    <button *ngIf="match.status !== 'completed' && league.status !== 'completed' && isLoggedIn"
+                    <button *ngIf="match.status !== 'completed' && league.status !== 'completed' && canEdit"
                         (click)="openResultModal(match)" class="btn btn-sm btn-primary">
                         Ingresar Resultado
                     </button>
@@ -240,8 +244,15 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr *ngFor="let pair of section.pairs; let i = index"
-                                [class.top-pair]="i === 0 && !section.title">
+                            <!-- Zone separator labels for round_robin_playoff -->
+                            <ng-container *ngFor="let pair of section.pairs; let i = index">
+                                <tr *ngIf="getStandingZoneLabel(i)" class="zone-separator">
+                                    <td colspan="9" style="padding: 0.5rem 1rem; font-weight: 700; font-size: 0.85rem; background: rgba(255,255,255,0.03); border-top: 2px solid rgba(255,255,255,0.1);">
+                                        {{ getStandingZoneLabel(i) }}
+                                    </td>
+                                </tr>
+                                <tr [class.top-pair]="i === 0 && !section.title"
+                                    [style.border-left]="getStandingZoneStyle(i)">
                                 <td class="rank-cell">
                                     <span class="rank">{{ i + 1 }}</span>
                                     <span *ngIf="i === 0 && !section.title" class="trophy" title="Campeón">🥇</span>
@@ -257,7 +268,8 @@
                                 <td>{{ pair.setsWon }}-{{ pair.setsLost }}</td>
                                 <td>{{ pair.gamesWon }}-{{ pair.gamesLost }}</td>
                                 <td class="pts-cell">{{ pair.points }}</td>
-                            </tr>
+                                </tr>
+                            </ng-container>
                         </tbody>
                     </table>
 
@@ -271,6 +283,11 @@
                 <p>No hay datos de clasificación aún</p>
             </div>
         </div>
+    </div>
+
+    <!-- Tab Content: Bracket -->
+    <div class="tab-content" *ngIf="activeTab === 'bracket'">
+        <app-league-bracket [league]="league"></app-league-bracket>
     </div>
 
     <!-- Tab Content: Config -->
@@ -312,11 +329,27 @@
                 </div>
             </div>
 
-            <div class="config-section" *ngIf="league.type === 'round_robin'">
+            <div class="config-section" *ngIf="league.type === 'round_robin' || league.type === 'round_robin_playoff'">
                 <h3>Configuración de Liga</h3>
                 <div class="config-row">
                     <span class="config-label">Rondas totales:</span>
-                    <span class="config-value">{{ league.config.rounds }}</span>
+                    <span class="config-value">{{ league.config.rounds || 1 }}</span>
+                </div>
+                <div class="config-row" *ngIf="league.type === 'round_robin_playoff'">
+                    <span class="config-label">Liga Oro:</span>
+                    <span class="config-value">Top {{ league.config.goldPlayoffCount || 4 }} parejas</span>
+                </div>
+                <div class="config-row" *ngIf="league.type === 'round_robin_playoff'">
+                    <span class="config-label">Liga Plata:</span>
+                    <span class="config-value">Siguientes {{ league.config.silverPlayoffCount || 4 }} parejas</span>
+                </div>
+                <div class="config-row" *ngIf="league.type === 'round_robin_playoff' && league.config.relegationCount">
+                    <span class="config-label">Descienden:</span>
+                    <span class="config-value">{{ league.config.relegationCount }} parejas</span>
+                </div>
+                <div class="config-row" *ngIf="league.type === 'round_robin_playoff' && league.config.skipExhibitionSets">
+                    <span class="config-label">Set exhibición:</span>
+                    <span class="config-value">3er set opcional si gana 2-0 (no cuenta en tabla)</span>
                 </div>
             </div>
 

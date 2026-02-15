@@ -285,3 +285,10 @@ docker image prune -a
 - PostgreSQL tiene un healthcheck para asegurar que esté listo antes de iniciar el backend
 - El frontend se sirve a través de nginx con cache y compresión habilitadas
 - Todos los logs están disponibles con `docker-compose logs`
+
+ger
+Diego
+rene
+manu
+
+

@@ -1,0 +1,197 @@
+<div class="container fade-in">
+    <!-- Header -->
+    <div class="flex-between mb-4">
+        <h1>📅 Ranking Mensual</h1>
+    </div>
+
+    <!-- Month Navigator -->
+    <div class="month-nav mb-4">
+        <button type="button" class="btn-arrow" (click)="prevMonth()">‹</button>
+        <div class="month-display">
+            <span class="month-name">{{ monthNames[selectedMonth - 1] }}</span>
+            <span class="month-year">{{ selectedYear }}</span>
+        </div>
+        <button type="button" class="btn-arrow" (click)="nextMonth()">›</button>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="loading" class="flex-center" style="min-height: 300px;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- No data -->
+    <div *ngIf="!loading && stats.totalTournaments === 0" class="card text-center" style="padding: 3rem;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🏆</div>
+        <h3>No hay torneos en {{ monthNames[selectedMonth - 1] }} {{ selectedYear }}</h3>
+        <p style="color: var(--text-muted); margin-top: 0.5rem;">
+            Intenta con otro mes o crea un nuevo torneo
+        </p>
+    </div>
+
+    <!-- Stats Content -->
+    <div *ngIf="!loading && stats.totalTournaments > 0">
+        <!-- Summary KPIs -->
+        <div class="grid grid-2 mb-4">
+            <div class="card kpi-card">
+                <div class="kpi-icon">🏆</div>
+                <div class="kpi-info">
+                    <h3>Torneos</h3>
+                    <div class="kpi-value">{{ stats.totalTournaments }}</div>
+                </div>
+            </div>
+            <div class="card kpi-card">
+                <div class="kpi-icon">🎾</div>
+                <div class="kpi-info">
+                    <h3>Partidos Jugados</h3>
+                    <div class="kpi-value">{{ stats.totalMatches }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Toggle -->
+        <div class="view-toggle mb-4">
+            <button class="toggle-btn" [class.active]="viewMode === 'players'"
+                (click)="viewMode = 'players'">
+                👤 Jugadores del Mes
+            </button>
+            <button class="toggle-btn" [class.active]="viewMode === 'pairs'"
+                (click)="viewMode = 'pairs'">
+                👥 Parejas del Mes
+            </button>
+        </div>
+
+        <!-- ==================== PLAYERS VIEW ==================== -->
+        <div *ngIf="viewMode === 'players'" class="fade-in">
+            <!-- Podium -->
+            <div class="card podium-card mb-4" *ngIf="stats.topPlayers.length >= 3">
+                <h2 class="section-title">🏆 Jugadores del Mes — {{ monthNames[selectedMonth - 1] }} {{ selectedYear }}</h2>
+                <div class="podium">
+                    <!-- 2nd place -->
+                    <div class="podium-place second">
+                        <div class="podium-avatar">🥈</div>
+                        <div class="podium-name">{{ stats.topPlayers[1].name }}</div>
+                        <div class="podium-stat">{{ stats.topPlayers[1].matchesWon }}V · {{ stats.topPlayers[1].matchesPlayed }}J</div>
+                        <div class="podium-bar">
+                            <span class="podium-bar-label">2°</span>
+                        </div>
+                    </div>
+                    <!-- 1st place -->
+                    <div class="podium-place first">
+                        <div class="podium-crown">👑</div>
+                        <div class="podium-avatar">🥇</div>
+                        <div class="podium-name">{{ stats.topPlayers[0].name }}</div>
+                        <div class="podium-stat">{{ stats.topPlayers[0].matchesWon }}V · {{ stats.topPlayers[0].matchesPlayed }}J</div>
+                        <div class="podium-bar">
+                            <span class="podium-bar-label">1°</span>
+                        </div>
+                    </div>
+                    <!-- 3rd place -->
+                    <div class="podium-place third">
+                        <div class="podium-avatar">🥉</div>
+                        <div class="podium-name">{{ stats.topPlayers[2].name }}</div>
+                        <div class="podium-stat">{{ stats.topPlayers[2].matchesWon }}V · {{ stats.topPlayers[2].matchesPlayed }}J</div>
+                        <div class="podium-bar">
+                            <span class="podium-bar-label">3°</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hierarchy / Organigrama -->
+            <div class="card mb-4" *ngIf="stats.topPlayers.length > 0">
+                <h2 class="section-title">📊 Ranking</h2>
+                <div class="hierarchy">
+                    <div *ngFor="let p of stats.topPlayers; let i = index" class="hierarchy-row">
+                        <div class="hierarchy-rank">
+                            <span *ngIf="i === 0" class="medal">🥇</span>
+                            <span *ngIf="i === 1" class="medal">🥈</span>
+                            <span *ngIf="i === 2" class="medal">🥉</span>
+                            <span *ngIf="i > 2" class="rank-num">{{ i + 1 }}</span>
+                        </div>
+                        <div class="hierarchy-name">{{ p.name }}</div>
+                        <div class="hierarchy-bar-container">
+                            <div class="hierarchy-bar" [style.width.%]="stats.topPlayers[0].matchesWon > 0 ? (p.matchesWon / stats.topPlayers[0].matchesWon) * 100 : 0"
+                                [class.bar-gold]="i === 0"
+                                [class.bar-silver]="i === 1"
+                                [class.bar-bronze]="i === 2">
+                            </div>
+                        </div>
+                        <div class="hierarchy-stats">
+                            <span class="stat-wins">{{ p.matchesWon }}V</span>
+                            <span class="stat-sep">/</span>
+                            <span class="stat-played">{{ p.matchesPlayed }}J</span>
+                            <span class="stat-pct">({{ getWinRate(p.matchesWon, p.matchesPlayed) }}%)</span>
+                        </div>
+                        <div class="hierarchy-tournaments">
+                            🏆 {{ p.tournamentsPlayed }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== PAIRS VIEW ==================== -->
+        <div *ngIf="viewMode === 'pairs'" class="fade-in">
+            <!-- Podium -->
+            <div class="card podium-card mb-4" *ngIf="stats.topPairs.length >= 3">
+                <h2 class="section-title">🏆 Parejas del Mes — {{ monthNames[selectedMonth - 1] }} {{ selectedYear }}</h2>
+                <div class="podium">
+                    <div class="podium-place second">
+                        <div class="podium-avatar">🥈</div>
+                        <div class="podium-name">{{ stats.topPairs[1].player1Name }}</div>
+                        <div class="podium-name" style="font-size: 0.8rem; opacity: 0.8;">{{ stats.topPairs[1].player2Name }}</div>
+                        <div class="podium-stat">{{ stats.topPairs[1].matchesWon }}V · {{ stats.topPairs[1].matchesPlayed }}J</div>
+                        <div class="podium-bar"><span class="podium-bar-label">2°</span></div>
+                    </div>
+                    <div class="podium-place first">
+                        <div class="podium-crown">👑</div>
+                        <div class="podium-avatar">🥇</div>
+                        <div class="podium-name">{{ stats.topPairs[0].player1Name }}</div>
+                        <div class="podium-name" style="font-size: 0.8rem; opacity: 0.8;">{{ stats.topPairs[0].player2Name }}</div>
+                        <div class="podium-stat">{{ stats.topPairs[0].matchesWon }}V · {{ stats.topPairs[0].matchesPlayed }}J</div>
+                        <div class="podium-bar"><span class="podium-bar-label">1°</span></div>
+                    </div>
+                    <div class="podium-place third">
+                        <div class="podium-avatar">🥉</div>
+                        <div class="podium-name">{{ stats.topPairs[2].player1Name }}</div>
+                        <div class="podium-name" style="font-size: 0.8rem; opacity: 0.8;">{{ stats.topPairs[2].player2Name }}</div>
+                        <div class="podium-stat">{{ stats.topPairs[2].matchesWon }}V · {{ stats.topPairs[2].matchesPlayed }}J</div>
+                        <div class="podium-bar"><span class="podium-bar-label">3°</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hierarchy / Organigrama -->
+            <div class="card mb-4" *ngIf="stats.topPairs.length > 0">
+                <h2 class="section-title">📊 Organigrama de Ranking</h2>
+                <div class="hierarchy">
+                    <div *ngFor="let p of stats.topPairs; let i = index" class="hierarchy-row">
+                        <div class="hierarchy-rank">
+                            <span *ngIf="i === 0" class="medal">🥇</span>
+                            <span *ngIf="i === 1" class="medal">🥈</span>
+                            <span *ngIf="i === 2" class="medal">🥉</span>
+                            <span *ngIf="i > 2" class="rank-num">{{ i + 1 }}</span>
+                        </div>
+                        <div class="hierarchy-name">{{ p.player1Name }} / {{ p.player2Name }}</div>
+                        <div class="hierarchy-bar-container">
+                            <div class="hierarchy-bar" [style.width.%]="stats.topPairs[0].matchesWon > 0 ? (p.matchesWon / stats.topPairs[0].matchesWon) * 100 : 0"
+                                [class.bar-gold]="i === 0"
+                                [class.bar-silver]="i === 1"
+                                [class.bar-bronze]="i === 2">
+                            </div>
+                        </div>
+                        <div class="hierarchy-stats">
+                            <span class="stat-wins">{{ p.matchesWon }}V</span>
+                            <span class="stat-sep">/</span>
+                            <span class="stat-played">{{ p.matchesPlayed }}J</span>
+                            <span class="stat-pct">({{ getWinRate(p.matchesWon, p.matchesPlayed) }}%)</span>
+                        </div>
+                        <div class="hierarchy-tournaments">
+                            🏆 {{ p.tournamentsPlayed }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

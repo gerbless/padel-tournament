@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, DestroyRef, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SidebarComponent } from './components/layout/sidebar/sidebar.component';
+import { ToastComponent } from './components/toast/toast.component';
 import { LayoutService } from './services/layout.service';
 import { ThemeService } from './services/theme.service';
 import { filter } from 'rxjs/operators';
@@ -9,7 +11,8 @@ import { filter } from 'rxjs/operators';
 @Component({
     selector: 'app-root',
     standalone: true,
-    imports: [RouterOutlet, CommonModule, SidebarComponent],
+    imports: [RouterOutlet, CommonModule, SidebarComponent, ToastComponent],
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
     <div class="app-layout">
         <app-sidebar *ngIf="showSidebar"></app-sidebar>
@@ -28,6 +31,7 @@ import { filter } from 'rxjs/operators';
             <span *ngIf="!themeService.darkMode()">🌙</span>
             <span *ngIf="themeService.darkMode()">☀️</span>
         </button>
+        <app-toast></app-toast>
     </div>
     `,
     styles: [`
@@ -136,22 +140,33 @@ export class AppComponent implements OnInit {
     sidebarCollapsed = false;
     showSidebar = true;
 
+    private destroyRef = inject(DestroyRef);
+
+    private cdr = inject(ChangeDetectorRef);
+
     constructor(
         private layoutService: LayoutService,
         public themeService: ThemeService,
         private router: Router
     ) {
-        this.layoutService.sidebarCollapsed$.subscribe(
-            (collapsed: boolean) => this.sidebarCollapsed = collapsed
+        this.layoutService.sidebarCollapsed$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(
+            (collapsed: boolean) => {
+                this.sidebarCollapsed = collapsed;
+                this.cdr.markForCheck();
+            }
         );
     }
 
     ngOnInit() {
         // Hide sidebar on landing page (/)
         this.router.events.pipe(
-            filter(event => event instanceof NavigationEnd)
+            filter(event => event instanceof NavigationEnd),
+            takeUntilDestroyed(this.destroyRef)
         ).subscribe((event: any) => {
             this.showSidebar = event.url !== '/' && event.url !== '/club-selection';
+            this.cdr.markForCheck();
         });
     }
 

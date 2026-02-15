@@ -1,4 +1,4 @@
-import { IsArray, ValidateNested, IsOptional, IsNumber, IsBoolean, IsString } from 'class-validator';
+import { IsArray, ValidateNested, IsOptional, IsNumber, IsBoolean, IsString, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class SetScoreDto {
@@ -25,5 +25,6 @@ export class UpdatePersonalMatchDto {
 
     @IsString()
     @IsOptional()
+    @IsIn(['draft', 'in_progress', 'completed'])
     status?: 'draft' | 'in_progress' | 'completed';
 }

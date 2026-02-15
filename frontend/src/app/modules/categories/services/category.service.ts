@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Category } from '../models/category.model';
 
@@ -13,12 +13,7 @@ export class CategoryService {
     constructor(private http: HttpClient) { }
 
     findAll(): Observable<Category[]> {
-        return this.http.get<Category[]>(this.apiUrl).pipe(
-            tap({
-                next: (data: Category[]) => console.log('Fetched categories:', data),
-                error: (err: any) => console.error('Error fetching categories:', err)
-            })
-        );
+        return this.http.get<Category[]>(this.apiUrl);
     }
 
     create(category: Category): Observable<Category> {

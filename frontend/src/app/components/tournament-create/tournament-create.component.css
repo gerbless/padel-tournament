@@ -1,1 +1,470 @@
-/* Additional component-specific styles */
+/* ============================================
+   WIZARD STEP INDICATOR
+   ============================================ */
+.wizard-steps {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+}
+
+.wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    flex: 1;
+    max-width: 120px;
+    position: relative;
+}
+
+.wizard-step::after {
+    content: '';
+    position: absolute;
+    top: 18px;
+    left: calc(50% + 20px);
+    width: calc(100% - 20px);
+    height: 2px;
+    background: var(--border);
+    z-index: 0;
+}
+
+.wizard-step:last-child::after {
+    display: none;
+}
+
+.wizard-step.completed::after {
+    background: var(--primary);
+}
+
+.step-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    border: 2px solid var(--border);
+    transition: all 0.3s ease;
+    z-index: 1;
+}
+
+.wizard-step.active .step-circle {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+}
+
+.wizard-step.completed .step-circle {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.step-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-align: center;
+}
+
+.wizard-step.active .step-label {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.wizard-step.completed .step-label {
+    color: var(--primary);
+}
+
+/* ============================================
+   WIZARD CARD & CONTENT
+   ============================================ */
+.wizard-card {
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+}
+
+.wizard-step-content {
+    flex: 1;
+}
+
+.step-title {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.step-description {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+}
+
+.field-error {
+    color: var(--error);
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.input-lg {
+    font-size: 1.1rem;
+    padding: 0.875rem 1rem;
+}
+
+/* ============================================
+   COURT INPUT (numeric stepper)
+   ============================================ */
+.court-input-wrapper {
+    display: flex;
+    justify-content: center;
+    padding: 2rem 0;
+}
+
+.court-input-group {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.court-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bg-primary);
+    font-size: 1.5rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+}
+
+.court-btn:hover:not(:disabled) {
+    border-color: var(--primary);
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--primary);
+}
+
+.court-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.court-value {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 80px;
+}
+
+.court-number {
+    font-size: 3rem;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1;
+}
+
+.court-unit {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+/* ============================================
+   DURATION SELECTOR
+   ============================================ */
+.duration-selector {
+    display: flex;
+    gap: 1rem;
+}
+
+.duration-option {
+    flex: 1;
+    padding: 1.5rem;
+    border: 2px solid var(--border);
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--bg-primary);
+}
+
+.duration-option:hover {
+    border-color: var(--primary-light);
+    transform: translateY(-2px);
+}
+
+.duration-option.selected {
+    border-color: var(--primary);
+    background: rgba(16, 185, 129, 0.05);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.duration-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.duration-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.duration-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.sub-config {
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 0.75rem;
+    border: 1px solid var(--border);
+}
+
+/* ============================================
+   SCORING SELECTOR
+   ============================================ */
+.scoring-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.scoring-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem;
+    border: 2px solid var(--border);
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--bg-primary);
+}
+
+.scoring-option:hover {
+    border-color: var(--primary-light);
+}
+
+.scoring-option.selected {
+    border-color: var(--primary);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.scoring-option input[type="radio"] {
+    width: auto;
+    margin-top: 4px;
+    accent-color: var(--primary);
+}
+
+.scoring-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.scoring-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* ============================================
+   COURT GROUP (Teams by court)
+   ============================================ */
+.court-group {
+    margin-bottom: 1.5rem;
+}
+
+.court-group-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+}
+
+.team-card {
+    padding: 1rem;
+    position: relative;
+    overflow: visible;
+}
+
+.team-title {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+}
+
+.label-sm {
+    font-size: 0.75rem;
+}
+
+/* ============================================
+   INFO BOX
+   ============================================ */
+.info-box {
+    padding: 1rem 1.25rem;
+    background: rgba(59, 130, 246, 0.08);
+    border-radius: 0.75rem;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+/* ============================================
+   WIZARD NAV
+   ============================================ */
+.wizard-nav {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.flex-grow {
+    flex: 1;
+}
+
+.btn-lg {
+    padding: 0.875rem 2rem;
+    font-size: 1.1rem;
+}
+
+/* ============================================
+   GROUP SELECTOR
+   ============================================ */
+.group-selector {
+    display: flex;
+    gap: 4px;
+}
+
+.group-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.group-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.group-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.team-card {
+    transition: all 0.2s;
+}
+
+.team-card:hover {
+    border-color: var(--primary);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+    .court-input-group {
+        gap: 1rem;
+    }
+
+    .court-number {
+        font-size: 2.5rem;
+    }
+
+    .duration-selector {
+        flex-direction: column;
+    }
+
+    .wizard-steps {
+        gap: 0.25rem;
+    }
+
+    .step-label {
+        font-size: 0.65rem;
+    }
+
+    .step-circle {
+        width: 30px;
+        height: 30px;
+        font-size: 0.75rem;
+    }
+
+    .wizard-step::after {
+        top: 14px;
+        left: calc(50% + 16px);
+        width: calc(100% - 16px);
+    }
+}
+
+/* ============================================
+   K-REGULAR GRAPH VALIDATION
+   ============================================ */
+.k-regular-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-left: 4px solid #f59e0b;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.k-regular-warning strong {
+    color: #f59e0b;
+}
+
+.k-regular-warning ul li {
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.k-regular-ok {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-left: 4px solid var(--primary);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.k-regular-ok strong {
+    color: var(--primary);
+}
+
+/* Compact team card for group assignment step */
+.team-card-compact {
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+}
+
+.team-card-compact .team-title {
+    font-size: 0.85rem;
+}

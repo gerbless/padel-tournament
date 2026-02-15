@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PlayerService, Player } from '../../services/player.service';
@@ -8,7 +8,8 @@ import { PlayerService, Player } from '../../services/player.service';
     standalone: true,
     imports: [CommonModule, RouterLink],
     templateUrl: './player-profile.component.html',
-    styleUrls: ['./player-profile.component.css']
+    styleUrls: ['./player-profile.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PlayerProfileComponent implements OnInit {
     player: Player | null = null;
@@ -16,7 +17,8 @@ export class PlayerProfileComponent implements OnInit {
 
     constructor(
         private route: ActivatedRoute,
-        private playerService: PlayerService
+        private playerService: PlayerService,
+        private cdr: ChangeDetectorRef
     ) { }
 
     ngOnInit() {
@@ -30,6 +32,7 @@ export class PlayerProfileComponent implements OnInit {
         this.playerService.findAll().subscribe(players => {
             this.player = players.find(p => p.id === id) || null;
             this.loading = false;
+            this.cdr.markForCheck();
         });
         // Note: Ideally backend should have findOne with enriched data, 
         // but findAll is cached/fast enough for now given current service structure.

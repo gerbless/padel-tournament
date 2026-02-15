@@ -8,6 +8,11 @@ export enum MatchStatus {
     COMPLETED = 'completed'
 }
 
+export enum MatchPhase {
+    GROUP = 'group',
+    ELIMINATION = 'elimination',
+}
+
 export interface SetResult {
     team1Games: number;
     team2Games: number;
@@ -43,6 +48,22 @@ export class Match {
 
     @Column({ nullable: true })
     winnerId: string;
+
+    @Column({ type: 'int', nullable: true })
+    groupNumber: number;
+
+    @Column({ type: 'int', nullable: true })
+    courtNumber: number;
+
+    @Column({ type: 'int', nullable: true })
+    round: number;
+
+    @Column({
+        type: 'enum',
+        enum: MatchPhase,
+        nullable: true
+    })
+    phase: MatchPhase;
 
     @ManyToOne(() => Tournament, tournament => tournament.matches, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'tournamentId' })

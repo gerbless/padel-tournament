@@ -1,0 +1,218 @@
+<div class="container fade-in">
+    <!-- Header bar -->
+    <div class="calendar-header-bar">
+        <a routerLink="/courts" class="back-btn">← Volver a Canchas</a>
+        <div class="court-title" *ngIf="court">
+            <h1>📅 {{ court.name }}</h1>
+            <span class="court-surface" *ngIf="court.surfaceType">{{ court.surfaceType }}</span>
+        </div>
+    </div>
+
+    <!-- Court Tabs -->
+    <div class="court-tabs" *ngIf="courts.length > 1">
+        <button *ngFor="let c of courts"
+            class="court-tab"
+            [class.active]="c.id === court?.id"
+            (click)="switchCourt(c.id)">
+            {{ c.name }}
+        </button>
+    </div>
+
+    <!-- Week Navigation -->
+    <div class="week-nav">
+        <button (click)="prevWeek()" class="btn btn-secondary btn-sm">← Anterior</button>
+        <span class="week-label">{{ weekLabel }}</span>
+        <button (click)="nextWeek()" class="btn btn-secondary btn-sm">Siguiente →</button>
+        <button (click)="goToday()" class="btn btn-primary btn-sm">Hoy</button>
+    </div>
+
+    <!-- ── Time Grid ──────────────────────────────────────── -->
+    <div class="time-grid-wrapper" *ngIf="!loading">
+        <div class="time-grid">
+            <!-- Time column (left labels) -->
+            <div class="time-column">
+                <div class="time-col-header"></div>
+                <div class="time-label" *ngFor="let hour of hours">
+                    <span>{{ hour }}:00</span>
+                </div>
+            </div>
+
+            <!-- Day columns -->
+            <div *ngFor="let day of weekDays" class="day-column" [class.today-col]="day.isToday">
+                <div class="day-header" [class.today]="day.isToday">
+                    <span class="day-name">{{ day.label }}</span>
+                    <span class="day-date">{{ day.shortDate }}</span>
+                </div>
+                <div class="slots-container">
+                    <!-- Background time-cells (clickable) -->
+                    <div *ngFor="let hour of hours"
+                        class="time-cell"
+                        (click)="openCreateModal(day.date, hour)">
+                    </div>
+                    <!-- Reservation blocks -->
+                    <div *ngFor="let res of getReservationsForDay(day.date)"
+                        class="reservation-block"
+                        [style.top]="getReservationTop(res)"
+                        [style.height]="getReservationHeight(res)"
+                        [style.background]="getReservationColor(res)"
+                        (click)="openEditModal(res); $event.stopPropagation()">
+                        <div class="res-time">{{ res.startTime }} – {{ res.endTime }}</div>
+                        <div class="res-title">{{ res.title || 'Reserva' }}</div>
+                        <div class="res-players" *ngIf="res.players?.length">
+                            {{ res.players.join(', ') }}
+                        </div>
+                        <div class="res-price" *ngIf="enablePricing && res.finalPrice">
+                            {{ formatPrice(res.finalPrice) }}
+                            <span class="payment-badge" [ngClass]="'pay-' + res.paymentStatus">
+                                {{ res.paymentStatus === 'paid' ? '✓' : res.paymentStatus === 'partial' ? '½' : '⏳' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="loading" class="loading-container">
+        <div class="spinner"></div>
+    </div>
+</div>
+
+<!-- ── Reservation Modal ─────────────────────────────────── -->
+<div class="modal-overlay" *ngIf="showModal" (click)="showModal = false">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>{{ editingReservation ? '📝 Editar Reserva' : '📅 Nueva Reserva' }}</h2>
+            <button class="modal-close" (click)="showModal = false">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-grid">
+                <!-- Date -->
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" [(ngModel)]="reservationForm.date" class="form-control"
+                        (ngModelChange)="calculatePrice()">
+                </div>
+
+                <!-- Nº Jugadores -->
+                <div class="form-group">
+                    <label>Nº Jugadores</label>
+                    <select [(ngModel)]="reservationForm.playerCount" class="form-control">
+                        <option [ngValue]="2">2</option>
+                        <option [ngValue]="3">3</option>
+                        <option [ngValue]="4">4</option>
+                    </select>
+                </div>
+
+                <!-- Times -->
+                <div class="form-group">
+                    <label>Hora inicio</label>
+                    <select [(ngModel)]="reservationForm.startTime" class="form-control"
+                        (ngModelChange)="onStartTimeChange()">
+                        <option *ngFor="let t of timeSlots" [value]="t">{{ t }}</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Hora fin</label>
+                    <input type="text" [ngModel]="reservationForm.endTime" class="form-control" readonly>
+                    <small>Bloque fijo de 1 hora 30 min</small>
+                </div>
+
+                <!-- Title (full width) -->
+                <div class="form-group col-span-full">
+                    <label>Título / Nombre de reserva <span class="optional">(Op)</span></label>
+                    <input type="text" [(ngModel)]="reservationForm.title" class="form-control"
+                        placeholder="Ej: Partido amistoso, Clase grupal…">
+                </div>
+            </div>
+
+            <!-- Players Section -->
+            <div class="players-section">
+                <h3>👥 Jugadores</h3>
+                <p class="section-hint">Busca jugadores existentes o escribe el nombre directamente</p>
+                <div class="players-grid">
+                    <div *ngFor="let p of reservationForm.players; let i = index; trackBy: trackByIndex"
+                         class="player-slot">
+                        <label class="player-label">Jugador {{ i + 1 }}</label>
+                        <app-player-select
+                            [mode]="'name'"
+                            [(ngModel)]="reservationForm.players[i]"
+                            [placeholder]="'Buscar o escribir nombre…'"
+                            [currentClubId]="court?.clubId || null"
+                            [excludeNames]="getExcludedPlayerNames(i)"
+                            (requestCreatePlayer)="onRequestCreatePlayer($event, i)">
+                        </app-player-select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pricing section -->
+            <div class="pricing-section" *ngIf="enablePricing">
+                <h3>💰 Precio</h3>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Tipo de cobro</label>
+                        <select [(ngModel)]="reservationForm.priceType" class="form-control"
+                            (ngModelChange)="onPriceTypeChange()">
+                            <option value="full_court">Cancha completa</option>
+                            <option value="per_player">Por jugador (1/4)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Precio base</label>
+                        <div class="input-with-suffix">
+                            <input type="text" [value]="formatPrice(reservationForm.basePrice)"
+                                class="form-control" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Precio final</label>
+                        <div class="input-with-suffix">
+                            <input type="number" [(ngModel)]="reservationForm.finalPrice"
+                                min="0" class="form-control">
+                            <span class="suffix">$</span>
+                        </div>
+                        <small>Modifica para dar un precio especial</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado de pago</label>
+                        <select [(ngModel)]="reservationForm.paymentStatus" class="form-control">
+                            <option value="pending">⏳ Pendiente</option>
+                            <option value="paid">✅ Pagado</option>
+                            <option value="partial">½ Pago parcial</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group col-span-full">
+                        <label>Notas de pago <span class="optional">(Op)</span></label>
+                        <textarea [(ngModel)]="reservationForm.paymentNotes" class="form-control"
+                            rows="2" placeholder="Ej: Pagó 50%, debe el resto…"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button *ngIf="editingReservation" (click)="cancelReservation()" class="btn btn-danger">
+                🗑️ Cancelar Reserva
+            </button>
+            <div class="spacer"></div>
+            <button (click)="showModal = false" class="btn btn-secondary">Cerrar</button>
+            <button (click)="saveReservation()" class="btn btn-primary">
+                {{ editingReservation ? 'Guardar Cambios' : 'Crear Reserva' }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Player Create Modal -->
+<app-player-create-modal
+    *ngIf="showPlayerCreateModal"
+    [initialName]="playerCreateInitialName"
+    [predefinedClubId]="court?.clubId || null"
+    (playerCreated)="onPlayerCreated($event)"
+    (close)="onClosePlayerCreateModal()">
+</app-player-create-modal>

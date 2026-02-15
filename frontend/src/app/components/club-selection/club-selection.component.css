@@ -327,3 +327,78 @@
     transform: scale(0.98);
     background: var(--bg-tertiary);
 }
+
+/* Role Badge */
+.role-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--primary);
+    margin-top: 0.35rem;
+}
+
+/* Filter Button */
+.btn-filter {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    min-height: 44px;
+}
+
+.btn-filter:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-filter.active {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* Role Badge */
+.role-badge {
+    display: inline-block;
+    margin-top: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--primary);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Filter Button */
+.btn-filter {
+    padding: 0.5rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    min-height: 44px;
+}
+
+.btn-filter:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-filter.active {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: var(--primary);
+    color: var(--primary);
+}

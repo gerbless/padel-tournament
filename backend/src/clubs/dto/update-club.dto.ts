@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class UpdateClubDto {
     @IsOptional()
@@ -12,4 +12,8 @@ export class UpdateClubDto {
     @IsOptional()
     @IsString()
     logo?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    enableCourtPricing?: boolean;
 }

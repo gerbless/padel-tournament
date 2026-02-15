@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -9,13 +9,15 @@ import { Club } from '../../models/club.model';
 import { PlayerCreateModalComponent } from '../player-create-modal/player-create-modal.component';
 
 import { AuthService } from '../../services/auth.service';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
     selector: 'app-player-list',
     standalone: true,
     imports: [CommonModule, ReactiveFormsModule, RouterLink, FormsModule, PlayerCreateModalComponent],
     templateUrl: './player-list.component.html',
-    styleUrls: ['./player-list.component.css']
+    styleUrls: ['./player-list.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PlayerListComponent implements OnInit {
     players: Player[] = [];
@@ -23,6 +25,8 @@ export class PlayerListComponent implements OnInit {
     categories: any[] = [];
     clubs: Club[] = []; // Available clubs
     isLoggedIn = false;
+    canEdit = false;
+    canAdmin = false;
 
     // Inline editing state
     editingPlayerId: string | null = null;
@@ -45,11 +49,18 @@ export class PlayerListComponent implements OnInit {
         private playerService: PlayerService,
         private categoryService: CategoryService,
         private clubService: ClubService,
-        private authService: AuthService
+        private authService: AuthService,
+        private cdr: ChangeDetectorRef,
+        private toast: ToastService
     ) { }
 
     ngOnInit() {
         this.isLoggedIn = this.authService.isAuthenticated();
+        const club = this.clubService.getSelectedClub();
+        if (club) {
+            this.canEdit = this.authService.hasClubRole(club.id, 'editor');
+            this.canAdmin = this.authService.hasClubRole(club.id, 'admin');
+        }
         this.loadPlayers();
         this.loadCategories();
         this.loadClubs();
@@ -58,6 +69,7 @@ export class PlayerListComponent implements OnInit {
     loadClubs() {
         this.clubService.getClubs().subscribe(clubs => {
             this.clubs = clubs;
+            this.cdr.markForCheck();
         });
     }
 
@@ -108,6 +120,7 @@ export class PlayerListComponent implements OnInit {
     loadCategories() {
         this.categoryService.findAll().subscribe(cats => {
             this.categories = cats;
+            this.cdr.markForCheck();
         });
     }
 
@@ -117,10 +130,12 @@ export class PlayerListComponent implements OnInit {
             next: (players) => {
                 this.players = players;
                 this.loading = false;
+                this.cdr.markForCheck();
             },
             error: (error: any) => {
                 console.error('Error loading players:', error);
                 this.loading = false;
+                this.cdr.markForCheck();
             }
         });
     }
@@ -153,11 +168,13 @@ export class PlayerListComponent implements OnInit {
             next: () => {
                 this.loadPlayers();
                 this.playerToDelete = null;
+                this.toast.success('Jugador eliminado');
+                this.cdr.markForCheck();
             },
             error: (error: any) => {
-                console.error('Error deleting player:', error);
-                alert('No se puede eliminar el jugador: ' + (error.error?.message || 'Tiene torneos jugados'));
+                this.toast.error('No se puede eliminar: ' + (error.error?.message || 'Tiene torneos jugados'));
                 this.playerToDelete = null;
+                this.cdr.markForCheck();
             }
         });
     }
@@ -206,11 +223,13 @@ export class PlayerListComponent implements OnInit {
                 this.saving = false;
                 this.editingPlayerId = null;
                 this.loadPlayers();
+                this.toast.success('Jugador actualizado');
+                this.cdr.markForCheck();
             },
             error: (error) => {
-                console.error('Error updating player:', error);
-                alert('Error al actualizar el jugador');
+                this.toast.error('Error al actualizar: ' + (error.error?.message || 'Error desconocido'));
                 this.saving = false;
+                this.cdr.markForCheck();
             }
         });
     }

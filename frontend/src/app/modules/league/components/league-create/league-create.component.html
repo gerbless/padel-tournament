@@ -74,6 +74,18 @@
                         <li>✓ Emoción de eliminación directa</li>
                     </ul>
                 </div>
+
+                <div class="type-card" [class.selected]="leagueType === 'round_robin_playoff'"
+                    (click)="leagueType = 'round_robin_playoff'">
+                    <div class="type-icon">🏆</div>
+                    <h4>Todos vs Todos + Playoffs</h4>
+                    <p>Fase regular round-robin, luego playoffs Oro y Plata según clasificación.</p>
+                    <ul>
+                        <li>✓ Top 4 → Liga Oro (SF + Final + 3°)</li>
+                        <li>✓ 5° al 8° → Liga Plata (SF + Final + 3°)</li>
+                        <li>✓ Últimas parejas descienden</li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -87,7 +99,7 @@
                     <input type="date" [(ngModel)]="startDate" class="form-control">
                 </div>
 
-                <div class="form-group" *ngIf="leagueType === 'round_robin'">
+                <div class="form-group" *ngIf="leagueType === 'round_robin' || leagueType === 'round_robin_playoff'">
                     <label>Número de Rondas</label>
                     <input type="number" [(ngModel)]="config.rounds" min="1" max="5" class="form-control">
                     <small>Cada pareja jugará {{ config.rounds }} vez(veces) contra cada rival</small>
@@ -113,6 +125,38 @@
                             <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.8;">
                                 Divide a los clasificados en copas según su posición en el grupo (ej: 1º y 2º a Oro, 3º
                                 y 4º a Plata).
+                            </p>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Round Robin + Playoff specific config -->
+                <div class="form-group" *ngIf="leagueType === 'round_robin_playoff'">
+                    <label>Parejas en Liga Oro</label>
+                    <input type="number" [(ngModel)]="config.goldPlayoffCount" min="2" max="8" class="form-control">
+                    <small>Las primeras {{ config.goldPlayoffCount }} clasificadas juegan playoffs Oro</small>
+                </div>
+
+                <div class="form-group" *ngIf="leagueType === 'round_robin_playoff'">
+                    <label>Parejas en Liga Plata</label>
+                    <input type="number" [(ngModel)]="config.silverPlayoffCount" min="2" max="8" class="form-control">
+                    <small>Las siguientes {{ config.silverPlayoffCount }} clasificadas juegan playoffs Plata</small>
+                </div>
+
+                <div class="form-group" *ngIf="leagueType === 'round_robin_playoff'">
+                    <label>Parejas que descienden</label>
+                    <input type="number" [(ngModel)]="config.relegationCount" min="0" max="4" class="form-control">
+                    <small>Las últimas {{ config.relegationCount }} parejas descienden de categoría</small>
+                </div>
+
+                <div class="form-group full-width" *ngIf="leagueType === 'round_robin_playoff'">
+                    <label class="checkbox-label"
+                        style="margin-top: 1rem; background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                        <input type="checkbox" [(ngModel)]="config.skipExhibitionSets">
+                        <div>
+                            <span style="font-weight: 600; font-size: 1rem;">🎾 Set de exhibición opcional</span>
+                            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.8;">
+                                Si una pareja gana 2-0, el 3er set es opcional y no cuenta en la tabla de posiciones.
                             </p>
                         </div>
                     </label>
@@ -276,7 +320,7 @@
                 <h3>{{ leagueName }}</h3>
                 <div class="summary-row">
                     <span class="label">Tipo:</span>
-                    <span class="value">{{ leagueType === 'round_robin' ? 'Todos contra Todos' : 'Grupos + Playoffs'
+                    <span class="value">{{ leagueType === 'round_robin' ? 'Todos contra Todos' : leagueType === 'round_robin_playoff' ? 'Todos vs Todos + Playoffs' : 'Grupos + Playoffs'
                         }}</span>
                 </div>
                 <div class="summary-row" *ngIf="category">
@@ -295,13 +339,25 @@
                     <span class="label">Partidos estimados:</span>
                     <span class="value">{{ pairs.length * (pairs.length - 1) / 2 * (config.rounds || 1) }}</span>
                 </div>
-                <div class="summary-row" *ngIf="leagueType === 'round_robin'">
+                <div class="summary-row" *ngIf="leagueType === 'round_robin' || leagueType === 'round_robin_playoff'">
                     <span class="label">Rondas:</span>
                     <span class="value">{{ config.rounds }}</span>
                 </div>
                 <div class="summary-row" *ngIf="leagueType === 'groups_playoff'">
                     <span class="label">Grupos:</span>
                     <span class="value">{{ config.numberOfGroups }}</span>
+                </div>
+                <div class="summary-row" *ngIf="leagueType === 'round_robin_playoff'">
+                    <span class="label">Liga Oro:</span>
+                    <span class="value">Top {{ config.goldPlayoffCount }} parejas</span>
+                </div>
+                <div class="summary-row" *ngIf="leagueType === 'round_robin_playoff'">
+                    <span class="label">Liga Plata:</span>
+                    <span class="value">Siguientes {{ config.silverPlayoffCount }} parejas</span>
+                </div>
+                <div class="summary-row" *ngIf="leagueType === 'round_robin_playoff' && config.relegationCount">
+                    <span class="label">Descienden:</span>
+                    <span class="value">{{ config.relegationCount }} parejas</span>
                 </div>
                 <div class="summary-row">
                     <span class="label">Puntuación:</span>

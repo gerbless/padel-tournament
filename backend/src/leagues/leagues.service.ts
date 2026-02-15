@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { League, LeagueStatus } from './entities/league.entity';
 import { LeagueTeam } from './entities/league-team.entity';
 import { LeagueMatch, MatchStatus } from './entities/league-match.entity';
 import { PlayersService } from '../players/players.service';
 import { CreateLeagueDto } from './dto/create-league.dto';
+import { UpdateLeagueDto } from './dto/update-league.dto';
+import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class LeaguesService {
@@ -16,42 +18,62 @@ export class LeaguesService {
         private leagueTeamRepository: Repository<LeagueTeam>,
         @InjectRepository(LeagueMatch)
         private leagueMatchRepository: Repository<LeagueMatch>,
-        private playersService: PlayersService
+        private playersService: PlayersService,
+        private dataSource: DataSource,
     ) { }
 
     async create(createLeagueDto: CreateLeagueDto): Promise<League> {
-        const league = this.leagueRepository.create({
-            ...createLeagueDto,
-            clubId: createLeagueDto.clubId
-        });
-        const savedLeague = await this.leagueRepository.save(league);
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
 
-        // If pairs are provided, create teams automatically
-        if (createLeagueDto.pairs && createLeagueDto.pairs.length > 0) {
-            for (let i = 0; i < createLeagueDto.pairs.length; i++) {
-                const pair = createLeagueDto.pairs[i];
-                await this.leagueTeamRepository.save({
-                    leagueId: savedLeague.id,
-                    player1Id: pair.playerA,
-                    player2Id: pair.playerB,
-                    teamName: `Pareja ${i + 1}`
-                });
+        try {
+            const league = queryRunner.manager.create(League, {
+                ...createLeagueDto,
+                clubId: createLeagueDto.clubId
+            });
+            const savedLeague = await queryRunner.manager.save(league);
+
+            // If pairs are provided, create teams automatically
+            if (createLeagueDto.pairs && createLeagueDto.pairs.length > 0) {
+                for (let i = 0; i < createLeagueDto.pairs.length; i++) {
+                    const pair = createLeagueDto.pairs[i];
+                    await queryRunner.manager.save(LeagueTeam, {
+                        leagueId: savedLeague.id,
+                        player1Id: pair.playerA,
+                        player2Id: pair.playerB,
+                        teamName: `Pareja ${i + 1}`
+                    });
+                }
             }
-        }
 
-        return this.findOne(savedLeague.id); // Return with teams loaded
+            await queryRunner.commitTransaction();
+            return this.findOne(savedLeague.id);
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            await queryRunner.release();
+        }
     }
 
-    async findAll(clubId?: string): Promise<League[]> {
-        const query: any = {
-            relations: ['teams', 'teams.player1', 'teams.player2', 'matches']
+    async findAll(clubId?: string, pagination?: PaginationQueryDto): Promise<PaginatedResult<League>> {
+        const page = pagination?.page || 1;
+        const limit = pagination?.limit || 20;
+        const skip = (page - 1) * limit;
+
+        const queryOptions: any = {
+            relations: ['teams', 'teams.player1', 'teams.player2', 'matches'],
+            skip,
+            take: limit,
         };
 
         if (clubId) {
-            query.where = { clubId };
+            queryOptions.where = { clubId };
         }
 
-        return this.leagueRepository.find(query);
+        const [data, total] = await this.leagueRepository.findAndCount(queryOptions);
+        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
     }
 
     async findOne(id: string): Promise<League> {
@@ -70,7 +92,7 @@ export class LeaguesService {
         return league;
     }
 
-    async update(id: string, updateLeagueDto: any): Promise<League> { // TODO: Define DTO
+    async update(id: string, updateLeagueDto: UpdateLeagueDto): Promise<League> {
         const league = await this.findOne(id);
         this.leagueRepository.merge(league, updateLeagueDto);
         return this.leagueRepository.save(league);
@@ -160,6 +182,8 @@ export class LeaguesService {
         // Check for playoff generation
         if (match.league.type === 'groups_playoff') {
             await this.checkAndGeneratePlayoffs(match.leagueId);
+        } else if (match.league.type === 'round_robin_playoff') {
+            await this.checkAndGenerateRoundRobinPlayoffs(match.leagueId);
         }
 
         // Check for automatic completion
@@ -364,29 +388,26 @@ export class LeaguesService {
     }
 
     async generateFixtures(id: string): Promise<LeagueMatch[]> {
-        console.log(`Generating fixtures for league ${id}`);
         const league = await this.findOne(id);
-        console.log(`League found: ${league.id}, type: ${league.type}, teams: ${league.teams.length}`);
 
         if (league.teams.length < 2) {
-            console.error('Not enough teams');
-            throw new Error('Not enough teams to generate fixtures');
+            throw new BadRequestException('Not enough teams to generate fixtures');
         }
 
         const matches: LeagueMatch[] = [];
 
-        if (league.type === 'round_robin') {
-            console.log('Generating Round Robin matches...');
-            this.generateRoundRobinMatches(league.teams, matches, id);
+        if (league.type === 'round_robin' || league.type === 'round_robin_playoff') {
+            const configRounds = league.config.rounds || 1;
+            for (let r = 0; r < configRounds; r++) {
+                this.generateRoundRobinMatches(league.teams, matches, id, undefined, r);
+            }
         } else if (league.type === 'groups_playoff') {
-            console.log('Generating Groups Playoff matches...');
             const groups = league.config.groups || [];
             if (groups.length === 0) {
                 const teamGroups = new Set(league.teams.map(t => t.group).filter(g => !!g));
 
                 // Auto-generate groups if not assigned
                 if (teamGroups.size === 0) {
-                    console.log('Auto-generating groups...');
                     await this.generateGroups(id, league.config.numberOfGroups || 2);
                     // Refresh league with new groups
                     const updatedLeague = await this.findOne(id);
@@ -406,18 +427,10 @@ export class LeaguesService {
             }
         }
 
-        console.log(`Saving ${matches.length} matches...`);
-        try {
-            const saved = await this.leagueMatchRepository.save(matches);
-            console.log('Matches saved successfully');
-            return saved;
-        } catch (error) {
-            console.error('Error saving matches:', error);
-            throw error;
-        }
+        return this.leagueMatchRepository.save(matches);
     }
 
-    private generateRoundRobinMatches(teams: LeagueTeam[], matches: LeagueMatch[], leagueId: string, group?: string) {
+    private generateRoundRobinMatches(teams: LeagueTeam[], matches: LeagueMatch[], leagueId: string, group?: string, roundCycle: number = 0) {
         const numTeams = teams.length;
         if (numTeams < 2) return;
 
@@ -426,8 +439,7 @@ export class LeaguesService {
         const workingTeams = ghost ? [...teams, null] : [...teams];
         const totalRounds = workingTeams.length - 1;
         const matchesPerRound = workingTeams.length / 2;
-
-        console.log(`RR: ${numTeams} teams (ghost=${ghost}), ${totalRounds} rounds`);
+        const roundOffset = roundCycle * totalRounds; // Offset round numbers for multi-cycle
 
         for (let round = 0; round < totalRounds; round++) {
             for (let match = 0; match < matchesPerRound; match++) {
@@ -435,11 +447,14 @@ export class LeaguesService {
                 const away = workingTeams[workingTeams.length - 1 - match];
 
                 if (home && away) {
+                    // In even cycles, swap home/away for variety
+                    const t1 = roundCycle % 2 === 0 ? home : away;
+                    const t2 = roundCycle % 2 === 0 ? away : home;
                     matches.push(this.leagueMatchRepository.create({
                         leagueId: leagueId,
-                        team1Id: home.id,
-                        team2Id: away.id,
-                        round: round + 1,
+                        team1Id: t1.id,
+                        team2Id: t2.id,
+                        round: roundOffset + round + 1,
                         group: group, // Optional group assignment
                         status: MatchStatus.PENDING
                     }));
@@ -455,10 +470,20 @@ export class LeaguesService {
 
     async calculateStandings(leagueId: string): Promise<void> {
         const league = await this.findOne(leagueId);
-        const matches = await this.leagueMatchRepository.find({
+        let matches = await this.leagueMatchRepository.find({
             where: { leagueId, status: MatchStatus.COMPLETED },
             relations: ['winner']
         });
+
+        // For groups_playoff and round_robin_playoff, only count regular-phase matches for standings
+        // Playoff matches (Playoff_QF, Playoff_SF, Playoff_F, etc.) should NOT inflate standings
+        if (league.type === 'groups_playoff' || league.type === 'round_robin_playoff') {
+            matches = matches.filter(m => !m.group || !m.group.startsWith('Playoff'));
+        }
+
+        // For round_robin, exclude tie-breaker matches from regular standings
+        // (TieBreaker matches are special and resolved separately)
+        matches = matches.filter(m => m.group !== 'TieBreaker');
 
         // Reset stats for all teams
         for (const team of league.teams) {
@@ -482,9 +507,9 @@ export class LeaguesService {
             team1.matchesPlayed++;
             team2.matchesPlayed++;
 
-            // Points config (default: Win=3, Loss=1)
+            // Points config (default: Win=3, Loss=0)
             const pointsForWin = league.config.pointsForWin ?? 3;
-            const pointsForLoss = league.config.pointsForLoss ?? 1;
+            const pointsForLoss = league.config.pointsForLoss ?? 0;
 
             if (match.winnerId === team1.id) {
                 team1.matchesWon++;
@@ -499,7 +524,29 @@ export class LeaguesService {
             }
 
             // Sets and Games
-            match.sets?.forEach(set => {
+            // Determine how many competitive sets to count
+            // If skipExhibitionSets is enabled and a team won 2-0, the 3rd set is exhibition
+            const skipExhibition = league.config.skipExhibitionSets ?? false;
+            let competitiveSets = match.sets || [];
+
+            if (skipExhibition && competitiveSets.length === 3) {
+                // Check if the winner won the first 2 sets (2-0 after 2 sets)
+                let t1WinsFirst2 = 0;
+                let t2WinsFirst2 = 0;
+                for (let i = 0; i < 2; i++) {
+                    const s = competitiveSets[i];
+                    const g1 = s.team1Games ?? s.pairAGames ?? 0;
+                    const g2 = s.team2Games ?? s.pairBGames ?? 0;
+                    if (g1 > g2) t1WinsFirst2++;
+                    else if (g2 > g1) t2WinsFirst2++;
+                }
+                // If someone already won 2-0, the 3rd set is exhibition — skip it
+                if (t1WinsFirst2 === 2 || t2WinsFirst2 === 2) {
+                    competitiveSets = competitiveSets.slice(0, 2);
+                }
+            }
+
+            competitiveSets.forEach(set => {
                 // Handle frontend nomenclature
                 const t1Games = set.team1Games ?? set.pairAGames ?? 0;
                 const t2Games = set.team2Games ?? set.pairBGames ?? 0;
@@ -516,7 +563,7 @@ export class LeaguesService {
                     team2.setsWon++;
                     team1.setsLost++;
                 }
-            });
+            }); // end competitiveSets.forEach
         }
 
         await this.leagueTeamRepository.save(league.teams);
@@ -525,11 +572,60 @@ export class LeaguesService {
     async getStandings(leagueId: string): Promise<LeagueTeam[]> {
         await this.calculateStandings(leagueId); // Ensure fresh stats
         const league = await this.findOne(leagueId);
-        return league.teams.sort((a, b) => {
-            if (a.points !== b.points) return b.points - a.points;
-            if ((a.setsWon - a.setsLost) !== (b.setsWon - b.setsLost)) return (b.setsWon - b.setsLost) - (a.setsWon - a.setsLost);
-            return (b.gamesWon - b.gamesLost) - (a.gamesWon - a.gamesLost);
+
+        // Load completed non-playoff matches for head-to-head tiebreaker
+        const completedMatches = await this.leagueMatchRepository.find({
+            where: { leagueId, status: MatchStatus.COMPLETED }
         });
+        const regularMatches = completedMatches.filter(m => 
+            !m.group?.startsWith('Playoff') && m.group !== 'TieBreaker'
+        );
+
+        return league.teams.sort((a, b) => {
+            // 1st criterion: Points
+            if (a.points !== b.points) return b.points - a.points;
+
+            // 2nd criterion: Game difference
+            const gamesDiffA = a.gamesWon - a.gamesLost;
+            const gamesDiffB = b.gamesWon - b.gamesLost;
+            if (gamesDiffA !== gamesDiffB) return gamesDiffB - gamesDiffA;
+
+            // 3rd criterion: Head-to-head result
+            const h2h = this.getHeadToHeadResult(a.id, b.id, regularMatches);
+            if (h2h !== 0) return h2h;
+
+            // 4th criterion: Set difference (fallback)
+            if ((a.setsWon - a.setsLost) !== (b.setsWon - b.setsLost)) {
+                return (b.setsWon - b.setsLost) - (a.setsWon - a.setsLost);
+            }
+
+            return 0;
+        });
+    }
+
+    /**
+     * Head-to-head tiebreaker: returns negative if teamA won, positive if teamB won, 0 if no result
+     */
+    private getHeadToHeadResult(teamAId: string, teamBId: string, matches: LeagueMatch[]): number {
+        // Find direct matches between these two teams
+        const directMatches = matches.filter(m =>
+            (m.team1Id === teamAId && m.team2Id === teamBId) ||
+            (m.team1Id === teamBId && m.team2Id === teamAId)
+        );
+
+        if (directMatches.length === 0) return 0;
+
+        let teamAWins = 0;
+        let teamBWins = 0;
+
+        for (const match of directMatches) {
+            if (match.winnerId === teamAId) teamAWins++;
+            else if (match.winnerId === teamBId) teamBWins++;
+        }
+
+        if (teamAWins > teamBWins) return -1; // A is better → sort A before B
+        if (teamBWins > teamAWins) return 1;  // B is better → sort B before A
+        return 0;
     }
 
     async suggestNextMatch(leagueId: string): Promise<LeagueMatch> {
@@ -612,6 +708,13 @@ export class LeaguesService {
                 const allFinalsDone = finals.every(m => m.status === MatchStatus.COMPLETED);
                 if (allFinalsDone) shouldComplete = true;
             }
+        } else if (league.type === 'round_robin_playoff') {
+            // Complete when all playoff finals AND 3rd place matches are done
+            const playoffMatches = league.matches.filter(m => m.group && m.group.startsWith('Playoff'));
+            if (playoffMatches.length > 0) {
+                const allPlayoffsDone = playoffMatches.every(m => m.status === MatchStatus.COMPLETED);
+                if (allPlayoffsDone) shouldComplete = true;
+            }
         }
 
         if (shouldComplete) {
@@ -685,5 +788,126 @@ export class LeaguesService {
         }
 
         return this.leagueMatchRepository.save(matches);
+    }
+
+    // ==========================================
+    // ROUND ROBIN + PLAYOFF (New format)
+    // ==========================================
+
+    /**
+     * Check if all regular-phase matches are done, then generate playoffs from standings.
+     * Format:
+     *   - Gold: Top 4 → SF (1v4, 2v3) → Final + 3rd place
+     *   - Silver: Next 4 (5-8) → SF (5v8, 6v7) → Final + 3rd place
+     *   - Bottom pairs → Relegated
+     */
+    private async checkAndGenerateRoundRobinPlayoffs(leagueId: string) {
+        const league = await this.findOne(leagueId);
+
+        // If playoffs already exist, check progression
+        const hasPlayoffs = league.matches.some(m => m.group && m.group.startsWith('Playoff'));
+        if (hasPlayoffs) {
+            await this.checkRoundRobinPlayoffProgression(league);
+            return;
+        }
+
+        // Check if all regular-phase matches are completed
+        const regularMatches = league.matches.filter(m =>
+            !m.group || (!m.group.startsWith('Playoff') && m.group !== 'TieBreaker')
+        );
+        if (regularMatches.length === 0) return;
+
+        const allCompleted = regularMatches.every(m => m.status === MatchStatus.COMPLETED);
+        if (!allCompleted) return;
+
+        // All regular matches done → generate playoffs from standings
+        await this.generateRoundRobinPlayoffFixtures(league);
+    }
+
+    private async generateRoundRobinPlayoffFixtures(league: League) {
+        const standings = await this.getStandings(league.id);
+        const matches: LeagueMatch[] = [];
+
+        const goldCount = league.config.goldPlayoffCount ?? 4;
+        const silverCount = league.config.silverPlayoffCount ?? 4;
+
+        // --- GOLD PLAYOFF (Top 4) ---
+        // SF: 1st vs 4th, 2nd vs 3rd
+        if (standings.length >= goldCount && goldCount >= 4) {
+            matches.push(this.createPlayoffMatch(
+                league.id, standings[0].id, standings[3].id, 'Playoff_Gold_SF', 1
+            ));
+            matches.push(this.createPlayoffMatch(
+                league.id, standings[1].id, standings[2].id, 'Playoff_Gold_SF', 1
+            ));
+        } else if (standings.length >= 2) {
+            // Less than 4 teams for Gold: direct final between top 2
+            matches.push(this.createPlayoffMatch(
+                league.id, standings[0].id, standings[1].id, 'Playoff_Gold_F', 1
+            ));
+        }
+
+        // --- SILVER PLAYOFF (5th-8th) ---
+        const silverStart = goldCount;
+        const silverEnd = silverStart + silverCount;
+        if (standings.length >= silverEnd && silverCount >= 4) {
+            // SF: 5th vs 8th, 6th vs 7th
+            matches.push(this.createPlayoffMatch(
+                league.id, standings[silverStart].id, standings[silverEnd - 1].id, 'Playoff_Silver_SF', 1
+            ));
+            matches.push(this.createPlayoffMatch(
+                league.id, standings[silverStart + 1].id, standings[silverEnd - 2].id, 'Playoff_Silver_SF', 1
+            ));
+        } else if (standings.length >= silverStart + 2) {
+            // Direct final if only 2 teams for Silver
+            matches.push(this.createPlayoffMatch(
+                league.id, standings[silverStart].id, standings[silverStart + 1].id, 'Playoff_Silver_F', 1
+            ));
+        }
+
+        if (matches.length > 0) {
+            await this.leagueMatchRepository.save(matches);
+        }
+    }
+
+    /**
+     * Handle playoff progression for round_robin_playoff:
+     * SF → Final + 3rd place match (losers of SF play for 3rd/4th)
+     */
+    private async checkRoundRobinPlayoffProgression(league: League) {
+        const tiers = ['_Gold', '_Silver'];
+
+        for (const tier of tiers) {
+            const sfGroup = `Playoff${tier}_SF`;
+            const fGroup = `Playoff${tier}_F`;
+            const thirdGroup = `Playoff${tier}_3rd`; // 3rd place match
+
+            const sfMatches = league.matches.filter(m => m.group === sfGroup);
+            const fMatches = league.matches.filter(m => m.group === fGroup);
+            const thirdMatches = league.matches.filter(m => m.group === thirdGroup);
+
+            // If SF are done but Final + 3rd place don't exist yet
+            if (sfMatches.length >= 2 && fMatches.length === 0 && thirdMatches.length === 0) {
+                const allSfDone = sfMatches.every(m => m.status === MatchStatus.COMPLETED);
+                if (!allSfDone) continue;
+
+                sfMatches.sort((a, b) => a.id.localeCompare(b.id));
+
+                const w1 = sfMatches[0].winnerId;
+                const w2 = sfMatches[1].winnerId;
+                const l1 = sfMatches[0].team1Id === w1 ? sfMatches[0].team2Id : sfMatches[0].team1Id;
+                const l2 = sfMatches[1].team1Id === w2 ? sfMatches[1].team2Id : sfMatches[1].team1Id;
+
+                if (w1 && w2 && l1 && l2) {
+                    const newMatches: LeagueMatch[] = [];
+                    // Final: Winner SF1 vs Winner SF2
+                    newMatches.push(this.createPlayoffMatch(league.id, w1, w2, fGroup, 1));
+                    // 3rd place: Loser SF1 vs Loser SF2
+                    newMatches.push(this.createPlayoffMatch(league.id, l1, l2, thirdGroup, 1));
+
+                    await this.leagueMatchRepository.save(newMatches);
+                }
+            }
+        }
     }
 }

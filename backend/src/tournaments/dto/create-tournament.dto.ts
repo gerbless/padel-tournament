@@ -1,6 +1,6 @@
-import { IsString, IsEnum, IsArray, ValidateNested, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsEnum, IsArray, ValidateNested, IsNotEmpty, IsOptional, IsUUID, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TournamentType } from '../entities/tournament.entity';
+import { TournamentType, DurationMode } from '../entities/tournament.entity';
 
 class TeamDto {
     @IsString()
@@ -10,6 +10,10 @@ class TeamDto {
     @IsString()
     @IsNotEmpty()
     player2Name: string;
+
+    @IsInt()
+    @Min(1)
+    groupNumber: number;
 }
 
 export class CreateTournamentDto {
@@ -17,8 +21,30 @@ export class CreateTournamentDto {
     @IsNotEmpty()
     name: string;
 
+    @IsOptional()
     @IsEnum(TournamentType)
-    type: TournamentType;
+    type?: TournamentType;
+
+    @IsInt()
+    @Min(1)
+    @Max(10)
+    courts: number;
+
+    @IsEnum(DurationMode)
+    durationMode: DurationMode;
+
+    @IsOptional()
+    @IsInt()
+    @Min(30)
+    durationMinutes?: number;
+
+    @IsInt()
+    @Min(0)
+    matchesPerTeam: number;
+
+    @IsInt()
+    @Min(1)
+    totalGroups: number;
 
     @IsArray()
     @ValidateNested({ each: true })

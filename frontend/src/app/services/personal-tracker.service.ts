@@ -53,6 +53,10 @@ export class PersonalTrackerService {
         return this.http.patch<PersonalMatch>(`${this.apiUrl}/${id}`, updates);
     }
 
+    deleteMatch(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.apiUrl}/${id}`);
+    }
+
     getHistory(): Observable<PersonalMatch[]> {
         return this.http.get<PersonalMatch[]>(`${this.apiUrl}/history`);
     }

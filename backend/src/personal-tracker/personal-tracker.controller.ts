@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { PersonalTrackerService } from './personal-tracker.service';
 import { CreatePersonalMatchDto } from './dto/create-personal-match.dto';
 import { UpdatePersonalMatchDto } from './dto/update-personal-match.dto';
@@ -37,5 +37,10 @@ export class PersonalTrackerController {
     @Patch(':id')
     update(@Request() req: any, @Param('id') id: string, @Body() updateDto: UpdatePersonalMatchDto) {
         return this.trackerService.update(id, updateDto, req.user.userId);
+    }
+
+    @Delete(':id')
+    remove(@Request() req: any, @Param('id') id: string) {
+        return this.trackerService.remove(id, req.user.userId);
     }
 }

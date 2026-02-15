@@ -7,7 +7,11 @@ async function bootstrap() {
 
     // Enable CORS for frontend (development and Docker)
     app.enableCors({
-        origin: ['http://localhost:4200', 'http://localhost', 'https://limier-stubbornly-dania.ngrok-free.dev', 'https://padel-tournament-frontend.onrender.com'],
+        origin: [
+            'http://localhost:4200',
+            'http://localhost',
+            'https://padel-tournament-frontend.onrender.com',
+        ],
         credentials: true,
     });
 

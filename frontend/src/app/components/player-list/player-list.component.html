@@ -1,7 +1,7 @@
 <div class="container fade-in">
     <div class="flex-between mb-4">
         <h1>👥 Gestión de Jugadores</h1>
-        <button class="btn btn-primary" (click)="openCreateModal()" *ngIf="isLoggedIn">
+        <button class="btn btn-primary" (click)="openCreateModal()" *ngIf="canEdit">
             + Nuevo Jugador
         </button>
     </div>
@@ -126,7 +126,7 @@
                         <td class="text-right" data-label="Acciones">
                             <div *ngIf="editingPlayerId !== player.id"
                                 style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-                                <ng-container *ngIf="isLoggedIn">
+                                <ng-container *ngIf="canEdit">
                                     <button class="btn btn-sm btn-secondary btn-icon" (click)="startEditing(player)"
                                         title="Editar categoría y posición">
                                         ✏️
