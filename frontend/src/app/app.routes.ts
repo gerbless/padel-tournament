@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
+import { superAdminGuard } from './guards/super-admin.guard';
 
 export const routes: Routes = [
     { path: '', loadComponent: () => import('./components/club-selection/club-selection.component').then(m => m.ClubSelectionComponent) },
@@ -57,6 +58,6 @@ export const routes: Routes = [
     {
         path: 'admin/club-settings',
         loadComponent: () => import('./components/admin/club-settings/club-settings.component').then(m => m.ClubSettingsComponent),
-        canActivate: [authGuard]
+        canActivate: [superAdminGuard]
     },
 ];

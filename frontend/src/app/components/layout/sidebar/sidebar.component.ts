@@ -50,8 +50,8 @@ import { PermissionsService, NavItem } from '../../../services/permissions.servi
                 <span class="label" *ngIf="!isCollapsed">{{ item.label }}</span>
             </a>
 
-            <!-- Admin Settings (only for club admin / super_admin) -->
-            <a *ngIf="isAdmin && selectedClub"
+            <!-- Admin Settings (only for super_admin) -->
+            <a *ngIf="isSuperAdmin && selectedClub"
                routerLink="/admin/club-settings"
                routerLinkActive="active"
                class="nav-item admin-item"
@@ -320,6 +320,7 @@ export class SidebarComponent implements OnInit {
     isLoggedIn = false;
     clubRole: string | null = null;
     isAdmin = false;
+    isSuperAdmin = false;
     visibleNavItems: NavItem[] = [];
 
     private destroyRef = inject(DestroyRef);
@@ -384,6 +385,13 @@ export class SidebarComponent implements OnInit {
             takeUntilDestroyed(this.destroyRef)
         ).subscribe(isAdmin => {
             this.isAdmin = isAdmin;
+            this.cdr.markForCheck();
+        });
+
+        this.permissionsService.isSuperAdmin$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(isSuperAdmin => {
+            this.isSuperAdmin = isSuperAdmin;
             this.cdr.markForCheck();
         });
     }
