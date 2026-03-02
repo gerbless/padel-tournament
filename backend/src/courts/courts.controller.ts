@@ -162,4 +162,13 @@ export class CourtsController {
     ) {
         return this.courtsService.getMonthlyRevenue(clubId, +year);
     }
+
+    @Get('club/:clubId/billing')
+    getBillingDashboard(
+        @Param('clubId') clubId: string,
+        @Query('year') year: number,
+        @Query('month') month?: number
+    ) {
+        return this.courtsService.getBillingDashboard(clubId, +year, month ? +month : undefined);
+    }
 }

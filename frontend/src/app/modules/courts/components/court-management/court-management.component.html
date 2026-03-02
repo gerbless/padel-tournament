@@ -32,6 +32,9 @@
                 <button *ngIf="courts.length > 0" (click)="openDailyView()" class="btn btn-secondary btn-sm">
                     📅 Vista Diaria
                 </button>
+                <button *ngIf="enablePricing && courts.length > 0" (click)="openBilling()" class="btn btn-secondary btn-sm">
+                    📊 Facturación
+                </button>
                 <button *ngIf="enablePricing && canAdmin && courts.length > 0" (click)="openAddPriceGlobal()" class="btn btn-secondary btn-sm">
                     💰 Precio para Todas
                 </button>

@@ -282,6 +282,10 @@ export class CourtManagementComponent implements OnInit {
         this.router.navigate(['/courts', 'daily'], { queryParams: { clubId: this.selectedClubId } });
     }
 
+    openBilling() {
+        this.router.navigate(['/courts', 'billing']);
+    }
+
     formatDays(days: number[]): string {
         return days.map(d => this.dayLabels[d]).join(', ');
     }

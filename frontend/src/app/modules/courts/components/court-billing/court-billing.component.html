@@ -1,0 +1,263 @@
+<div class="container fade-in">
+    <!-- Header -->
+    <div class="billing-header">
+        <a routerLink="/courts" class="back-btn">← Gestión de Canchas</a>
+        <h1>📊 Facturación & Finanzas</h1>
+        <span class="club-badge" *ngIf="clubName">{{ clubName }}</span>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label>Año</label>
+            <select [(ngModel)]="selectedYear" (ngModelChange)="onFilterChange()">
+                <option *ngFor="let y of availableYears" [value]="y">{{ y }}</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Mes</label>
+            <select [(ngModel)]="selectedMonth" (ngModelChange)="onFilterChange()">
+                <option [ngValue]="null">Todo el año</option>
+                <option *ngFor="let m of monthFullNames; let i = index" [ngValue]="i + 1">{{ m }}</option>
+            </select>
+        </div>
+        <span class="period-label">{{ getPeriodLabel() }}</span>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="loading" class="loading-container">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div *ngIf="!loading && dashboard" class="dashboard">
+
+        <!-- ═══ KPI Cards ═══ -->
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-total">
+                <div class="kpi-icon">💰</div>
+                <div class="kpi-content">
+                    <span class="kpi-value">{{ formatCurrency(totals.totalRevenue) }}</span>
+                    <span class="kpi-label">Facturación Total</span>
+                </div>
+                <div class="kpi-sub">{{ formatNumber(totals.totalReservations) }} reservas</div>
+            </div>
+
+            <div class="kpi-card kpi-paid">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-content">
+                    <span class="kpi-value">{{ formatCurrency(totals.paidRevenue) }}</span>
+                    <span class="kpi-label">Cobrado</span>
+                </div>
+                <div class="kpi-sub">{{ formatNumber(totals.paidCount) }} pagadas</div>
+            </div>
+
+            <div class="kpi-card kpi-pending">
+                <div class="kpi-icon">⏳</div>
+                <div class="kpi-content">
+                    <span class="kpi-value">{{ formatCurrency(totals.pendingRevenue) }}</span>
+                    <span class="kpi-label">Por Cobrar</span>
+                </div>
+                <div class="kpi-sub">{{ formatNumber(totals.pendingCount) }} pendientes</div>
+            </div>
+
+            <div class="kpi-card kpi-rate">
+                <div class="kpi-icon">📈</div>
+                <div class="kpi-content">
+                    <span class="kpi-value">{{ getCollectionRate() }}%</span>
+                    <span class="kpi-label">Tasa de Cobro</span>
+                </div>
+                <div class="kpi-progress">
+                    <div class="kpi-progress-bar" [style.width]="getCollectionRate() + '%'"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ Status Breakdown Donuts ═══ -->
+        <div class="status-section">
+            <h2>📋 Reservas por Estado</h2>
+            <div class="status-grid">
+                <div class="status-card paid">
+                    <div class="status-ring">
+                        <svg viewBox="0 0 36 36">
+                            <path class="ring-bg" d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="ring-fill" [attr.stroke-dasharray]="(totals.totalReservations ? (totals.paidCount / totals.totalReservations * 100) : 0) + ', 100'" d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        </svg>
+                        <span class="ring-value">{{ totals.paidCount }}</span>
+                    </div>
+                    <span class="status-label">✅ Pagadas</span>
+                    <span class="status-amount">{{ formatCurrency(totals.paidRevenue) }}</span>
+                </div>
+
+                <div class="status-card partial">
+                    <div class="status-ring">
+                        <svg viewBox="0 0 36 36">
+                            <path class="ring-bg" d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="ring-fill" [attr.stroke-dasharray]="(totals.totalReservations ? (totals.partialCount / totals.totalReservations * 100) : 0) + ', 100'" d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        </svg>
+                        <span class="ring-value">{{ totals.partialCount }}</span>
+                    </div>
+                    <span class="status-label">½ Parciales</span>
+                    <span class="status-amount">{{ formatCurrency(totals.partialRevenue) }}</span>
+                </div>
+
+                <div class="status-card pending">
+                    <div class="status-ring">
+                        <svg viewBox="0 0 36 36">
+                            <path class="ring-bg" d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="ring-fill" [attr.stroke-dasharray]="(totals.totalReservations ? (totals.pendingCount / totals.totalReservations * 100) : 0) + ', 100'" d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        </svg>
+                        <span class="ring-value">{{ totals.pendingCount }}</span>
+                    </div>
+                    <span class="status-label">⏳ Pendientes</span>
+                    <span class="status-amount">{{ formatCurrency(totals.pendingRevenue) }}</span>
+                </div>
+
+                <div class="status-card total-card">
+                    <div class="status-ring total-ring">
+                        <span class="ring-value big">{{ totals.totalReservations }}</span>
+                    </div>
+                    <span class="status-label">📊 Total</span>
+                    <span class="status-amount">{{ formatCurrency(totals.totalRevenue) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ Monthly Revenue Chart ═══ -->
+        <div class="chart-section" *ngIf="!selectedMonth">
+            <h2>📈 Facturación Mensual {{ selectedYear }}</h2>
+            <div class="chart-container">
+                <div class="chart-y-axis">
+                    <span>{{ formatCurrency(chartMaxRevenue) }}</span>
+                    <span>{{ formatCurrency(chartMaxRevenue * 0.75) }}</span>
+                    <span>{{ formatCurrency(chartMaxRevenue * 0.5) }}</span>
+                    <span>{{ formatCurrency(chartMaxRevenue * 0.25) }}</span>
+                    <span>$0</span>
+                </div>
+                <div class="chart-bars">
+                    <div class="chart-grid-lines">
+                        <div class="grid-line"></div>
+                        <div class="grid-line"></div>
+                        <div class="grid-line"></div>
+                        <div class="grid-line"></div>
+                    </div>
+                    <div *ngFor="let cm of chartMonths" class="chart-bar-group">
+                        <div class="bar-stack">
+                            <div class="bar bar-pending"
+                                [style.height]="getBarHeight(cm.data.pendingRevenue + cm.data.partialRevenue)"
+                                [title]="'Pendiente: ' + formatCurrency(cm.data.pendingRevenue + cm.data.partialRevenue)">
+                            </div>
+                            <div class="bar bar-paid"
+                                [style.height]="getBarHeight(cm.data.paidRevenue)"
+                                [title]="'Cobrado: ' + formatCurrency(cm.data.paidRevenue)">
+                            </div>
+                        </div>
+                        <span class="bar-label">{{ cm.label }}</span>
+                        <span class="bar-value" *ngIf="cm.data.totalRevenue > 0">{{ formatCurrency(cm.data.totalRevenue) }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot paid-dot"></span> Cobrado</span>
+                <span class="legend-item"><span class="legend-dot pending-dot"></span> Pendiente / Parcial</span>
+            </div>
+        </div>
+
+        <!-- ═══ Per-Court Breakdown Table ═══ -->
+        <div class="court-table-section">
+            <h2>🏟️ Facturación por Cancha</h2>
+            <div class="table-wrapper">
+                <table class="billing-table">
+                    <thead>
+                        <tr>
+                            <th class="th-court">#</th>
+                            <th>Cancha</th>
+                            <th class="th-right">Reservas</th>
+                            <th class="th-right">Pagadas</th>
+                            <th class="th-right">Parcial</th>
+                            <th class="th-right">Pendientes</th>
+                            <th class="th-right">Facturado</th>
+                            <th class="th-right">Cobrado</th>
+                            <th class="th-right">Por Cobrar</th>
+                            <th class="th-right">% del Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let court of courts">
+                            <td class="td-court-num">
+                                <span class="court-number">{{ court.courtNumber }}</span>
+                            </td>
+                            <td class="td-court-name">{{ court.courtName }}</td>
+                            <td class="td-right">{{ court.totalReservations }}</td>
+                            <td class="td-right td-paid">{{ court.paidCount }}</td>
+                            <td class="td-right td-partial">{{ court.partialCount }}</td>
+                            <td class="td-right td-pending">{{ court.pendingCount }}</td>
+                            <td class="td-right td-revenue">{{ formatCurrency(court.totalRevenue) }}</td>
+                            <td class="td-right td-paid-amount">{{ formatCurrency(court.paidRevenue) }}</td>
+                            <td class="td-right td-owed">{{ formatCurrency(court.pendingRevenue + court.partialRevenue) }}</td>
+                            <td class="td-right">
+                                <div class="share-bar">
+                                    <div class="share-fill" [style.width]="getCourtRevenuePercent(court) + '%'"></div>
+                                    <span>{{ getCourtRevenuePercent(court) }}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="totals-row">
+                            <td colspan="2"><strong>TOTAL</strong></td>
+                            <td class="td-right"><strong>{{ totals.totalReservations }}</strong></td>
+                            <td class="td-right td-paid"><strong>{{ totals.paidCount }}</strong></td>
+                            <td class="td-right td-partial"><strong>{{ totals.partialCount }}</strong></td>
+                            <td class="td-right td-pending"><strong>{{ totals.pendingCount }}</strong></td>
+                            <td class="td-right td-revenue"><strong>{{ formatCurrency(totals.totalRevenue) }}</strong></td>
+                            <td class="td-right td-paid-amount"><strong>{{ formatCurrency(totals.paidRevenue) }}</strong></td>
+                            <td class="td-right td-owed"><strong>{{ formatCurrency(totals.pendingRevenue + totals.partialRevenue) }}</strong></td>
+                            <td class="td-right"><strong>100%</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ Per-Court Visual Bars ═══ -->
+        <div class="court-bars-section">
+            <h2>📊 Comparativa Visual por Cancha</h2>
+            <div class="court-bars">
+                <div *ngFor="let court of courts" class="court-bar-row">
+                    <div class="court-bar-label">
+                        <span class="court-num-badge">{{ court.courtNumber }}</span>
+                        <span class="court-bar-name">{{ court.courtName }}</span>
+                    </div>
+                    <div class="court-bar-track">
+                        <div class="court-bar-paid" [style.width]="(totals.totalRevenue ? (court.paidRevenue / totals.totalRevenue * 100) : 0) + '%'">
+                            <span *ngIf="court.paidRevenue > 0">{{ formatCurrency(court.paidRevenue) }}</span>
+                        </div>
+                        <div class="court-bar-partial" [style.width]="(totals.totalRevenue ? (court.partialRevenue / totals.totalRevenue * 100) : 0) + '%'"></div>
+                        <div class="court-bar-pending" [style.width]="(totals.totalRevenue ? (court.pendingRevenue / totals.totalRevenue * 100) : 0) + '%'"></div>
+                    </div>
+                    <span class="court-bar-total">{{ formatCurrency(court.totalRevenue) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Empty state -->
+        <div *ngIf="courts.length === 0 && !loading" class="empty-state">
+            <div class="empty-icon">📊</div>
+            <h3>Sin datos de facturación</h3>
+            <p>No hay reservas registradas para el período seleccionado</p>
+        </div>
+    </div>
+</div>

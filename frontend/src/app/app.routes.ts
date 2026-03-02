@@ -50,6 +50,7 @@ export const routes: Routes = [
         children: [
             { path: '', loadComponent: () => import('./modules/courts/components/court-management/court-management.component').then(m => m.CourtManagementComponent) },
             { path: 'daily', loadComponent: () => import('./modules/courts/components/court-daily-view/court-daily-view.component').then(m => m.CourtDailyViewComponent) },
+            { path: 'billing', loadComponent: () => import('./modules/courts/components/court-billing/court-billing.component').then(m => m.CourtBillingComponent) },
             { path: ':courtId/calendar', loadComponent: () => import('./modules/courts/components/court-calendar/court-calendar.component').then(m => m.CourtCalendarComponent) },
         ]
     },

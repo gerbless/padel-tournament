@@ -55,3 +55,43 @@ export interface MonthlyRevenue {
     totalReservations: number;
     paidRevenue: number;
 }
+
+export interface CourtBilling {
+    courtId: string;
+    courtName: string;
+    courtNumber: number;
+    totalReservations: number;
+    paidCount: number;
+    partialCount: number;
+    pendingCount: number;
+    totalRevenue: number;
+    paidRevenue: number;
+    partialRevenue: number;
+    pendingRevenue: number;
+}
+
+export interface BillingTotals {
+    totalReservations: number;
+    paidCount: number;
+    partialCount: number;
+    pendingCount: number;
+    totalRevenue: number;
+    paidRevenue: number;
+    partialRevenue: number;
+    pendingRevenue: number;
+}
+
+export interface MonthlyTrend {
+    month: number;
+    totalRevenue: number;
+    paidRevenue: number;
+    pendingRevenue: number;
+    partialRevenue: number;
+    totalReservations: number;
+}
+
+export interface BillingDashboard {
+    courts: CourtBilling[];
+    totals: BillingTotals;
+    monthlyTrend: MonthlyTrend[];
+}

@@ -271,4 +271,75 @@ export class CourtsService {
             .orderBy("EXTRACT(MONTH FROM r.date::date)", 'ASC')
             .getRawMany();
     }
+
+    async getBillingDashboard(clubId: string, year: number, month?: number): Promise<any> {
+        const dateFilter = month
+            ? `EXTRACT(YEAR FROM r."date"::date) = ${year} AND EXTRACT(MONTH FROM r."date"::date) = ${month}`
+            : `EXTRACT(YEAR FROM r."date"::date) = ${year}`;
+
+        // Per-court breakdown
+        const perCourt = await this.reservationRepository.query(`
+            SELECT
+                c."id" AS "courtId",
+                c."name" AS "courtName",
+                c."courtNumber",
+                COUNT(r."id") AS "totalReservations",
+                COUNT(CASE WHEN r."paymentStatus" = 'paid' THEN 1 END) AS "paidCount",
+                COUNT(CASE WHEN r."paymentStatus" = 'partial' THEN 1 END) AS "partialCount",
+                COUNT(CASE WHEN r."paymentStatus" = 'pending' THEN 1 END) AS "pendingCount",
+                COALESCE(SUM(CAST(r."finalPrice" AS numeric)), 0) AS "totalRevenue",
+                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'paid' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "paidRevenue",
+                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'partial' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "partialRevenue",
+                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'pending' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "pendingRevenue"
+            FROM "courts" c
+            LEFT JOIN "reservations" r ON r."courtId" = c."id"
+                AND r."status" != 'cancelled'
+                AND ${dateFilter}
+            WHERE c."clubId" = $1 AND c."isActive" = true
+            GROUP BY c."id", c."name", c."courtNumber"
+            ORDER BY c."courtNumber" ASC
+        `, [clubId]);
+
+        // Totals
+        const totals = await this.reservationRepository.query(`
+            SELECT
+                COUNT(r."id") AS "totalReservations",
+                COUNT(CASE WHEN r."paymentStatus" = 'paid' THEN 1 END) AS "paidCount",
+                COUNT(CASE WHEN r."paymentStatus" = 'partial' THEN 1 END) AS "partialCount",
+                COUNT(CASE WHEN r."paymentStatus" = 'pending' THEN 1 END) AS "pendingCount",
+                COALESCE(SUM(CAST(r."finalPrice" AS numeric)), 0) AS "totalRevenue",
+                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'paid' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "paidRevenue",
+                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'partial' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "partialRevenue",
+                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'pending' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "pendingRevenue"
+            FROM "reservations" r
+            JOIN "courts" c ON r."courtId" = c."id"
+            WHERE c."clubId" = $1
+                AND r."status" != 'cancelled'
+                AND ${dateFilter}
+        `, [clubId]);
+
+        // Monthly trend for the year
+        const monthlyTrend = await this.reservationRepository.query(`
+            SELECT
+                EXTRACT(MONTH FROM r."date"::date) AS "month",
+                COALESCE(SUM(CAST(r."finalPrice" AS numeric)), 0) AS "totalRevenue",
+                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'paid' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "paidRevenue",
+                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'pending' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "pendingRevenue",
+                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'partial' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "partialRevenue",
+                COUNT(r."id") AS "totalReservations"
+            FROM "reservations" r
+            JOIN "courts" c ON r."courtId" = c."id"
+            WHERE c."clubId" = $1
+                AND r."status" != 'cancelled'
+                AND EXTRACT(YEAR FROM r."date"::date) = ${year}
+            GROUP BY EXTRACT(MONTH FROM r."date"::date)
+            ORDER BY "month" ASC
+        `, [clubId]);
+
+        return {
+            courts: perCourt,
+            totals: totals[0] || {},
+            monthlyTrend
+        };
+    }
 }
