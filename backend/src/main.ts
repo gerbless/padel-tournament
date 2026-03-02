@@ -12,6 +12,7 @@ async function bootstrap() {
             'http://localhost',
             'http://localhost/api',
             'https://padel-tournament-frontend.onrender.com',
+            'https://padel-tournament-4gwr.onrender.com/api'
         ],
         credentials: true,
     });
