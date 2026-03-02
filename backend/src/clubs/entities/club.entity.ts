@@ -27,6 +27,32 @@ export class Club {
     @Column({ default: false })
     enableCourtPricing: boolean;
 
+    /**
+     * Per-club module visibility configuration.
+     * Admins toggle which modules are active for their club.
+     */
+    @Column({
+        type: 'jsonb',
+        default: {
+            dashboard: true,
+            tournaments: true,
+            leagues: true,
+            courts: true,
+            players: true,
+            ranking: true,
+            estadisticas: true,
+        },
+    })
+    enabledModules: {
+        dashboard: boolean;
+        tournaments: boolean;
+        leagues: boolean;
+        courts: boolean;
+        players: boolean;
+        ranking: boolean;
+        estadisticas: boolean;
+    };
+
     // Relations
     @OneToMany(() => Tournament, tournament => tournament.club)
     tournaments: Tournament[];

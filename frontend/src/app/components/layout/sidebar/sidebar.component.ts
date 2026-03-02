@@ -6,6 +6,7 @@ import { LayoutService } from '../../../services/layout.service';
 import { ClubService } from '../../../services/club.service';
 import { Club } from '../../../models/club.model';
 import { AuthService } from '../../../services/auth.service';
+import { PermissionsService, NavItem } from '../../../services/permissions.service';
 
 @Component({
     selector: 'app-sidebar',
@@ -39,39 +40,25 @@ import { AuthService } from '../../../services/auth.service';
         </button>
 
         <nav class="nav-menu">
-            <a routerLink="/dashboard" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
-                <span class="icon">📊</span>
-                <span class="label" *ngIf="!isCollapsed">Estadísticas</span>
-            </a>
-            <a routerLink="/tournaments" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
-                <span class="icon">🏆</span>
-                <span class="label" *ngIf="!isCollapsed">Torneos</span>
-            </a>
-            <a routerLink="/leagues" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
-                <span class="icon">🏆</span>
-                <span class="label" *ngIf="!isCollapsed">Ligas</span>
-            </a>
-            <a routerLink="/courts" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
-                <span class="icon">🏟️</span>
-                <span class="label" *ngIf="!isCollapsed">Canchas</span>
-            </a>
-            <a routerLink="/players" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
-                <span class="icon">👥</span>
-                <span class="label" *ngIf="!isCollapsed">Jugadores</span>
-            </a>
-            <a routerLink="/ranking" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
-                <span class="icon">🥇</span>
-                <span class="label" *ngIf="!isCollapsed">Ranking</span>
-            </a>
-            <a routerLink="/estadisticas" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
-                <span class="icon">📅</span>
-                <span class="label" *ngIf="!isCollapsed">Ranking Mensual</span>
+            <!-- Dynamic nav items based on permissions -->
+            <a *ngFor="let item of visibleNavItems"
+               [routerLink]="item.path"
+               routerLinkActive="active"
+               class="nav-item"
+               (click)="closeMobileMenu()">
+                <span class="icon">{{ item.icon }}</span>
+                <span class="label" *ngIf="!isCollapsed">{{ item.label }}</span>
             </a>
 
-            <!--<a *ngIf="isLoggedIn" routerLink="/personal-tracker" routerLinkActive="active" class="nav-item" (click)="closeMobileMenu()">
-                <span class="icon">📈</span>
-                <span class="label" *ngIf="!isCollapsed">Mi Padel</span>
-            </a> -->
+            <!-- Admin Settings (only for club admin / super_admin) -->
+            <a *ngIf="isAdmin && selectedClub"
+               routerLink="/admin/club-settings"
+               routerLinkActive="active"
+               class="nav-item admin-item"
+               (click)="closeMobileMenu()">
+                <span class="icon">⚙️</span>
+                <span class="label" *ngIf="!isCollapsed">Configuración</span>
+            </a>
 
             <div class="divider" style="height: 1px; background: rgba(255,255,255,0.1); margin: 0.5rem 0;"></div>
 
@@ -87,7 +74,7 @@ import { AuthService } from '../../../services/auth.service';
 
         <div class="footer">
             <div *ngIf="!isCollapsed">
-                <p>v1.2.0</p>
+                <p>v1.3.0</p>
             </div>
         </div>
     </aside>
@@ -271,6 +258,15 @@ import { AuthService } from '../../../services/auth.service';
             display: inline-block;
         }
 
+        .admin-item {
+            margin-top: 0.25rem;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            padding-top: 0.75rem;
+        }
+        .admin-item .label {
+            color: var(--primary);
+        }
+
         .footer {
             margin-top: auto;
             padding-top: 1rem;
@@ -323,6 +319,8 @@ export class SidebarComponent implements OnInit {
 
     isLoggedIn = false;
     clubRole: string | null = null;
+    isAdmin = false;
+    visibleNavItems: NavItem[] = [];
 
     private destroyRef = inject(DestroyRef);
 
@@ -332,6 +330,7 @@ export class SidebarComponent implements OnInit {
         private layoutService: LayoutService,
         private clubService: ClubService,
         private authService: AuthService,
+        private permissionsService: PermissionsService,
         private router: Router
     ) {
         this.layoutService.sidebarCollapsed$.pipe(
@@ -370,6 +369,21 @@ export class SidebarComponent implements OnInit {
             takeUntilDestroyed(this.destroyRef)
         ).subscribe(() => {
             this.updateClubRole();
+            this.cdr.markForCheck();
+        });
+
+        // Subscribe to dynamic nav items from PermissionsService
+        this.permissionsService.visibleNavItems$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(items => {
+            this.visibleNavItems = items;
+            this.cdr.markForCheck();
+        });
+
+        this.permissionsService.isClubAdmin$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(isAdmin => {
+            this.isAdmin = isAdmin;
             this.cdr.markForCheck();
         });
     }

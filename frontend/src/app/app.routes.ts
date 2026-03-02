@@ -54,4 +54,9 @@ export const routes: Routes = [
             { path: ':courtId/calendar', loadComponent: () => import('./modules/courts/components/court-calendar/court-calendar.component').then(m => m.CourtCalendarComponent) },
         ]
     },
+    {
+        path: 'admin/club-settings',
+        loadComponent: () => import('./components/admin/club-settings/club-settings.component').then(m => m.ClubSettingsComponent),
+        canActivate: [authGuard]
+    },
 ];

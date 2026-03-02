@@ -1,0 +1,200 @@
+<div class="container fade-in" *ngIf="canAccess; else noAccess">
+    <div class="page-header">
+        <a routerLink="/dashboard" class="back-link">← Volver</a>
+        <h1>⚙️ Configuración del Club</h1>
+        <p class="subtitle" *ngIf="club">{{ club.name }}</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-bar">
+        <button class="tab" [class.active]="activeTab === 'modules'" (click)="activeTab = 'modules'">
+            📦 Módulos
+        </button>
+        <button class="tab" [class.active]="activeTab === 'users'" (click)="activeTab = 'users'">
+            👥 Usuarios y Roles
+        </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!--                MODULES TAB                     -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <div *ngIf="activeTab === 'modules'" class="tab-content">
+        <div class="section-info">
+            <h2>Módulos del Club</h2>
+            <p>Controla qué secciones están disponibles en el menú lateral para los usuarios de este club. Los módulos desactivados no serán visibles para nadie excepto los administradores.</p>
+        </div>
+
+        <div class="modules-grid">
+            <div *ngFor="let key of moduleKeys" class="module-card" [class.enabled]="isModuleEnabled(key)" [class.disabled]="!isModuleEnabled(key)">
+                <div class="module-header">
+                    <span class="module-icon">{{ getModuleIcon(key) }}</span>
+                    <div class="module-info">
+                        <span class="module-name">{{ getModuleLabel(key) }}</span>
+                        <span class="module-visibility">{{ getModuleVisibility(key) }}</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" [checked]="isModuleEnabled(key)" (change)="toggleModule(key)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="actions-bar">
+            <button class="btn btn-primary" (click)="saveModules()" [disabled]="saving">
+                {{ saving ? 'Guardando...' : '💾 Guardar Configuración' }}
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!--                USERS TAB                       -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <div *ngIf="activeTab === 'users'" class="tab-content">
+        <div class="section-info">
+            <h2>Usuarios y Roles</h2>
+            <p>Crea usuarios, asígnalos al club y controla su nivel de acceso.</p>
+            <div class="roles-legend">
+                <div class="legend-item">
+                    <span class="role-badge role-admin">🔑 Administrador</span>
+                    <span>Acceso total: puede configurar módulos, gestionar usuarios, canchas, torneos, etc.</span>
+                </div>
+                <div class="legend-item">
+                    <span class="role-badge role-editor">✏️ Editor</span>
+                    <span>Puede crear y editar torneos, ligas, reservas y ver todas las secciones habilitadas.</span>
+                </div>
+                <div class="legend-item">
+                    <span class="role-badge role-viewer">👁️ Visualizador</span>
+                    <span>Solo puede ver la información de las secciones habilitadas, sin poder editar.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── CREATE USER ─────────────────────────── -->
+        <div class="create-user-section">
+            <button class="btn btn-create-user" (click)="toggleCreateUser()">
+                {{ showCreateUser ? '✕ Cancelar' : '➕ Crear Nuevo Usuario' }}
+            </button>
+
+            <div *ngIf="showCreateUser" class="create-user-form">
+                <h3>Crear usuario y asignar al club</h3>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>Email *</label>
+                        <input type="email" [(ngModel)]="newUserEmail" class="form-control" placeholder="usuario@email.com">
+                    </div>
+                    <div class="form-field">
+                        <label>Contraseña *</label>
+                        <div class="password-row">
+                            <input type="text" [(ngModel)]="newUserPassword" class="form-control" placeholder="Mínimo 6 caracteres">
+                            <button class="btn btn-sm btn-outline" (click)="generatePassword()" title="Generar contraseña aleatoria">
+                                🎲
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label>Rol en el club</label>
+                        <select [(ngModel)]="newUserRole" class="form-control">
+                            <option value="viewer">👁️ Visualizador</option>
+                            <option value="editor">✏️ Editor</option>
+                            <option value="admin">🔑 Administrador</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="create-user-actions">
+                    <div *ngIf="createUserError" class="alert alert-error">⚠️ {{ createUserError }}</div>
+                    <div *ngIf="createUserSuccess" class="alert alert-success">✅ {{ createUserSuccess }}</div>
+                    <button class="btn btn-primary" (click)="createUser()"
+                            [disabled]="creatingUser || !newUserEmail || !newUserPassword">
+                        {{ creatingUser ? 'Creando...' : '✅ Crear y Asignar al Club' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── ASSIGN EXISTING USER ────────────────── -->
+        <div class="add-user-form" *ngIf="availableUsers.length > 0">
+            <h3>Asignar usuario existente al club</h3>
+            <div class="form-row">
+                <select [(ngModel)]="selectedUserId" class="form-control">
+                    <option value="">Seleccionar usuario...</option>
+                    <option *ngFor="let u of availableUsers" [value]="u.id">
+                        {{ u.email }}{{ u.player ? ' (' + u.player.name + ')' : '' }}
+                    </option>
+                </select>
+                <select [(ngModel)]="selectedRole" class="form-control role-select">
+                    <option value="viewer">👁️ Visualizador</option>
+                    <option value="editor">✏️ Editor</option>
+                    <option value="admin">🔑 Administrador</option>
+                </select>
+                <button class="btn btn-primary" (click)="assignRole()" [disabled]="!selectedUserId">
+                    + Asignar
+                </button>
+            </div>
+        </div>
+
+        <!-- ─── CURRENT CLUB USERS ──────────────────── -->
+        <div class="users-list-header">
+            <h3>Usuarios del Club ({{ clubUsers.length }})</h3>
+        </div>
+        <div class="users-list">
+            <div *ngIf="loadingUsers" class="loading-state">
+                <div class="spinner"></div>
+            </div>
+
+            <div *ngIf="!loadingUsers && clubUsers.length === 0" class="empty-state">
+                <div class="empty-icon">👤</div>
+                <h3>Sin usuarios asignados</h3>
+                <p>Crea un usuario nuevo o asigna uno existente al club.</p>
+            </div>
+
+            <div *ngFor="let ucr of clubUsers" class="user-card">
+                <div class="user-info">
+                    <div class="user-avatar">{{ ucr.user.email.charAt(0).toUpperCase() }}</div>
+                    <div class="user-details">
+                        <span class="user-email">{{ ucr.user.email }}</span>
+                        <span class="user-player" *ngIf="ucr.user.player">🎾 {{ ucr.user.player.name }}</span>
+                        <span class="user-no-player" *ngIf="!ucr.user.player">
+                            <a class="link-player-btn" (click)="startLinkPlayer(ucr.userId)">🔗 Vincular jugador</a>
+                        </span>
+                        <span class="user-global-role" *ngIf="ucr.user.role === 'super_admin'">⭐ Super Admin</span>
+                    </div>
+                </div>
+                <div class="user-actions">
+                    <select [ngModel]="ucr.role" (ngModelChange)="changeRole(ucr, $event)" class="role-select-sm">
+                        <option value="viewer">👁️ Visualizador</option>
+                        <option value="editor">✏️ Editor</option>
+                        <option value="admin">🔑 Administrador</option>
+                    </select>
+                    <button class="btn-icon btn-danger" (click)="removeUserRole(ucr)" title="Eliminar acceso">
+                        ✕
+                    </button>
+                </div>
+                <!-- Player linking inline -->
+                <div *ngIf="linkingPlayerId === ucr.userId" class="link-player-row">
+                    <select [(ngModel)]="selectedPlayerId" class="form-control">
+                        <option value="">Seleccionar jugador...</option>
+                        <option *ngFor="let p of getUnlinkedPlayers()" [value]="p.id">
+                            {{ p.name }}{{ p.category ? ' (' + p.category.name + ')' : '' }}
+                        </option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" (click)="linkPlayer(ucr.userId)" [disabled]="!selectedPlayerId">
+                        Vincular
+                    </button>
+                    <button class="btn btn-sm btn-outline" (click)="linkingPlayerId = null">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ng-template #noAccess>
+    <div class="container fade-in">
+        <div class="empty-state">
+            <div class="empty-icon">🔒</div>
+            <h3>Acceso restringido</h3>
+            <p>No tienes permisos de administrador para este club.</p>
+            <a routerLink="/dashboard" class="btn btn-primary" style="margin-top: 1rem; display: inline-block;">Ir al Dashboard</a>
+        </div>
+    </div>
+</ng-template>

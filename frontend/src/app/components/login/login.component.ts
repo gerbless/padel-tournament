@@ -33,7 +33,7 @@ export class LoginComponent {
             next: () => {
                 this.loading = false;
                 this.cdr.markForCheck();
-                this.router.navigate(['/leagues']);
+                this.router.navigate(['/courts']);
             },
             error: (err) => {
                 console.error(err);

@@ -1,4 +1,15 @@
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsObject, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class EnabledModulesDto {
+    @IsOptional() @IsBoolean() dashboard?: boolean;
+    @IsOptional() @IsBoolean() tournaments?: boolean;
+    @IsOptional() @IsBoolean() leagues?: boolean;
+    @IsOptional() @IsBoolean() courts?: boolean;
+    @IsOptional() @IsBoolean() players?: boolean;
+    @IsOptional() @IsBoolean() ranking?: boolean;
+    @IsOptional() @IsBoolean() estadisticas?: boolean;
+}
 
 export class UpdateClubDto {
     @IsOptional()
@@ -16,4 +27,10 @@ export class UpdateClubDto {
     @IsOptional()
     @IsBoolean()
     enableCourtPricing?: boolean;
+
+    @IsOptional()
+    @IsObject()
+    @ValidateNested()
+    @Type(() => EnabledModulesDto)
+    enabledModules?: EnabledModulesDto;
 }
