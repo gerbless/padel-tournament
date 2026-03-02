@@ -8,12 +8,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../../environments/environment';
 import { ToastService } from '../../../../services/toast.service';
 import { AuthService } from '../../../../services/auth.service';
-
-interface Club {
-    id: string;
-    name: string;
-    enableCourtPricing?: boolean;
-}
+import { ClubService } from '../../../../services/club.service';
 
 @Component({
     selector: 'app-court-management',
@@ -24,9 +19,8 @@ interface Club {
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CourtManagementComponent implements OnInit {
-    clubs: Club[] = [];
     selectedClubId = '';
-    selectedClub: Club | null = null;
+    selectedClubName = '';
     courts: Court[] = [];
     loading = true;
     isLoggedIn = false;
@@ -62,46 +56,27 @@ export class CourtManagementComponent implements OnInit {
         private router: Router,
         private cdr: ChangeDetectorRef,
         private toast: ToastService,
-        private authService: AuthService
+        private authService: AuthService,
+        private clubService: ClubService
     ) { }
 
     ngOnInit() {
         this.isLoggedIn = this.authService.isAuthenticated();
-        this.loadClubs();
-    }
-
-    loadClubs() {
-        this.http.get<Club[]>(`${environment.apiUrl}/clubs`).subscribe({
-            next: (clubs) => {
-                this.clubs = clubs;
-                if (clubs.length === 1) {
-                    this.selectedClubId = clubs[0].id;
-                    this.selectedClub = clubs[0];
-                    this.enablePricing = clubs[0].enableCourtPricing || false;
-                    this.canEdit = this.authService.hasClubRole(clubs[0].id, 'editor');
-                    this.canAdmin = this.authService.hasClubRole(clubs[0].id, 'admin');
-                    this.loadCourts();
-                } else {
-                    this.loading = false;
-                    this.cdr.markForCheck();
-                }
-            },
-            error: () => {
+        this.clubService.selectedClub$.subscribe(club => {
+            if (club) {
+                this.selectedClubId = club.id;
+                this.selectedClubName = club.name;
+                this.enablePricing = (club as any).enableCourtPricing || false;
+                this.canEdit = this.authService.hasClubRole(club.id, 'editor');
+                this.canAdmin = this.authService.hasClubRole(club.id, 'admin');
+                this.loadCourts();
+            } else {
+                this.selectedClubId = '';
+                this.selectedClubName = '';
                 this.loading = false;
-                this.toast.error('Error al cargar clubs');
                 this.cdr.markForCheck();
             }
         });
-    }
-
-    onClubChange() {
-        this.selectedClub = this.clubs.find(c => c.id === this.selectedClubId) || null;
-        this.enablePricing = this.selectedClub?.enableCourtPricing || false;
-        this.canEdit = this.selectedClubId ? this.authService.hasClubRole(this.selectedClubId, 'editor') : false;
-        this.canAdmin = this.selectedClubId ? this.authService.hasClubRole(this.selectedClubId, 'admin') : false;
-        if (this.selectedClubId) {
-            this.loadCourts();
-        }
     }
 
     loadCourts() {

@@ -1,16 +1,14 @@
 <div class="container fade-in">
     <div class="page-header">
         <h1>🏟️ Gestión de Canchas</h1>
-        <p style="color: var(--text-secondary);">Administra las canchas y configura precios</p>
+        <p style="color: var(--text-secondary);">{{ selectedClubName ? selectedClubName + ' · ' : '' }}Administra las canchas y configura precios</p>
     </div>
 
-    <!-- Club Selector -->
-    <div class="club-selector" *ngIf="clubs.length > 1">
-        <label>Club:</label>
-        <select [(ngModel)]="selectedClubId" (ngModelChange)="onClubChange()" class="form-control">
-            <option value="">Selecciona un club</option>
-            <option *ngFor="let club of clubs" [value]="club.id">{{ club.name }}</option>
-        </select>
+    <!-- No club selected warning -->
+    <div *ngIf="!selectedClubId" class="empty-state">
+        <div class="empty-icon">🏢</div>
+        <h3>No hay club seleccionado</h3>
+        <p>Selecciona un club desde el menú principal para gestionar sus canchas</p>
     </div>
 
     <!-- Pricing Toggle -->
