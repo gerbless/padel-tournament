@@ -36,9 +36,9 @@ export class CourtCalendarComponent implements OnInit {
     // Calendar state
     weekStart: Date = new Date();
     weekDays: { date: string; label: string; shortDate: string; isToday: boolean }[] = [];
-    hours: number[] = [];
+    slots: { label: string; startTime: string; minutes: number }[] = [];
     startHour = 7;
-    endHour = 23;
+    endHour = 24;
 
     // Reservation modal
     showModal = false;
@@ -54,7 +54,8 @@ export class CourtCalendarComponent implements OnInit {
         basePrice: 0,
         finalPrice: 0,
         paymentStatus: 'pending' as 'pending' | 'paid' | 'partial',
-        paymentNotes: ''
+        paymentNotes: '',
+        playerPayments: [] as { playerName: string; paid: boolean; amount: number }[]
     };
 
     timeSlots: string[] = [];
@@ -69,14 +70,21 @@ export class CourtCalendarComponent implements OnInit {
         private authService: AuthService,
         private cdr: ChangeDetectorRef
     ) {
-        for (let h = this.startHour; h < this.endHour; h++) {
-            this.hours.push(h);
+        // Generate 30-min slots from 7:00 to 23:00 (last slot ends at 23:30)
+        let slotMin = this.startHour * 60;
+        const endMin = 23 * 60 + 30;
+        while (slotMin < endMin) {
+            const h = Math.floor(slotMin / 60);
+            const m = slotMin % 60;
+            const label = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+            this.slots.push({ label, startTime: label, minutes: slotMin });
+            slotMin += 30;
         }
-        for (let h = this.startHour; h <= this.endHour; h++) {
-            this.timeSlots.push(`${h.toString().padStart(2, '0')}:00`);
-            if (h < this.endHour) {
-                this.timeSlots.push(`${h.toString().padStart(2, '0')}:30`);
-            }
+        // Time slots for the start-time dropdown in the modal
+        for (let t = this.startHour * 60; t < endMin; t += 30) {
+            const hh = Math.floor(t / 60);
+            const mm = t % 60;
+            this.timeSlots.push(`${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`);
         }
     }
 
@@ -228,18 +236,19 @@ export class CourtCalendarComponent implements OnInit {
     }
 
     getReservationColor(res: Reservation): string {
+        if (res.status === 'cancelled') return '#6b7280';
         if (res.paymentStatus === 'paid') return 'var(--success, #10b981)';
         if (res.paymentStatus === 'partial') return '#f59e0b';
-        return 'var(--primary, #6366f1)';
+        return '#ef4444';
     }
 
     // ── Reservation CRUD ─────────────────────────────────────
 
-    openCreateModal(date: string, hour: number) {
+    openCreateModal(date: string, slotStartTime: string) {
         if (!this.isLoggedIn || !this.court) return;
         this.editingReservation = null;
 
-        const startTime = `${hour.toString().padStart(2, '0')}:00`;
+        const startTime = slotStartTime;
         const endTime = this.calcEndTime(startTime);
 
         this.reservationForm = {
@@ -253,7 +262,8 @@ export class CourtCalendarComponent implements OnInit {
             basePrice: 0,
             finalPrice: 0,
             paymentStatus: 'pending',
-            paymentNotes: ''
+            paymentNotes: '',
+            playerPayments: []
         };
 
         this.calculatePrice();
@@ -278,7 +288,8 @@ export class CourtCalendarComponent implements OnInit {
             basePrice: Number(res.basePrice) || 0,
             finalPrice: Number(res.finalPrice) || 0,
             paymentStatus: res.paymentStatus || 'pending',
-            paymentNotes: res.paymentNotes || ''
+            paymentNotes: res.paymentNotes || '',
+            playerPayments: res.playerPayments || []
         };
 
         this.showModal = true;
@@ -290,7 +301,10 @@ export class CourtCalendarComponent implements OnInit {
         let endMin = m + 30;
         let endH = h + 1;
         if (endMin >= 60) { endMin -= 60; endH++; }
-        if (endH > this.endHour) endH = this.endHour;
+        const maxMin = 23 * 60 + 30;
+        if (endH * 60 + endMin > maxMin) {
+            endH = 23; endMin = 30;
+        }
         return `${endH.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
     }
 
@@ -314,12 +328,12 @@ export class CourtCalendarComponent implements OnInit {
             );
 
             if (block) {
-                const price = this.reservationForm.priceType === 'per_player'
-                    ? Number(block.pricePerPlayer)
-                    : Number(block.priceFullCourt);
-                this.reservationForm.basePrice = price;
-                if (!this.editingReservation) {
-                    this.reservationForm.finalPrice = price;
+                this.reservationForm.basePrice = Number(block.priceFullCourt);
+                if (this.reservationForm.priceType === 'per_player') {
+                    // In per-player mode, finalPrice comes from sum of individual amounts
+                    this.updateOverallPaymentStatus();
+                } else if (!this.editingReservation) {
+                    this.reservationForm.finalPrice = Number(block.priceFullCourt);
                 }
             } else {
                 this.reservationForm.basePrice = 0;
@@ -332,6 +346,11 @@ export class CourtCalendarComponent implements OnInit {
     }
 
     onPriceTypeChange() {
+        if (this.reservationForm.priceType === 'per_player') {
+            this.initPlayerPayments();
+        } else {
+            this.reservationForm.playerPayments = [];
+        }
         this.calculatePrice();
     }
 
@@ -350,7 +369,8 @@ export class CourtCalendarComponent implements OnInit {
             priceType: this.reservationForm.priceType,
             finalPrice: this.reservationForm.finalPrice,
             paymentStatus: this.reservationForm.paymentStatus,
-            paymentNotes: this.reservationForm.paymentNotes || undefined
+            paymentNotes: this.reservationForm.paymentNotes || undefined,
+            playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null
         };
 
         if (this.editingReservation) {
@@ -427,5 +447,45 @@ export class CourtCalendarComponent implements OnInit {
     formatPrice(price: number): string {
         if (!price) return '0$';
         return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(price) + '$';
+    }
+
+    // ── Per-player payment helpers ───────────────────────────
+
+    get allPlayersFilled(): boolean {
+        return this.reservationForm.players.filter(p => p.trim()).length >= 4;
+    }
+
+    onPlayerChange() {
+        if (this.reservationForm.priceType === 'per_player' && !this.allPlayersFilled) {
+            this.reservationForm.priceType = 'full_court';
+            this.reservationForm.playerPayments = [];
+            this.calculatePrice();
+        }
+        if (this.reservationForm.priceType === 'per_player' && this.allPlayersFilled) {
+            this.initPlayerPayments();
+        }
+        this.cdr.markForCheck();
+    }
+
+    initPlayerPayments() {
+        const filledPlayers = this.reservationForm.players.filter(p => p.trim());
+        const perPlayerAmount = Math.round(((this.reservationForm.basePrice || 0) / 4) * 100) / 100;
+        const existing = this.reservationForm.playerPayments || [];
+
+        this.reservationForm.playerPayments = filledPlayers.map(name => {
+            const prev = existing.find(pp => pp.playerName === name);
+            return prev ? { ...prev, amount: prev.amount || perPlayerAmount } : { playerName: name, paid: false, amount: perPlayerAmount };
+        });
+        this.updateOverallPaymentStatus();
+    }
+
+    updateOverallPaymentStatus() {
+        const pp = this.reservationForm.playerPayments;
+        if (!pp.length) return;
+        const allPaid = pp.every(p => p.paid);
+        const somePaid = pp.some(p => p.paid);
+        this.reservationForm.paymentStatus = allPaid ? 'paid' : somePaid ? 'partial' : 'pending';
+        this.reservationForm.finalPrice = pp.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        this.cdr.markForCheck();
     }
 }

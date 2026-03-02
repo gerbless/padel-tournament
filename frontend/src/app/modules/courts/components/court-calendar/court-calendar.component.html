@@ -32,8 +32,8 @@
             <!-- Time column (left labels) -->
             <div class="time-column">
                 <div class="time-col-header"></div>
-                <div class="time-label" *ngFor="let hour of hours">
-                    <span>{{ hour }}:00</span>
+                <div class="time-label" *ngFor="let slot of slots">
+                    <span>{{ slot.label }}</span>
                 </div>
             </div>
 
@@ -45,9 +45,9 @@
                 </div>
                 <div class="slots-container">
                     <!-- Background time-cells (clickable) -->
-                    <div *ngFor="let hour of hours"
+                    <div *ngFor="let slot of slots"
                         class="time-cell"
-                        (click)="openCreateModal(day.date, hour)">
+                        (click)="openCreateModal(day.date, slot.startTime)">
                     </div>
                     <!-- Reservation blocks -->
                     <div *ngFor="let res of getReservationsForDay(day.date)"
@@ -141,6 +141,7 @@
                             [placeholder]="'Buscar o escribir nombre…'"
                             [currentClubId]="court?.clubId || null"
                             [excludeNames]="getExcludedPlayerNames(i)"
+                            (ngModelChange)="onPlayerChange()"
                             (requestCreatePlayer)="onRequestCreatePlayer($event, i)">
                         </app-player-select>
                     </div>
@@ -157,8 +158,9 @@
                         <select [(ngModel)]="reservationForm.priceType" class="form-control"
                             (ngModelChange)="onPriceTypeChange()">
                             <option value="full_court">Cancha completa</option>
-                            <option value="per_player">Por jugador (1/4)</option>
+                            <option value="per_player" [disabled]="!allPlayersFilled">Por jugador (1/4)</option>
                         </select>
+                        <small *ngIf="!allPlayersFilled" class="hint-disabled">Carga los 4 jugadores para habilitar cobro por jugador</small>
                     </div>
                     <div class="form-group">
                         <label>Precio base</label>
@@ -168,7 +170,7 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" *ngIf="reservationForm.priceType !== 'per_player'">
                         <label>Precio final</label>
                         <div class="input-with-suffix">
                             <input type="number" [(ngModel)]="reservationForm.finalPrice"
@@ -177,7 +179,7 @@
                         </div>
                         <small>Modifica para dar un precio especial</small>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" *ngIf="reservationForm.priceType !== 'per_player'">
                         <label>Estado de pago</label>
                         <select [(ngModel)]="reservationForm.paymentStatus" class="form-control">
                             <option value="pending">⏳ Pendiente</option>
@@ -186,10 +188,41 @@
                         </select>
                     </div>
 
-                    <div class="form-group col-span-full">
+                    <div class="form-group col-span-full" *ngIf="reservationForm.priceType !== 'per_player'">
                         <label>Notas de pago <span class="optional">(Op)</span></label>
                         <textarea [(ngModel)]="reservationForm.paymentNotes" class="form-control"
                             rows="2" placeholder="Ej: Pagó 50%, debe el resto…"></textarea>
+                    </div>
+                </div>
+
+                <!-- Per-player payment grid -->
+                <div class="player-payments" *ngIf="reservationForm.priceType === 'per_player' && reservationForm.playerPayments.length > 0">
+                    <h4>💳 Pago por Jugador</h4>
+                    <div class="player-payment-list">
+                        <div *ngFor="let pp of reservationForm.playerPayments; let i = index"
+                             class="player-payment-row" [class.paid]="pp.paid">
+                            <div class="pp-player">
+                                <span class="pp-index">{{ i + 1 }}</span>
+                                <span class="pp-name">{{ pp.playerName }}</span>
+                            </div>
+                            <div class="pp-amount">
+                                <input type="number" [(ngModel)]="pp.amount" min="0" class="form-control form-control-sm"
+                                    (ngModelChange)="updateOverallPaymentStatus()">
+                                <span class="suffix-sm">$</span>
+                            </div>
+                            <div class="pp-status">
+                                <button class="pp-toggle" [class.is-paid]="pp.paid"
+                                    (click)="pp.paid = !pp.paid; updateOverallPaymentStatus()">
+                                    {{ pp.paid ? '✅ Pagado' : '⏳ Pendiente' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pp-summary">
+                        <span>Total: <strong>{{ formatPrice(reservationForm.finalPrice) }}</strong></span>
+                        <span class="pp-summary-status" [ngClass]="'pay-' + reservationForm.paymentStatus">
+                            {{ reservationForm.paymentStatus === 'paid' ? '✅ Todo pagado' : reservationForm.paymentStatus === 'partial' ? '½ Pago parcial' : '⏳ Pendiente' }}
+                        </span>
                     </div>
                 </div>
             </div>

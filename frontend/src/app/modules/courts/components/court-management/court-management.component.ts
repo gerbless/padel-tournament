@@ -26,6 +26,7 @@ export class CourtManagementComponent implements OnInit {
     isLoggedIn = false;
     canEdit = false;
     canAdmin = false;
+    expandedPrices = new Set<string>();
 
     // Add/Edit Court modal
     showCourtModal = false;
@@ -97,11 +98,23 @@ export class CourtManagementComponent implements OnInit {
 
     togglePricing() {
         this.enablePricing = !this.enablePricing;
+        this.cdr.markForCheck();
         this.http.patch(`${environment.apiUrl}/clubs/${this.selectedClubId}`, {
             enableCourtPricing: this.enablePricing
         }).subscribe({
-            next: () => this.toast.success(this.enablePricing ? 'Control de precios activado' : 'Control de precios desactivado'),
-            error: () => this.toast.error('Error al actualizar configuración')
+            next: () => {
+                this.toast.success(this.enablePricing ? 'Control de precios activado' : 'Control de precios desactivado');
+                // Update the stored club so other views pick up the change
+                const currentClub = this.clubService.getSelectedClub();
+                if (currentClub) {
+                    this.clubService.selectClub({ ...currentClub, enableCourtPricing: this.enablePricing } as any);
+                }
+            },
+            error: () => {
+                this.enablePricing = !this.enablePricing;
+                this.cdr.markForCheck();
+                this.toast.error('Error al actualizar configuración');
+            }
         });
     }
 

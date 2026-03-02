@@ -37,6 +37,10 @@
 
 .price-section { margin: 1rem 0; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
 .price-section h4 { margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--text-secondary); }
+.price-toggle { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; }
+.price-toggle:hover { color: var(--text-primary); }
+.toggle-arrow { font-size: 0.7rem; transition: transform 0.2s; display: inline-block; }
+.toggle-arrow.expanded { transform: rotate(90deg); }
 .price-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
 .price-row:last-child { border-bottom: none; }
 .price-time { flex: 1; }

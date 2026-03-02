@@ -43,4 +43,8 @@ export class CreateReservationDto {
     @IsOptional()
     @IsString()
     paymentNotes?: string;
+
+    @IsOptional()
+    @IsArray()
+    playerPayments?: { playerName: string; paid: boolean; amount: number }[];
 }

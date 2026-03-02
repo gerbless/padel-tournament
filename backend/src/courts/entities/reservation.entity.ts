@@ -84,6 +84,9 @@ export class Reservation {
     @Column({ type: 'text', nullable: true })
     paymentNotes: string;
 
+    @Column({ type: 'jsonb', nullable: true })
+    playerPayments: { playerName: string; paid: boolean; amount: number }[];
+
     @CreateDateColumn()
     createdAt: Date;
 

@@ -162,6 +162,7 @@ export class CourtsService {
             finalPrice: dto.finalPrice || 0,
             paymentStatus: (dto.paymentStatus as any) || PaymentStatus.PENDING,
             paymentNotes: dto.paymentNotes,
+            playerPayments: dto.playerPayments || null,
         } as Partial<Reservation>);
         return this.reservationRepository.save(reservation as Reservation);
     }

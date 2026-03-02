@@ -59,8 +59,12 @@
 
                 <!-- Price Blocks -->
                 <div class="price-section" *ngIf="enablePricing && court.priceBlocks && court.priceBlocks.length > 0">
-                    <h4>Precios por bloque</h4>
-                    <div *ngFor="let block of court.priceBlocks" class="price-row">
+                    <h4 class="price-toggle" (click)="expandedPrices.has(court.id) ? expandedPrices.delete(court.id) : expandedPrices.add(court.id)">
+                        <span class="toggle-arrow" [class.expanded]="expandedPrices.has(court.id)">▶</span>
+                        Precios por bloque ({{ court.priceBlocks.length }})
+                    </h4>
+                    <div *ngIf="expandedPrices.has(court.id)">
+                        <div *ngFor="let block of court.priceBlocks" class="price-row">
                         <div class="price-time">
                             <span class="price-days">{{ formatDays(block.daysOfWeek) }}</span>
                             <span class="price-hours">{{ block.startTime }} - {{ block.endTime }}</span>
@@ -72,6 +76,7 @@
                         <div class="price-actions" *ngIf="canAdmin">
                             <button (click)="openEditPrice(block)" class="btn-icon" title="Editar">✏️</button>
                             <button (click)="deletePrice(block)" class="btn-icon btn-danger" title="Eliminar">🗑️</button>
+                        </div>
                         </div>
                     </div>
                 </div>
