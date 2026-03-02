@@ -10,6 +10,7 @@ async function bootstrap() {
         origin: [
             'http://localhost:4200',
             'http://localhost',
+            'http://localhost/api',
             'https://padel-tournament-frontend.onrender.com',
         ],
         credentials: true,
