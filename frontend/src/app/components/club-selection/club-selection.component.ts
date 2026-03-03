@@ -4,8 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ClubService } from '../../services/club.service';
 import { AuthService, ClubRole } from '../../services/auth.service';
-import { Club } from '../../models/club.model';
+import { Club, DEFAULT_ENABLED_MODULES, EnabledModules } from '../../models/club.model';
 import { Player } from '../../services/player.service';
+import { SIDEBAR_ITEMS } from '../../services/permissions.service';
 
 @Component({
     selector: 'app-club-selection',
@@ -116,7 +117,28 @@ export class ClubSelectionComponent implements OnInit {
 
     selectClub(club: Club): void {
         this.clubService.selectClub(club);
-        this.router.navigate(['/dashboard']);
+
+        const modules: EnabledModules = { ...DEFAULT_ENABLED_MODULES, ...(club.enabledModules || {}) };
+
+        if (!this.isLoggedIn) {
+            // Check if any public-visible module is enabled
+            const publicItems = SIDEBAR_ITEMS.filter(
+                item => item.publicVisible && modules[item.moduleKey]
+            );
+
+            if (publicItems.length === 0) {
+                // No public modules available → must login first
+                this.router.navigate(['/login']);
+                return;
+            }
+
+            // Navigate to the first available public module
+            this.router.navigate([publicItems[0].path]);
+            return;
+        }
+
+        // Logged-in user → navigate to courts (default)
+        this.router.navigate(['/courts']);
     }
 
     getClubRoleBadge(clubId: string): string {
