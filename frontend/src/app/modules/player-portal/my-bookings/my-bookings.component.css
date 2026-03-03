@@ -1,0 +1,131 @@
+.container { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+.page-header h1 { margin: 0; font-size: 1.5rem; }
+
+.btn-new {
+    padding: 0.5rem 1rem;
+    background: #10b981;
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+.btn-new:hover { background: #059669; }
+
+.loading-container { display: flex; justify-content: center; padding: 3rem; }
+.spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.section { margin-bottom: 2rem; }
+.section-title {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+    margin-bottom: 0.75rem;
+}
+
+.booking-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.2s;
+}
+.booking-card.upcoming { border-left: 3px solid #10b981; }
+.booking-card.past { opacity: 0.6; border-left: 3px solid #6b7280; }
+
+.booking-date {
+    min-width: 100px;
+    display: flex;
+    flex-direction: column;
+}
+.booking-date .day {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.booking-date .time {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.booking-details {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.court-name {
+    font-weight: 500;
+}
+.price {
+    font-weight: 600;
+    color: #10b981;
+}
+
+.payment-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-weight: 500;
+}
+.payment-badge.paid { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.payment-badge.partial { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.payment-badge.pending { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+.btn-cancel {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+.btn-cancel:hover { background: rgba(239, 68, 68, 0.25); }
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+.empty-state h3 { margin: 0 0 0.5rem; color: var(--text-primary); }
+.empty-state p { margin: 0 0 1.5rem; }
+.btn-primary {
+    display: inline-block;
+    padding: 0.6rem 1.5rem;
+    background: #10b981;
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+@media (max-width: 600px) {
+    .booking-card { flex-wrap: wrap; }
+    .booking-details { gap: 0.5rem; }
+}

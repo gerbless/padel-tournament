@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpCode, HttpStatus, UseGuards, Request } from '@nestjs/common';
 import { CourtsService } from './courts.service';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { CreatePriceBlockDto } from './dto/create-price-block.dto';
@@ -6,10 +6,14 @@ import { CreateReservationDto } from './dto/create-reservation.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClubRoleGuard } from '../auth/club-role.guard';
 import { ClubRoles } from '../auth/club-roles.decorator';
+import { PlayersService } from '../players/players.service';
 
 @Controller('courts')
 export class CourtsController {
-    constructor(private readonly courtsService: CourtsService) { }
+    constructor(
+        private readonly courtsService: CourtsService,
+        private readonly playersService: PlayersService,
+    ) { }
 
     // ==========================================
     // COURTS CRUD
@@ -53,6 +57,16 @@ export class CourtsController {
 
     @UseGuards(JwtAuthGuard, ClubRoleGuard)
     @ClubRoles('admin')
+    @Post(':courtId/copy-price-blocks/:sourceCourtId')
+    copyPriceBlocks(
+        @Param('courtId') courtId: string,
+        @Param('sourceCourtId') sourceCourtId: string,
+    ) {
+        return this.courtsService.copyPriceBlocks(courtId, sourceCourtId);
+    }
+
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin')
     @Post(':courtId/price-blocks')
     createPriceBlock(@Param('courtId') courtId: string, @Body() dto: CreatePriceBlockDto) {
         dto.courtId = courtId;
@@ -72,6 +86,16 @@ export class CourtsController {
     @Get(':courtId/price-blocks')
     getPriceBlocks(@Param('courtId') courtId: string) {
         return this.courtsService.getPriceBlocks(courtId);
+    }
+
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin')
+    @Patch('club/:clubId/price-blocks/bulk-update')
+    bulkUpdatePriceBlocks(
+        @Param('clubId') clubId: string,
+        @Body() body: { matchCriteria: { startTime: string; endTime: string; daysOfWeek: number[] }; newValues: Partial<CreatePriceBlockDto> },
+    ) {
+        return this.courtsService.bulkUpdatePriceBlocks(clubId, body.matchCriteria, body.newValues);
     }
 
     @UseGuards(JwtAuthGuard, ClubRoleGuard)
@@ -170,5 +194,42 @@ export class CourtsController {
         @Query('month') month?: number
     ) {
         return this.courtsService.getBillingDashboard(clubId, +year, month ? +month : undefined);
+    }
+
+    // ==========================================
+    // PUBLIC: AVAILABLE SLOTS
+    // ==========================================
+
+    @Get('club/:clubId/available-slots')
+    getAvailableSlots(
+        @Param('clubId') clubId: string,
+        @Query('date') date: string
+    ) {
+        return this.courtsService.getAvailableSlots(clubId, date);
+    }
+
+    // ==========================================
+    // PLAYER BOOKINGS (auth required, any user)
+    // ==========================================
+
+    @UseGuards(JwtAuthGuard)
+    @Post('player-booking')
+    async createPlayerBooking(@Request() req, @Body() dto: { courtId: string; clubId: string; date: string; startTime: string; endTime: string }) {
+        const player = await this.playersService.findOne(req.user.playerId);
+        return this.courtsService.createPlayerBooking(req.user.userId, req.user.playerId, player.name, dto);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get('player-bookings/my')
+    async getMyBookings(@Request() req, @Query('clubId') clubId?: string) {
+        const player = await this.playersService.findOne(req.user.playerId);
+        return this.courtsService.getPlayerBookings(req.user.playerId, player.name, clubId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Delete('player-bookings/:id')
+    async cancelMyBooking(@Request() req, @Param('id') id: string) {
+        const player = await this.playersService.findOne(req.user.playerId);
+        return this.courtsService.cancelPlayerBooking(req.user.playerId, player.name, id);
     }
 }

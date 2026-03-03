@@ -1,6 +1,18 @@
-import { IsOptional, IsString, IsIn, IsArray, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsIn, IsArray, IsUUID, IsEmail } from 'class-validator';
 
 export class UpdatePlayerDto {
+    @IsOptional()
+    @IsString()
+    name?: string;
+
+    @IsOptional()
+    @IsString()
+    identification?: string;
+
+    @IsOptional()
+    @IsEmail()
+    email?: string;
+
     @IsOptional()
     @IsString()
     categoryId?: string;

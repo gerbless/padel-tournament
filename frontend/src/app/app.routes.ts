@@ -60,4 +60,22 @@ export const routes: Routes = [
         loadComponent: () => import('./components/admin/club-settings/club-settings.component').then(m => m.ClubSettingsComponent),
         canActivate: [superAdminGuard]
     },
+    {
+        path: 'register',
+        loadComponent: () => import('./components/register/register.component').then(m => m.RegisterComponent)
+    },
+    {
+        path: 'player/booking',
+        loadComponent: () => import('./modules/player-portal/player-booking/player-booking.component').then(m => m.PlayerBookingComponent)
+    },
+    {
+        path: 'player/profile',
+        loadComponent: () => import('./modules/player-portal/player-profile/player-profile.component').then(m => m.PlayerProfileComponent),
+        canActivate: [authGuard]
+    },
+    {
+        path: 'player/my-bookings',
+        loadComponent: () => import('./modules/player-portal/my-bookings/my-bookings.component').then(m => m.MyBookingsComponent),
+        canActivate: [authGuard]
+    },
 ];

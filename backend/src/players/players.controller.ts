@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { PlayersService } from './players.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
@@ -82,6 +82,20 @@ export class PlayersController {
     @Get('partner-recommendations')
     getPartnerRecommendations(@Query('clubId') clubId?: string) {
         return this.playersService.getAllPartnerRecommendations(clubId);
+    }
+
+    // ── Player Self-Service Profile ──
+
+    @UseGuards(JwtAuthGuard)
+    @Get('me')
+    async getMyProfile(@Request() req) {
+        return this.playersService.findOne(req.user.playerId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Patch('me')
+    async updateMyProfile(@Request() req, @Body() dto: UpdatePlayerDto) {
+        return this.playersService.update(req.user.playerId, dto);
     }
 
     @Get(':id')

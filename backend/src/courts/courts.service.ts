@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Court } from './entities/court.entity';
 import { CourtPriceBlock } from './entities/court-price-block.entity';
 import { Reservation, ReservationStatus, PriceType, PaymentStatus } from './entities/reservation.entity';
@@ -26,6 +26,25 @@ export class CourtsService {
     async createCourt(dto: CreateCourtDto): Promise<Court> {
         const court = this.courtRepository.create(dto);
         return this.courtRepository.save(court);
+    }
+
+    async copyPriceBlocks(targetCourtId: string, sourceCourtId: string): Promise<CourtPriceBlock[]> {
+        const sourceBlocks = await this.priceBlockRepository.find({ where: { courtId: sourceCourtId } });
+        if (sourceBlocks.length === 0) return [];
+
+        const newBlocks: CourtPriceBlock[] = [];
+        for (const block of sourceBlocks) {
+            const newBlock = this.priceBlockRepository.create({
+                courtId: targetCourtId,
+                daysOfWeek: [...block.daysOfWeek],
+                startTime: block.startTime,
+                endTime: block.endTime,
+                priceFullCourt: block.priceFullCourt,
+                pricePerPlayer: block.pricePerPlayer,
+            });
+            newBlocks.push(await this.priceBlockRepository.save(newBlock));
+        }
+        return newBlocks;
     }
 
     async findCourtsByClub(clubId: string): Promise<Court[]> {
@@ -90,6 +109,36 @@ export class CourtsService {
         if (!block) throw new NotFoundException(`Price block ${id} not found`);
         Object.assign(block, dto);
         return this.priceBlockRepository.save(block);
+    }
+
+    async bulkUpdatePriceBlocks(
+        clubId: string,
+        matchCriteria: { startTime: string; endTime: string; daysOfWeek: number[] },
+        newValues: Partial<CreatePriceBlockDto>,
+    ): Promise<{ updated: number }> {
+        // Get all courts for this club
+        const courts = await this.courtRepository.find({ where: { clubId } });
+        const courtIds = courts.map(c => c.id);
+        if (courtIds.length === 0) return { updated: 0 };
+
+        // Find all matching price blocks across these courts
+        const allBlocks = await this.priceBlockRepository.find({
+            where: { courtId: In(courtIds) },
+        });
+
+        const sortedMatch = [...matchCriteria.daysOfWeek].sort().join(',');
+        const matching = allBlocks.filter(b =>
+            b.startTime === matchCriteria.startTime &&
+            b.endTime === matchCriteria.endTime &&
+            [...b.daysOfWeek].sort().join(',') === sortedMatch
+        );
+
+        for (const block of matching) {
+            Object.assign(block, newValues);
+            await this.priceBlockRepository.save(block);
+        }
+
+        return { updated: matching.length };
     }
 
     async removePriceBlock(id: string): Promise<void> {
@@ -392,5 +441,113 @@ export class CourtsService {
             totals: totals[0] || {},
             monthlyTrend
         };
+    }
+
+    // ==========================================
+    // AVAILABLE SLOTS (PUBLIC)
+    // ==========================================
+
+    async getAvailableSlots(clubId: string, date: string) {
+        const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+
+        const courts = await this.courtRepository.find({
+            where: { clubId, isActive: true },
+            relations: ['priceBlocks'],
+            order: { courtNumber: 'ASC' },
+        });
+
+        const reservations = await this.reservationRepository.find({
+            where: { clubId, date, status: ReservationStatus.CONFIRMED },
+        });
+
+        return courts.map(court => {
+            const blocks = (court.priceBlocks || [])
+                .filter(b => b.daysOfWeek.includes(dayOfWeek))
+                .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            const slots = blocks.map(block => {
+                const isReserved = reservations.some(r =>
+                    r.courtId === court.id &&
+                    ((block.startTime >= r.startTime && block.startTime < r.endTime) ||
+                     (block.endTime > r.startTime && block.endTime <= r.endTime) ||
+                     (block.startTime <= r.startTime && block.endTime >= r.endTime))
+                );
+
+                return {
+                    startTime: block.startTime,
+                    endTime: block.endTime,
+                    priceFullCourt: Number(block.priceFullCourt),
+                    pricePerPlayer: Number(block.pricePerPlayer),
+                    available: !isReserved,
+                };
+            });
+
+            return {
+                courtId: court.id,
+                courtName: court.name,
+                courtNumber: court.courtNumber,
+                surfaceType: court.surfaceType,
+                slots,
+            };
+        });
+    }
+
+    // ==========================================
+    // PLAYER BOOKINGS
+    // ==========================================
+
+    async createPlayerBooking(userId: string, playerId: string, playerName: string, dto: {
+        courtId: string;
+        clubId: string;
+        date: string;
+        startTime: string;
+        endTime: string;
+    }): Promise<Reservation> {
+        // Get price
+        const priceBlock = await this.getPrice(dto.courtId, dto.date, dto.startTime);
+        const price = priceBlock ? Number(priceBlock.priceFullCourt) : 0;
+
+        return this.createReservation({
+            courtId: dto.courtId,
+            clubId: dto.clubId,
+            date: dto.date,
+            startTime: dto.startTime,
+            endTime: dto.endTime,
+            title: `Reserva - ${playerName}`,
+            players: [playerName],
+            playerCount: 4,
+            priceType: 'full_court',
+            finalPrice: price,
+            paymentStatus: 'pending',
+        } as CreateReservationDto);
+    }
+
+    async getPlayerBookings(playerId: string, playerName: string, clubId?: string): Promise<Reservation[]> {
+        const qb = this.reservationRepository
+            .createQueryBuilder('r')
+            .leftJoinAndSelect('r.court', 'court')
+            .where("r.title LIKE :pattern", { pattern: `%${playerName}%` })
+            .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED });
+
+        if (clubId) {
+            qb.andWhere('r.clubId = :clubId', { clubId });
+        }
+
+        return qb.orderBy('r.date', 'DESC')
+            .addOrderBy('r.startTime', 'ASC')
+            .getMany();
+    }
+
+    async cancelPlayerBooking(playerId: string, playerName: string, reservationId: string): Promise<Reservation> {
+        const reservation = await this.reservationRepository.findOne({ where: { id: reservationId } });
+        if (!reservation) throw new NotFoundException('Reserva no encontrada');
+
+        // Verify this reservation belongs to this player
+        if (!reservation.title?.includes(playerName)) {
+            throw new ForbiddenException('No tienes permiso para cancelar esta reserva');
+        }
+
+        reservation.status = ReservationStatus.CANCELLED;
+        return this.reservationRepository.save(reservation);
     }
 }

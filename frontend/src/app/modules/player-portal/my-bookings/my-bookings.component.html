@@ -1,0 +1,56 @@
+<div class="container fade-in">
+    <div class="page-header">
+        <h1>📋 Mis Reservas</h1>
+        <a routerLink="/player/booking" class="btn-new">+ Nueva Reserva</a>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="loading" class="loading-container">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Upcoming Bookings -->
+    <div *ngIf="!loading && upcomingBookings.length > 0" class="section">
+        <h2 class="section-title">Próximas</h2>
+        <div *ngFor="let booking of upcomingBookings" class="booking-card upcoming">
+            <div class="booking-date">
+                <span class="day">{{ formatDate(booking.date) }}</span>
+                <span class="time">{{ booking.startTime }} - {{ booking.endTime }}</span>
+            </div>
+            <div class="booking-details">
+                <span class="court-name">🏟️ {{ booking.court?.name || 'Cancha' }}</span>
+                <span class="price">{{ formatPrice(booking.finalPrice) }}</span>
+                <span class="payment-badge" [ngClass]="booking.paymentStatus">
+                    {{ booking.paymentStatus === 'paid' ? 'Pagado' : booking.paymentStatus === 'partial' ? 'Parcial' : 'Pendiente' }}
+                </span>
+            </div>
+            <button class="btn-cancel" (click)="cancelBooking(booking)">✕</button>
+        </div>
+    </div>
+
+    <!-- Past Bookings -->
+    <div *ngIf="!loading && pastBookings.length > 0" class="section">
+        <h2 class="section-title">Anteriores</h2>
+        <div *ngFor="let booking of pastBookings" class="booking-card past">
+            <div class="booking-date">
+                <span class="day">{{ formatDate(booking.date) }}</span>
+                <span class="time">{{ booking.startTime }} - {{ booking.endTime }}</span>
+            </div>
+            <div class="booking-details">
+                <span class="court-name">🏟️ {{ booking.court?.name || 'Cancha' }}</span>
+                <span class="price">{{ formatPrice(booking.finalPrice) }}</span>
+                <span class="payment-badge" [ngClass]="booking.paymentStatus">
+                    {{ booking.paymentStatus === 'paid' ? 'Pagado' : 'Pendiente' }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!loading && bookings.length === 0" class="empty-state">
+        <div class="empty-icon">📋</div>
+        <h3>No tienes reservas</h3>
+        <p>Haz tu primera reserva de cancha</p>
+        <a routerLink="/player/booking" class="btn-primary">Reservar Cancha</a>
+    </div>
+</div>

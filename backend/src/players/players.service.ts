@@ -148,6 +148,18 @@ export class PlayersService {
             throw new NotFoundException(`Player with ID ${id} not found`);
         }
 
+        if (updatePlayerDto.name !== undefined) {
+            player.name = updatePlayerDto.name;
+        }
+
+        if (updatePlayerDto.email !== undefined) {
+            player.email = updatePlayerDto.email;
+        }
+
+        if (updatePlayerDto.identification !== undefined) {
+            player.identification = updatePlayerDto.identification;
+        }
+
         if (updatePlayerDto.categoryId !== undefined) {
             player.category = updatePlayerDto.categoryId ? { id: updatePlayerDto.categoryId } as any : null;
         }

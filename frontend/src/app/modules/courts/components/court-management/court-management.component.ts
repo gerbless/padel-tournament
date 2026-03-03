@@ -33,12 +33,15 @@ export class CourtManagementComponent implements OnInit {
     showCourtModal = false;
     editingCourt: Court | null = null;
     courtForm = { name: '', courtNumber: 1, surfaceType: '', isActive: true };
+    copyFromCourtId = '';
 
     // Price Block modal
     showPriceModal = false;
     editingPriceBlock: CourtPriceBlock | null = null;
     priceCourtId = '';
     applyPriceToAll = false;
+    applyEditToAll = false;
+    matchingBlocksCount = 0;
     priceForm: CourtPriceBlock = {
         daysOfWeek: [1, 2, 3, 4, 5],
         startTime: '08:00',
@@ -121,8 +124,13 @@ export class CourtManagementComponent implements OnInit {
     }
 
     // Court CRUD
+    get courtsWithPriceBlocks(): Court[] {
+        return this.courts.filter(c => c.priceBlocks && c.priceBlocks.length > 0);
+    }
+
     openAddCourt() {
         this.editingCourt = null;
+        this.copyFromCourtId = '';
         this.courtForm = {
             name: `Cancha ${this.courts.length + 1}`,
             courtNumber: this.courts.length + 1,
@@ -158,10 +166,23 @@ export class CourtManagementComponent implements OnInit {
                 ...this.courtForm,
                 clubId: this.selectedClubId
             } as any).subscribe({
-                next: () => {
+                next: (newCourt: Court) => {
                     this.showCourtModal = false;
-                    this.loadCourts();
-                    this.toast.success('Cancha creada');
+                    if (this.copyFromCourtId && newCourt.id) {
+                        this.courtService.copyPriceBlocks(newCourt.id, this.copyFromCourtId).subscribe({
+                            next: (blocks) => {
+                                this.loadCourts();
+                                this.toast.success(`Cancha creada con ${blocks.length} bloques de precio copiados`);
+                            },
+                            error: () => {
+                                this.loadCourts();
+                                this.toast.warning('Cancha creada, pero hubo un error al copiar los precios');
+                            }
+                        });
+                    } else {
+                        this.loadCourts();
+                        this.toast.success('Cancha creada');
+                    }
                 },
                 error: () => this.toast.error('Error al crear cancha')
             });
@@ -217,6 +238,21 @@ export class CourtManagementComponent implements OnInit {
         this.priceCourtId = block.courtId || '';
         this.editingPriceBlock = block;
         this.priceForm = { ...block };
+        this.applyEditToAll = false;
+
+        // Count matching blocks across other courts
+        this.matchingBlocksCount = 0;
+        const sortedDays = [...block.daysOfWeek].sort().join(',');
+        for (const court of this.courts) {
+            if (court.id === block.courtId) continue;
+            const matches = (court.priceBlocks || []).filter(b =>
+                b.startTime === block.startTime &&
+                b.endTime === block.endTime &&
+                [...b.daysOfWeek].sort().join(',') === sortedDays
+            );
+            this.matchingBlocksCount += matches.length;
+        }
+
         this.showPriceModal = true;
     }
 
@@ -240,14 +276,38 @@ export class CourtManagementComponent implements OnInit {
 
     savePrice() {
         if (this.editingPriceBlock && this.editingPriceBlock.id) {
-            this.courtService.updatePriceBlock(this.editingPriceBlock.id, this.priceForm).subscribe({
-                next: () => {
-                    this.showPriceModal = false;
-                    this.loadCourts();
-                    this.toast.success('Bloque de precio actualizado');
-                },
-                error: () => this.toast.error('Error al actualizar precio')
-            });
+            if (this.applyEditToAll && this.matchingBlocksCount > 0) {
+                // Bulk update all matching blocks across all courts
+                const matchCriteria = {
+                    startTime: this.editingPriceBlock.startTime,
+                    endTime: this.editingPriceBlock.endTime,
+                    daysOfWeek: this.editingPriceBlock.daysOfWeek,
+                };
+                const newValues: any = {
+                    daysOfWeek: this.priceForm.daysOfWeek,
+                    startTime: this.priceForm.startTime,
+                    endTime: this.priceForm.endTime,
+                    priceFullCourt: this.priceForm.priceFullCourt,
+                    pricePerPlayer: this.priceForm.pricePerPlayer,
+                };
+                this.courtService.bulkUpdatePriceBlocks(this.selectedClubId, matchCriteria, newValues).subscribe({
+                    next: (result) => {
+                        this.showPriceModal = false;
+                        this.loadCourts();
+                        this.toast.success(`${result.updated} bloques actualizados en todas las canchas`);
+                    },
+                    error: () => this.toast.error('Error al actualizar precios')
+                });
+            } else {
+                this.courtService.updatePriceBlock(this.editingPriceBlock.id, this.priceForm).subscribe({
+                    next: () => {
+                        this.showPriceModal = false;
+                        this.loadCourts();
+                        this.toast.success('Bloque de precio actualizado');
+                    },
+                    error: () => this.toast.error('Error al actualizar precio')
+                });
+            }
         } else if (this.applyPriceToAll) {
             this.courtService.createPriceBlockForAllCourts(this.selectedClubId, this.priceForm).subscribe({
                 next: (blocks) => {

@@ -1,0 +1,140 @@
+.container { max-width: 600px; margin: 0 auto; padding: 1.5rem; }
+
+.page-header { margin-bottom: 1.5rem; }
+.page-header h1 { margin: 0; font-size: 1.5rem; }
+
+.loading-container { display: flex; justify-content: center; padding: 3rem; }
+.spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.profile-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+}
+
+.avatar {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #059669);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 auto 1.5rem;
+}
+
+.profile-content {
+    text-align: left;
+}
+
+/* View Mode */
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.info-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+.info-value {
+    font-weight: 500;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: rgba(16, 185, 129, 0.05);
+    border-radius: 12px;
+    text-align: center;
+}
+.stat-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #10b981;
+}
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.btn-edit {
+    width: 100%;
+    margin-top: 1.5rem;
+    padding: 0.7rem;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #10b981;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+.btn-edit:hover { background: rgba(16, 185, 129, 0.2); }
+
+/* Edit Mode */
+.form-group { margin-bottom: 1rem; }
+.form-group label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+.form-control {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.edit-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+.btn-cancel {
+    flex: 1;
+    padding: 0.7rem;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+.btn-save {
+    flex: 1;
+    padding: 0.7rem;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }

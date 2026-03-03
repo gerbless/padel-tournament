@@ -1,0 +1,246 @@
+.container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+.page-header h1 { margin: 0; font-size: 1.5rem; }
+
+.club-badge {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.date-selector {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+.date-selector label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.date-input {
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+.date-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-transform: capitalize;
+}
+
+.notice {
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    color: #fbbf24;
+}
+.notice a { color: var(--primary); text-decoration: underline; }
+
+.loading-container {
+    display: flex;
+    justify-content: center;
+    padding: 3rem 0;
+}
+.spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Courts Grid */
+.courts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 1.25rem;
+}
+
+.court-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.court-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.court-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.court-number {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.court-info h3 { margin: 0; font-size: 1rem; }
+.surface { font-size: 0.75rem; color: var(--text-secondary); }
+
+.slots-count {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Slots */
+.slots-list {
+    padding: 0.5rem;
+}
+
+.slot-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.25rem;
+    transition: all 0.15s;
+}
+
+.slot-item.available {
+    cursor: pointer;
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid transparent;
+}
+.slot-item.available:hover {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+.slot-item.selected {
+    background: rgba(16, 185, 129, 0.2) !important;
+    border-color: #10b981 !important;
+    border: 1px solid #10b981;
+}
+
+.slot-item.reserved {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.slot-time .time {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.slot-price {
+    font-weight: 700;
+    color: #10b981;
+    font-size: 1rem;
+}
+
+.reserved-badge {
+    font-size: 0.75rem;
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+}
+
+.no-slots-msg {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Booking Bar */
+.booking-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border-top: 2px solid #10b981;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 200;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.booking-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+}
+
+.booking-price {
+    font-weight: 700;
+    color: #10b981;
+    font-size: 1.1rem;
+}
+
+.btn-confirm {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.btn-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.btn-confirm:hover:not(:disabled) {
+    background: #059669;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+.empty-state h3 { margin: 0 0 0.5rem; }
+
+@media (max-width: 480px) {
+    .courts-grid { grid-template-columns: 1fr; }
+    .booking-bar { flex-direction: column; text-align: center; }
+    .booking-info { justify-content: center; }
+}

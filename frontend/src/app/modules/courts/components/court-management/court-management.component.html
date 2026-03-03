@@ -150,6 +150,20 @@
                         <span>Cancha activa (disponible para reservas)</span>
                     </label>
                 </div>
+
+                <!-- Copy Price Blocks from existing court -->
+                <div class="form-group col-span-full" *ngIf="!editingCourt && courtsWithPriceBlocks.length > 0">
+                    <label>📋 Copiar bloques de precio de</label>
+                    <select [(ngModel)]="copyFromCourtId" class="form-control">
+                        <option value="">No copiar (sin bloques de precio)</option>
+                        <option *ngFor="let c of courtsWithPriceBlocks" [value]="c.id">
+                            {{ c.name }} ({{ c.priceBlocks?.length || 0 }} bloques)
+                        </option>
+                    </select>
+                    <small *ngIf="copyFromCourtId" style="color: #10b981; margin-top: 0.25rem; display: block;">
+                        ✓ Se copiarán los bloques de precio al crear la cancha
+                    </small>
+                </div>
             </div>
         </div>
         <div class="modal-footer">
@@ -187,6 +201,19 @@
                         <option *ngFor="let c of courts" [value]="c.id">{{ c.name }}</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- Bulk edit toggle (only when editing and matching blocks exist) -->
+            <div class="apply-target" *ngIf="editingPriceBlock && matchingBlocksCount > 0">
+                <div class="target-options">
+                    <button class="target-btn" [class.active]="!applyEditToAll" (click)="applyEditToAll = false">
+                        🏟️ Solo esta cancha
+                    </button>
+                    <button class="target-btn" [class.active]="applyEditToAll" (click)="applyEditToAll = true">
+                        📋 Todas las canchas ({{ matchingBlocksCount + 1 }})
+                    </button>
+                </div>
+                <p class="target-hint" *ngIf="applyEditToAll">Se actualizarán {{ matchingBlocksCount + 1 }} bloques iguales en todas las canchas</p>
             </div>
 
             <div class="form-grid">
@@ -233,7 +260,7 @@
         <div class="modal-footer">
             <button (click)="showPriceModal = false" class="btn btn-secondary">Cancelar</button>
             <button (click)="savePrice()" class="btn btn-primary">
-                {{ editingPriceBlock ? 'Guardar' : 'Crear Bloque' }}
+                {{ editingPriceBlock ? (applyEditToAll && matchingBlocksCount > 0 ? 'Guardar en Todas' : 'Guardar') : 'Crear Bloque' }}
             </button>
         </div>
     </div>

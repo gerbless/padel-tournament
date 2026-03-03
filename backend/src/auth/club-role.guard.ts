@@ -67,6 +67,11 @@ export class ClubRoleGuard implements CanActivate {
             clubId = await this.resolveClubIdFromResource(request.params.id);
         }
 
+        // Also try courtId param (e.g. /courts/:courtId/...)
+        if (!clubId && request.params?.courtId) {
+            clubId = await this.resolveClubIdFromResource(request.params.courtId);
+        }
+
         if (!clubId) {
             this.logger.warn('ClubRoleGuard: No se pudo determinar el clubId del request');
             throw new ForbiddenException('No se pudo determinar el club para verificar permisos');

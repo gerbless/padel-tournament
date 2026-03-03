@@ -1,0 +1,90 @@
+<div class="container fade-in">
+    <div class="page-header">
+        <h1>👤 Mi Perfil</h1>
+    </div>
+
+    <div *ngIf="loading" class="loading-container">
+        <div class="spinner"></div>
+    </div>
+
+    <div *ngIf="!loading && player" class="profile-card">
+        <div class="avatar">
+            {{ player.name?.charAt(0)?.toUpperCase() || '?' }}
+        </div>
+
+        <div class="profile-content">
+            <!-- View Mode -->
+            <div *ngIf="!editMode" class="profile-view">
+                <div class="info-row">
+                    <span class="info-label">Nombre</span>
+                    <span class="info-value">{{ player.name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Email</span>
+                    <span class="info-value">{{ player.email || 'No registrado' }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Identificación</span>
+                    <span class="info-value">{{ player.identification || 'No registrada' }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Posición</span>
+                    <span class="info-value">{{ player.position ? (player.position === 'drive' ? 'Drive' : player.position === 'reves' ? 'Revés' : 'Mixto') : 'Sin definir' }}</span>
+                </div>
+                <div class="info-row" *ngIf="player.category">
+                    <span class="info-label">Categoría</span>
+                    <span class="info-value">{{ player.category.name }}</span>
+                </div>
+
+                <div class="stats-grid" *ngIf="player.totalPoints > 0 || player.tournamentsPlayed > 0">
+                    <div class="stat">
+                        <span class="stat-value">{{ player.totalPoints }}</span>
+                        <span class="stat-label">Puntos</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">{{ player.matchesWon }}</span>
+                        <span class="stat-label">Victorias</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">{{ player.tournamentsPlayed }}</span>
+                        <span class="stat-label">Torneos</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-edit" (click)="toggleEdit()">✏️ Editar Perfil</button>
+            </div>
+
+            <!-- Edit Mode -->
+            <div *ngIf="editMode" class="profile-edit">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" [(ngModel)]="form.name" class="form-control" placeholder="Tu nombre">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" [(ngModel)]="form.email" class="form-control" placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label>Identificación</label>
+                    <input type="text" [(ngModel)]="form.identification" class="form-control" placeholder="RUT o Pasaporte">
+                </div>
+                <div class="form-group">
+                    <label>Posición</label>
+                    <select [(ngModel)]="form.position" class="form-control">
+                        <option value="">Sin definir</option>
+                        <option value="drive">Drive</option>
+                        <option value="reves">Revés</option>
+                        <option value="mixto">Mixto</option>
+                    </select>
+                </div>
+
+                <div class="edit-actions">
+                    <button class="btn btn-cancel" (click)="toggleEdit()">Cancelar</button>
+                    <button class="btn btn-save" (click)="saveProfile()" [disabled]="saving">
+                        {{ saving ? 'Guardando...' : 'Guardar' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

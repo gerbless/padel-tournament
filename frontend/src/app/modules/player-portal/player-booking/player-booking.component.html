@@ -1,0 +1,89 @@
+<div class="container fade-in">
+    <div class="page-header">
+        <h1>🏟️ Reservar Cancha</h1>
+        <span class="club-badge" *ngIf="clubName">{{ clubName }}</span>
+    </div>
+
+    <!-- Date Selector -->
+    <div class="date-selector">
+        <label>Fecha</label>
+        <input type="date" [(ngModel)]="selectedDate" [min]="minDate"
+            (ngModelChange)="onDateChange()" class="date-input">
+        <span class="date-label">{{ formatDate(selectedDate) }}</span>
+    </div>
+
+    <!-- Login Notice -->
+    <div class="notice" *ngIf="!isLoggedIn">
+        <span>🔐</span> Debes <a routerLink="/login">iniciar sesión</a> o <a routerLink="/register">registrarte</a> para hacer una reserva.
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="loading" class="loading-container">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Courts Grid -->
+    <div *ngIf="!loading" class="courts-grid">
+        <div *ngFor="let court of courts" class="court-card"
+            [class.no-slots]="getAvailableSlots(court).length === 0">
+            <div class="court-header">
+                <div class="court-info">
+                    <span class="court-number">{{ court.courtNumber }}</span>
+                    <div>
+                        <h3>{{ court.courtName }}</h3>
+                        <span class="surface" *ngIf="court.surfaceType">{{ court.surfaceType }}</span>
+                    </div>
+                </div>
+                <span class="slots-count" *ngIf="getAvailableSlots(court).length > 0">
+                    {{ getAvailableSlots(court).length }} disponibles
+                </span>
+            </div>
+
+            <div class="slots-list" *ngIf="getAvailableSlots(court).length > 0">
+                <div *ngFor="let slot of getAvailableSlots(court)"
+                    class="slot-item available"
+                    [class.selected]="selectedSlot?.court?.courtId === court.courtId && selectedSlot?.slot?.startTime === slot.startTime"
+                    (click)="selectSlot(court, slot)">
+                    <div class="slot-time">
+                        <span class="time">{{ slot.startTime }} - {{ slot.endTime }}</span>
+                    </div>
+                    <div class="slot-price">
+                        {{ formatPrice(slot.priceFullCourt) }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="no-slots-msg" *ngIf="getAvailableSlots(court).length === 0">
+                Sin horarios disponibles para este día
+            </div>
+        </div>
+    </div>
+
+    <!-- No available slots message -->
+    <div *ngIf="!loading && courts.length > 0 && !hasAnyAvailableSlot()" class="empty-state">
+        <div class="empty-icon">📅</div>
+        <h3>No hay horarios disponibles</h3>
+        <p>Todas las canchas están reservadas para este día. Prueba con otra fecha.</p>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!loading && courts.length === 0" class="empty-state">
+        <div class="empty-icon">🏟️</div>
+        <h3>No hay canchas disponibles</h3>
+        <p>El club no tiene canchas configuradas en este momento</p>
+    </div>
+
+    <!-- Booking Confirmation Bar -->
+    <div class="booking-bar" *ngIf="selectedSlot">
+        <div class="booking-info">
+            <strong>{{ selectedSlot.court.courtName }}</strong>
+            <span>{{ formatDate(selectedDate) }}</span>
+            <span>{{ selectedSlot.slot.startTime }} - {{ selectedSlot.slot.endTime }}</span>
+            <span class="booking-price">{{ formatPrice(selectedSlot.slot.priceFullCourt) }}</span>
+        </div>
+        <button class="btn btn-confirm" (click)="confirmBooking()" [disabled]="booking || !isLoggedIn">
+            <span *ngIf="booking">Reservando...</span>
+            <span *ngIf="!booking">✓ Confirmar Reserva</span>
+        </button>
+    </div>
+</div>

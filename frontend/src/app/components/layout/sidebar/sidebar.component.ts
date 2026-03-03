@@ -60,6 +60,35 @@ import { PermissionsService, NavItem } from '../../../services/permissions.servi
                 <span class="label" *ngIf="!isCollapsed">Configuración</span>
             </a>
 
+            <!-- Player Portal Section -->
+            <div *ngIf="selectedClub" class="divider" style="height: 1px; background: rgba(255,255,255,0.1); margin: 0.5rem 0;"></div>
+            <div *ngIf="selectedClub && !isCollapsed" class="nav-section-label" style="padding: 0.25rem 1rem; font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px;">Jugador</div>
+
+            <a *ngIf="selectedClub"
+               routerLink="/player/booking"
+               routerLinkActive="active"
+               class="nav-item"
+               (click)="closeMobileMenu()">
+                <span class="icon">🏟️</span>
+                <span class="label" *ngIf="!isCollapsed">Reservar Cancha</span>
+            </a>
+            <a *ngIf="isLoggedIn && selectedClub && !isSuperAdmin && !clubRole"
+               routerLink="/player/my-bookings"
+               routerLinkActive="active"
+               class="nav-item"
+               (click)="closeMobileMenu()">
+                <span class="icon">📋</span>
+                <span class="label" *ngIf="!isCollapsed">Mis Reservas</span>
+            </a>
+            <a *ngIf="isLoggedIn && selectedClub && !isSuperAdmin && !clubRole"
+               routerLink="/player/profile"
+               routerLinkActive="active"
+               class="nav-item"
+               (click)="closeMobileMenu()">
+                <span class="icon">👤</span>
+                <span class="label" *ngIf="!isCollapsed">Mi Perfil</span>
+            </a>
+
             <div class="divider" style="height: 1px; background: rgba(255,255,255,0.1); margin: 0.5rem 0;"></div>
 
             <a *ngIf="!isLoggedIn" routerLink="/login" class="nav-item" (click)="closeMobileMenu()" style="color: var(--primary);">

@@ -36,6 +36,10 @@ export class CourtService {
         return this.http.get<CourtPriceBlock[]>(`${this.apiUrl}/${courtId}/price-blocks`);
     }
 
+    copyPriceBlocks(targetCourtId: string, sourceCourtId: string): Observable<CourtPriceBlock[]> {
+        return this.http.post<CourtPriceBlock[]>(`${this.apiUrl}/${targetCourtId}/copy-price-blocks/${sourceCourtId}`, {});
+    }
+
     createPriceBlock(courtId: string, data: Partial<CourtPriceBlock>): Observable<CourtPriceBlock> {
         return this.http.post<CourtPriceBlock>(`${this.apiUrl}/${courtId}/price-blocks`, data);
     }
@@ -46,6 +50,17 @@ export class CourtService {
 
     updatePriceBlock(id: string, data: Partial<CourtPriceBlock>): Observable<CourtPriceBlock> {
         return this.http.patch<CourtPriceBlock>(`${this.apiUrl}/price-blocks/${id}`, data);
+    }
+
+    bulkUpdatePriceBlocks(
+        clubId: string,
+        matchCriteria: { startTime: string; endTime: string; daysOfWeek: number[] },
+        newValues: Partial<CourtPriceBlock>
+    ): Observable<{ updated: number }> {
+        return this.http.patch<{ updated: number }>(
+            `${this.apiUrl}/club/${clubId}/price-blocks/bulk-update`,
+            { matchCriteria, newValues }
+        );
     }
 
     deletePriceBlock(id: string): Observable<void> {
