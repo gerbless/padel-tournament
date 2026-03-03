@@ -9,6 +9,7 @@ import { PermissionsService, SIDEBAR_ITEMS, NavItem } from '../../../services/pe
 import { Club, EnabledModules, DEFAULT_ENABLED_MODULES } from '../../../models/club.model';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
+import { ConfirmService } from '../../../services/confirm.service';
 
 interface ClubUser {
     id: string;
@@ -69,6 +70,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
         private permissionsService: PermissionsService,
         private http: HttpClient,
         private router: Router,
+        private confirmService: ConfirmService,
     ) { }
 
     ngOnInit() {
@@ -214,8 +216,13 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
         });
     }
 
-    removeUserRole(ucr: ClubUser) {
-        if (!confirm(`¿Eliminar el acceso de ${ucr.user.email} a este club?`)) return;
+    async removeUserRole(ucr: ClubUser) {
+        const ok = await this.confirmService.confirm({
+            title: 'Eliminar Acceso',
+            message: `¿Eliminar el acceso de <strong>${ucr.user.email}</strong> a este club?`,
+            confirmText: 'Eliminar'
+        });
+        if (!ok) return;
         this.http.delete(
             `${environment.apiUrl}/users/${ucr.userId}/club-roles/${ucr.clubId}`
         ).subscribe({

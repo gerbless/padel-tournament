@@ -7,6 +7,7 @@ import { Court, CourtPriceBlock } from '../../../../models/court.model';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../../environments/environment';
 import { ToastService } from '../../../../services/toast.service';
+import { ConfirmService } from '../../../../services/confirm.service';
 import { AuthService } from '../../../../services/auth.service';
 import { ClubService } from '../../../../services/club.service';
 
@@ -57,6 +58,7 @@ export class CourtManagementComponent implements OnInit {
         private router: Router,
         private cdr: ChangeDetectorRef,
         private toast: ToastService,
+        private confirmService: ConfirmService,
         private authService: AuthService,
         private clubService: ClubService
     ) { }
@@ -166,8 +168,13 @@ export class CourtManagementComponent implements OnInit {
         }
     }
 
-    deleteCourt(court: Court) {
-        if (!confirm(`¿Eliminar ${court.name}? Esto eliminará todas las reservas asociadas.`)) return;
+    async deleteCourt(court: Court) {
+        const ok = await this.confirmService.confirm({
+            title: 'Eliminar Cancha',
+            message: `¿Eliminar <strong>${court.name}</strong>? Esto eliminará todas las reservas asociadas.`,
+            confirmText: 'Eliminar'
+        });
+        if (!ok) return;
         this.courtService.deleteCourt(court.id).subscribe({
             next: () => {
                 this.loadCourts();
@@ -262,8 +269,14 @@ export class CourtManagementComponent implements OnInit {
         }
     }
 
-    deletePrice(block: CourtPriceBlock) {
-        if (!block.id || !confirm('¿Eliminar este bloque de precio?')) return;
+    async deletePrice(block: CourtPriceBlock) {
+        if (!block.id) return;
+        const ok = await this.confirmService.confirm({
+            title: 'Eliminar Precio',
+            message: '¿Eliminar este bloque de precio?',
+            confirmText: 'Eliminar'
+        });
+        if (!ok) return;
         this.courtService.deletePriceBlock(block.id).subscribe({
             next: () => {
                 this.loadCourts();

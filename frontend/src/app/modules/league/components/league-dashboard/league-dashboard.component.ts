@@ -8,6 +8,7 @@ import { League, Match, MatchResult, SetScore, Pair } from '../../../../models/l
 
 import { AuthService } from '../../../../services/auth.service';
 import { ToastService } from '../../../../services/toast.service';
+import { ConfirmService } from '../../../../services/confirm.service';
 import { LeagueBracketComponent } from '../league-bracket/league-bracket.component';
 
 @Component({
@@ -53,7 +54,7 @@ export class LeagueDashboardComponent implements OnInit {
         );
 
         if (!validation.valid) {
-            alert(validation.error);
+            this.toast.warning(validation.error!);
             return;
         }
 
@@ -102,6 +103,7 @@ export class LeagueDashboardComponent implements OnInit {
 
     private cdr = inject(ChangeDetectorRef);
     private toast = inject(ToastService);
+    private confirmService = inject(ConfirmService);
 
     constructor(
         private route: ActivatedRoute,
@@ -150,7 +152,7 @@ export class LeagueDashboardComponent implements OnInit {
                 console.error('Error loading league:', err);
                 this.loading = false;
                 this.cdr.markForCheck();
-                alert('Error al cargar la liga');
+                this.toast.error('Error al cargar la liga');
                 this.router.navigate(['/leagues']);
             }
         });
@@ -455,12 +457,12 @@ export class LeagueDashboardComponent implements OnInit {
 
     openResultModal(match: Match) {
         if (this.league?.status === 'completed') {
-            alert('La liga está finalizada. No se pueden modificar los resultados.');
+            this.toast.info('La liga está finalizada. No se pueden modificar los resultados.');
             return;
         }
 
         if (match.status === 'completed') {
-            alert('Este partido ya tiene resultado registrado');
+            this.toast.info('Este partido ya tiene resultado registrado');
             return;
         }
 
@@ -557,7 +559,8 @@ export class LeagueDashboardComponent implements OnInit {
             },
             error: (err) => {
                 console.error('Error suggesting match:', err);
-                alert('No hay partidos pendientes o error al generar sugerencia');
+                this.toast.warning('No hay partidos pendientes o error al generar sugerencia');
+                this.cdr.markForCheck();
             }
         });
     }
@@ -578,17 +581,22 @@ export class LeagueDashboardComponent implements OnInit {
         return labels[status] || status;
     }
 
-    confirmCompleteLeague() {
-        if (confirm('¿Estás seguro de que deseas finalizar la liga? Esto marcará el torneo como completado y no se podrán modificar resultados.')) {
-            if (!this.league) return;
-            this.leagueService.completeLeague(this.league.id).subscribe({
-                next: () => {
-                    this.loadLeague(this.league!.id);
-                    this.toast.success('¡Liga finalizada! Felicidades a los campeones 🏆');
-                },
-                error: () => this.toast.error('Error al finalizar la liga')
-            });
-        }
+    async confirmCompleteLeague() {
+        const ok = await this.confirmService.confirm({
+            title: 'Finalizar Liga',
+            message: '¿Estás seguro de que deseas finalizar la liga? Esto marcará el torneo como completado y <strong>no se podrán modificar resultados</strong>.',
+            confirmText: 'Finalizar Liga',
+            confirmClass: 'btn-warning'
+        });
+        if (!ok || !this.league) return;
+
+        this.leagueService.completeLeague(this.league.id).subscribe({
+            next: () => {
+                this.loadLeague(this.league!.id);
+                this.toast.success('¡Liga finalizada! Felicidades a los campeones 🏆');
+            },
+            error: () => this.toast.error('Error al finalizar la liga')
+        });
     }
 
     get hasTies(): boolean {
@@ -616,8 +624,14 @@ export class LeagueDashboardComponent implements OnInit {
         return false;
     }
 
-    generateTieBreaker() {
-        if (!confirm('Se han detectado empates en los primeros lugares. ¿Deseas generar partidos de desempate?')) return;
+    async generateTieBreaker() {
+        const ok = await this.confirmService.confirm({
+            title: 'Partidos de Desempate',
+            message: 'Se han detectado empates en los primeros lugares. ¿Deseas generar partidos de desempate?',
+            confirmText: 'Generar',
+            confirmClass: 'btn-primary'
+        });
+        if (!ok) return;
 
         this.leagueService.generateTieBreaker(this.league!.id).subscribe({
             next: () => {

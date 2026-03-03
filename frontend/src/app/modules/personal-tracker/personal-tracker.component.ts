@@ -4,6 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { StatsDashboardComponent } from './components/stats-dashboard/stats-dashboard.component';
 import { PersonalTrackerService, PersonalMatch } from '../../services/personal-tracker.service';
 import { ToastService } from '../../services/toast.service';
+import { ConfirmService } from '../../services/confirm.service';
 
 @Component({
     selector: 'app-personal-tracker',
@@ -21,7 +22,8 @@ export class PersonalTrackerComponent implements OnInit {
         private trackerService: PersonalTrackerService,
         private router: Router,
         private cdr: ChangeDetectorRef,
-        private toast: ToastService
+        private toast: ToastService,
+        private confirmService: ConfirmService
     ) { }
 
     ngOnInit() {
@@ -48,13 +50,18 @@ export class PersonalTrackerComponent implements OnInit {
         this.router.navigate(['/personal-tracker/edit', matchId]);
     }
 
-    deleteMatch(matchId: string) {
-        if (confirm('¿Estás seguro de eliminar este partido?')) {
-            this.trackerService.deleteMatch(matchId).subscribe({
-                next: () => { this.loadInProgressMatches(); this.toast.success('Partido eliminado'); },
-                error: () => this.toast.error('Error al eliminar el partido')
-            });
-        }
+    async deleteMatch(matchId: string) {
+        const ok = await this.confirmService.confirm({
+            title: 'Eliminar Partido',
+            message: '¿Estás seguro de eliminar este partido?',
+            confirmText: 'Eliminar'
+        });
+        if (!ok) return;
+
+        this.trackerService.deleteMatch(matchId).subscribe({
+            next: () => { this.loadInProgressMatches(); this.toast.success('Partido eliminado'); },
+            error: () => this.toast.error('Error al eliminar el partido')
+        });
     }
 
     getStatusLabel(status?: string): string {

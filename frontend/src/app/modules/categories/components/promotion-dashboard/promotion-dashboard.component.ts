@@ -4,6 +4,7 @@ import { CategoryService } from '../../services/category.service';
 import { PlayerService } from '../../../../services/player.service';
 import { AuthService } from '../../../../services/auth.service';
 import { ToastService } from '../../../../services/toast.service';
+import { ConfirmService } from '../../../../services/confirm.service';
 import { ClubService } from '../../../../services/club.service';
 
 @Component({
@@ -25,6 +26,7 @@ export class PromotionDashboardComponent implements OnInit {
         private playerService: PlayerService,
         private cdr: ChangeDetectorRef,
         private toast: ToastService,
+        private confirmService: ConfirmService,
         private authService: AuthService,
         private clubService: ClubService
     ) { }
@@ -47,8 +49,14 @@ export class PromotionDashboardComponent implements OnInit {
         });
     }
 
-    applyChange(item: any, type: 'promotion' | 'relegation') {
-        if (!confirm(`¿Aplicar cambio de categoría para ${item.player}?`)) return;
+    async applyChange(item: any, type: 'promotion' | 'relegation') {
+        const ok = await this.confirmService.confirm({
+            title: 'Cambio de Categoría',
+            message: `¿Aplicar cambio de categoría para <strong>${item.player}</strong>?`,
+            confirmText: 'Aplicar',
+            confirmClass: 'btn-primary'
+        });
+        if (!ok) return;
 
         if (!item.playerId || !item.suggestedCategoryId) {
             console.error('Missing playerId or suggestedCategoryId in analysis item');

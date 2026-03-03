@@ -5,6 +5,7 @@ import { TournamentService, Tournament } from '../../services/tournament.service
 import { ClubService } from '../../services/club.service';
 import { Subscription } from 'rxjs';
 import { ToastService } from '../../services/toast.service';
+import { ConfirmService } from '../../services/confirm.service';
 
 import { AuthService } from '../../services/auth.service';
 
@@ -39,7 +40,8 @@ export class TournamentListComponent implements OnInit, OnDestroy {
         private clubService: ClubService,
         private authService: AuthService,
         private cdr: ChangeDetectorRef,
-        private toast: ToastService
+        private toast: ToastService,
+        private confirmService: ConfirmService
     ) {
         const now = new Date();
         this.selectedMonth = now.getMonth() + 1;
@@ -152,15 +154,20 @@ export class TournamentListComponent implements OnInit, OnDestroy {
         }
     }
 
-    deleteTournament(id: string, event: Event) {
+    async deleteTournament(id: string, event: Event) {
         event.preventDefault();
         event.stopPropagation();
 
-        if (confirm('¿Estás seguro de eliminar este torneo?')) {
-            this.tournamentService.deleteTournament(id).subscribe({
-                next: () => { this.loadTournaments(); this.toast.success('Torneo eliminado'); },
-                error: () => this.toast.error('Error al eliminar el torneo')
-            });
-        }
+        const ok = await this.confirmService.confirm({
+            title: 'Eliminar Torneo',
+            message: '¿Estás seguro de eliminar este torneo?',
+            confirmText: 'Eliminar'
+        });
+        if (!ok) return;
+
+        this.tournamentService.deleteTournament(id).subscribe({
+            next: () => { this.loadTournaments(); this.toast.success('Torneo eliminado'); },
+            error: () => this.toast.error('Error al eliminar el torneo')
+        });
     }
 }

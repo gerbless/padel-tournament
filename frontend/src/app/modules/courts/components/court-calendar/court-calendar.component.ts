@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { CourtService } from '../../../../services/court.service';
 import { Court, Reservation } from '../../../../models/court.model';
 import { ToastService } from '../../../../services/toast.service';
+import { ConfirmService } from '../../../../services/confirm.service';
 import { AuthService } from '../../../../services/auth.service';
 import { environment } from '../../../../../environments/environment';
 import { PlayerSelectComponent } from '../../../../components/player-select/player-select.component';
@@ -67,6 +68,7 @@ export class CourtCalendarComponent implements OnInit {
         private courtService: CourtService,
         private http: HttpClient,
         private toast: ToastService,
+        private confirmService: ConfirmService,
         private authService: AuthService,
         private cdr: ChangeDetectorRef
     ) {
@@ -394,9 +396,15 @@ export class CourtCalendarComponent implements OnInit {
         }
     }
 
-    cancelReservation() {
+    async cancelReservation() {
         if (!this.editingReservation) return;
-        if (!confirm('¿Cancelar esta reserva?')) return;
+        const ok = await this.confirmService.confirm({
+            title: 'Cancelar Reserva',
+            message: '¿Cancelar esta reserva?',
+            confirmText: 'Cancelar Reserva',
+            confirmClass: 'btn-warning'
+        });
+        if (!ok) return;
         this.courtService.cancelReservation(this.editingReservation.id).subscribe({
             next: () => {
                 this.showModal = false;

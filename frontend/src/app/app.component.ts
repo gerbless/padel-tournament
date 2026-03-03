@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SidebarComponent } from './components/layout/sidebar/sidebar.component';
 import { ToastComponent } from './components/toast/toast.component';
+import { ConfirmModalComponent } from './components/confirm-modal/confirm-modal.component';
 import { LayoutService } from './services/layout.service';
 import { ThemeService } from './services/theme.service';
 import { filter } from 'rxjs/operators';
@@ -11,7 +12,7 @@ import { filter } from 'rxjs/operators';
 @Component({
     selector: 'app-root',
     standalone: true,
-    imports: [RouterOutlet, CommonModule, SidebarComponent, ToastComponent],
+    imports: [RouterOutlet, CommonModule, SidebarComponent, ToastComponent, ConfirmModalComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
     <div class="app-layout">
@@ -32,6 +33,7 @@ import { filter } from 'rxjs/operators';
             <span *ngIf="themeService.darkMode()">☀️</span>
         </button>
         <app-toast></app-toast>
+        <app-confirm-modal></app-confirm-modal>
     </div>
     `,
     styles: [`

@@ -5,6 +5,7 @@ import { CategoryService } from '../../services/category.service';
 import { Category } from '../../models/category.model';
 import { AuthService } from '../../../../services/auth.service';
 import { ToastService } from '../../../../services/toast.service';
+import { ConfirmService } from '../../../../services/confirm.service';
 import { ClubService } from '../../../../services/club.service';
 
 @Component({
@@ -28,6 +29,7 @@ export class CategoryListComponent implements OnInit {
         private fb: FormBuilder,
         private cdr: ChangeDetectorRef,
         private toast: ToastService,
+        private confirmService: ConfirmService,
         private authService: AuthService,
         private clubService: ClubService
     ) {
@@ -79,13 +81,18 @@ export class CategoryListComponent implements OnInit {
         this.categoryForm.patchValue(category);
     }
 
-    delete(id: string) {
-        if (confirm('¿Seguro que deseas eliminar esta categoría?')) {
-            this.categoryService.delete(id).subscribe({
-                next: () => { this.loadCategories(); this.toast.success('Categoría eliminada'); },
-                error: () => this.toast.error('Error al eliminar la categoría')
-            });
-        }
+    async delete(id: string) {
+        const ok = await this.confirmService.confirm({
+            title: 'Eliminar Categoría',
+            message: '¿Seguro que deseas eliminar esta categoría?',
+            confirmText: 'Eliminar'
+        });
+        if (!ok) return;
+
+        this.categoryService.delete(id).subscribe({
+            next: () => { this.loadCategories(); this.toast.success('Categoría eliminada'); },
+            error: () => this.toast.error('Error al eliminar la categoría')
+        });
     }
 
     resetForm() {

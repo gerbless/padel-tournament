@@ -141,7 +141,7 @@ export class LeagueCreateComponent implements OnInit {
 
     addManualPair(playerAId: string, playerBId: string) {
         if (playerAId === playerBId) {
-            alert('No puedes emparejar un jugador consigo mismo');
+            this.toast.warning('No puedes emparejar un jugador consigo mismo');
             return;
         }
         this.pairs.push({ playerA: playerAId, playerB: playerBId });
@@ -181,33 +181,33 @@ export class LeagueCreateComponent implements OnInit {
         switch (this.currentStep) {
             case 1:
                 if (!this.leagueName || !this.leagueType) {
-                    alert('Por favor completa el nombre y tipo de liga');
+                    this.toast.warning('Por favor completa el nombre y tipo de liga');
                     return false;
                 }
                 return true;
             case 2:
                 if (!this.startDate) {
-                    alert('Por favor selecciona una fecha de inicio');
+                    this.toast.warning('Por favor selecciona una fecha de inicio');
                     return false;
                 }
                 return true;
             case 3:
                 if (this.selectedPlayerIds.length < 4) {
-                    alert('Selecciona al menos 4 jugadores (2 parejas)');
+                    this.toast.warning('Selecciona al menos 4 jugadores (2 parejas)');
                     return false;
                 }
                 if (this.selectedPlayerIds.length % 2 !== 0) {
-                    alert('Debes seleccionar un número par de jugadores');
+                    this.toast.warning('Debes seleccionar un número par de jugadores');
                     return false;
                 }
                 return true;
             case 4:
                 if (this.pairs.length < 2) {
-                    alert('Debes formar al menos 2 parejas');
+                    this.toast.warning('Debes formar al menos 2 parejas');
                     return false;
                 }
                 if (this.availableForPairing.length > 0) {
-                    alert('Todos los jugadores deben estar en una pareja. Quedan ' + this.availableForPairing.length + ' jugadores sin emparejar.');
+                    this.toast.warning('Todos los jugadores deben estar en una pareja. Quedan ' + this.availableForPairing.length + ' jugadores sin emparejar.');
                     return false;
                 }
                 return true;
