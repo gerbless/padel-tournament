@@ -65,6 +65,10 @@ export const routes: Routes = [
         loadComponent: () => import('./components/register/register.component').then(m => m.RegisterComponent)
     },
     {
+        path: 'verify-email',
+        loadComponent: () => import('./components/verify-email/verify-email.component').then(m => m.VerifyEmailComponent)
+    },
+    {
         path: 'player/booking',
         loadComponent: () => import('./modules/player-portal/player-booking/player-booking.component').then(m => m.PlayerBookingComponent)
     },

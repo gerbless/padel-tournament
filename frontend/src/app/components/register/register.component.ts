@@ -28,6 +28,8 @@ export class RegisterComponent {
 
     error = '';
     loading = false;
+    registrationSuccess = false;
+    successMessage = '';
 
     clubId: string | null = null;
     clubName: string | null = null;
@@ -104,27 +106,28 @@ export class RegisterComponent {
 
         this.http.post<any>(`${environment.apiUrl}/auth/register`, body).subscribe({
             next: (response) => {
-                if (response.access_token) {
-                    localStorage.setItem('token', response.access_token);
-                    const user = {
-                        id: response.user.id,
-                        username: response.user.username,
-                        role: response.user.role,
-                        playerId: response.user.playerId,
-                        clubRoles: response.user.clubRoles || [],
-                    };
-                    localStorage.setItem('currentUser', JSON.stringify(user));
-                    // Reload auth state from storage
-                    this.authService.refreshProfile().subscribe();
-                }
                 this.loading = false;
-                this.toast.success('¡Registro exitoso! Bienvenido');
+                this.registrationSuccess = true;
+                this.successMessage = response.message || 'Te enviamos un email de verificación. Revisa tu bandeja de entrada para activar tu cuenta.';
                 this.cdr.markForCheck();
-                this.router.navigate(['/player/booking']);
             },
             error: (err) => {
                 this.loading = false;
                 this.error = err.error?.message || 'Error al registrarse';
+                this.cdr.markForCheck();
+            }
+        });
+    }
+
+    resendVerification() {
+        if (!this.email) return;
+        this.http.post<any>(`${environment.apiUrl}/auth/resend-verification`, { email: this.email }).subscribe({
+            next: (res) => {
+                this.toast.success(res.message || 'Email de verificación reenviado');
+                this.cdr.markForCheck();
+            },
+            error: () => {
+                this.toast.error('Error al reenviar el email');
                 this.cdr.markForCheck();
             }
         });

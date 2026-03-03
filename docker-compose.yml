@@ -36,6 +36,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-cambiar-este-secreto-en-produccion}
       PORT: 3000
       NODE_ENV: production
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      APP_URL: ${APP_URL:-http://localhost}
     ports:
       - "3000:3000"
     depends_on:

@@ -76,3 +76,19 @@ label {
     font-size: 0.875rem;
     text-align: center;
 }
+
+.resend-btn {
+    display: block;
+    margin: 0.75rem auto 0;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--primary);
+    padding: 0.4rem 1rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.resend-btn:hover {
+    background: var(--bg-primary);
+}

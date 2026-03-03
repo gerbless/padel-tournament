@@ -76,6 +76,7 @@ export class UsersService {
      * Link an existing user to an existing player
      */
     async linkUserToPlayer(userId: string, playerId: string): Promise<User> {
+
         const user = await this.usersRepository.findOne({ where: { id: userId } });
         if (!user) {
             throw new NotFoundException('Usuario no encontrado');
@@ -89,6 +90,27 @@ export class UsersService {
         user.player = player;
         const saved = await this.usersRepository.save(user);
         return this.sanitizeUser(saved);
+    }
+
+    // ─── Email Verification ──────────────────────────────────
+
+    async findByVerificationToken(token: string): Promise<User | undefined> {
+        return this.usersRepository.findOne({
+            where: { emailVerificationToken: token },
+        });
+    }
+
+    async markEmailVerified(userId: string): Promise<void> {
+        await this.usersRepository.update(userId, {
+            isEmailVerified: true,
+            emailVerificationToken: null,
+        });
+    }
+
+    async updateVerificationToken(userId: string, token: string): Promise<void> {
+        await this.usersRepository.update(userId, {
+            emailVerificationToken: token,
+        });
     }
 
     // ─── Club Role Management ─────────────────────────────────

@@ -12,6 +12,7 @@ import { CourtsModule } from './courts/courts.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PersonalTrackerModule } from './personal-tracker/personal-tracker.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
     imports: [
@@ -43,6 +44,7 @@ import { PersonalTrackerModule } from './personal-tracker/personal-tracker.modul
         AuthModule,
         UsersModule,
         PersonalTrackerModule,
+        EmailModule,
     ],
 })
 export class AppModule { }

@@ -20,6 +20,9 @@
 
             <div *ngIf="error" class="error-message">
                 {{ error }}
+                <button *ngIf="showResend" class="resend-btn" (click)="resendVerification()">
+                    Reenviar email de verificación
+                </button>
             </div>
 
             <button type="submit" class="btn btn-primary btn-block" [disabled]="loading">

@@ -110,3 +110,47 @@ label {
     text-decoration: none;
     font-weight: 500;
 }
+
+/* Verification sent state */
+.verification-sent {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.verification-sent .icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.verification-sent h2 {
+    margin-bottom: 0.5rem;
+    font-size: 1.4rem;
+}
+
+.verification-sent .success-msg {
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.verification-sent .hint {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.7;
+}
+
+.btn-secondary {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 0.6rem 1.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    width: 100%;
+}
+
+.btn-secondary:hover {
+    background: var(--border);
+}

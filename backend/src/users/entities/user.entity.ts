@@ -17,6 +17,12 @@ export class User {
     @Column({ default: 'user' })
     role: string;
 
+    @Column({ default: false })
+    isEmailVerified: boolean;
+
+    @Column({ nullable: true })
+    emailVerificationToken: string;
+
     @OneToOne(() => Player, { nullable: true })
     @JoinColumn()
     player: Player;
