@@ -68,6 +68,8 @@ export interface CourtBilling {
     paidRevenue: number;
     partialRevenue: number;
     pendingRevenue: number;
+    collectedRevenue: number;
+    owedRevenue: number;
 }
 
 export interface BillingTotals {
@@ -79,6 +81,8 @@ export interface BillingTotals {
     paidRevenue: number;
     partialRevenue: number;
     pendingRevenue: number;
+    collectedRevenue: number;
+    owedRevenue: number;
 }
 
 export interface MonthlyTrend {

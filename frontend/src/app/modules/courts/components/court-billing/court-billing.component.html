@@ -46,7 +46,7 @@
             <div class="kpi-card kpi-paid">
                 <div class="kpi-icon">✅</div>
                 <div class="kpi-content">
-                    <span class="kpi-value">{{ formatCurrency(totals.paidRevenue) }}</span>
+                    <span class="kpi-value">{{ formatCurrency(totals.collectedRevenue) }}</span>
                     <span class="kpi-label">Cobrado</span>
                 </div>
                 <div class="kpi-sub">{{ formatNumber(totals.paidCount) }} pagadas</div>
@@ -55,10 +55,10 @@
             <div class="kpi-card kpi-pending">
                 <div class="kpi-icon">⏳</div>
                 <div class="kpi-content">
-                    <span class="kpi-value">{{ formatCurrency(totals.pendingRevenue) }}</span>
+                    <span class="kpi-value">{{ formatCurrency(totals.owedRevenue) }}</span>
                     <span class="kpi-label">Por Cobrar</span>
                 </div>
-                <div class="kpi-sub">{{ formatNumber(totals.pendingCount) }} pendientes</div>
+                <div class="kpi-sub">{{ formatNumber(totals.pendingCount + totals.partialCount) }} pendientes</div>
             </div>
 
             <div class="kpi-card kpi-rate">
@@ -191,7 +191,7 @@
                             <th class="th-right">Facturado</th>
                             <th class="th-right">Cobrado</th>
                             <th class="th-right">Por Cobrar</th>
-                            <th class="th-right">% del Total</th>
+                            <th class="th-right">% Cobrado</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -205,12 +205,12 @@
                             <td class="td-right td-partial">{{ court.partialCount }}</td>
                             <td class="td-right td-pending">{{ court.pendingCount }}</td>
                             <td class="td-right td-revenue">{{ formatCurrency(court.totalRevenue) }}</td>
-                            <td class="td-right td-paid-amount">{{ formatCurrency(court.paidRevenue) }}</td>
-                            <td class="td-right td-owed">{{ formatCurrency(court.pendingRevenue + court.partialRevenue) }}</td>
+                            <td class="td-right td-paid-amount">{{ formatCurrency(court.collectedRevenue) }}</td>
+                            <td class="td-right td-owed">{{ formatCurrency(court.owedRevenue) }}</td>
                             <td class="td-right">
                                 <div class="share-bar">
-                                    <div class="share-fill" [style.width]="getCourtRevenuePercent(court) + '%'"></div>
-                                    <span>{{ getCourtRevenuePercent(court) }}%</span>
+                                    <div class="share-fill" [style.width]="getCourtCollectionRate(court) + '%'"></div>
+                                    <span>{{ getCourtCollectionRate(court) }}%</span>
                                 </div>
                             </td>
                         </tr>
@@ -223,9 +223,9 @@
                             <td class="td-right td-partial"><strong>{{ totals.partialCount }}</strong></td>
                             <td class="td-right td-pending"><strong>{{ totals.pendingCount }}</strong></td>
                             <td class="td-right td-revenue"><strong>{{ formatCurrency(totals.totalRevenue) }}</strong></td>
-                            <td class="td-right td-paid-amount"><strong>{{ formatCurrency(totals.paidRevenue) }}</strong></td>
-                            <td class="td-right td-owed"><strong>{{ formatCurrency(totals.pendingRevenue + totals.partialRevenue) }}</strong></td>
-                            <td class="td-right"><strong>100%</strong></td>
+                            <td class="td-right td-paid-amount"><strong>{{ formatCurrency(totals.collectedRevenue) }}</strong></td>
+                            <td class="td-right td-owed"><strong>{{ formatCurrency(totals.owedRevenue) }}</strong></td>
+                            <td class="td-right"><strong>{{ getCollectionRate() }}%</strong></td>
                         </tr>
                     </tfoot>
                 </table>

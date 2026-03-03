@@ -28,7 +28,8 @@ export class CourtBillingComponent implements OnInit {
     courts: CourtBilling[] = [];
     totals: BillingTotals = {
         totalReservations: 0, paidCount: 0, partialCount: 0, pendingCount: 0,
-        totalRevenue: 0, paidRevenue: 0, partialRevenue: 0, pendingRevenue: 0
+        totalRevenue: 0, paidRevenue: 0, partialRevenue: 0, pendingRevenue: 0,
+        collectedRevenue: 0, owedRevenue: 0
     };
     monthlyTrend: MonthlyTrend[] = [];
     chartMaxRevenue = 0;
@@ -79,7 +80,9 @@ export class CourtBillingComponent implements OnInit {
                     totalRevenue: +c.totalRevenue,
                     paidRevenue: +c.paidRevenue,
                     partialRevenue: +c.partialRevenue,
-                    pendingRevenue: +c.pendingRevenue
+                    pendingRevenue: +c.pendingRevenue,
+                    collectedRevenue: +(c as any).collectedRevenue || 0,
+                    owedRevenue: +(c as any).owedRevenue || 0
                 }));
                 this.totals = {
                     totalReservations: +data.totals.totalReservations || 0,
@@ -89,7 +92,9 @@ export class CourtBillingComponent implements OnInit {
                     totalRevenue: +data.totals.totalRevenue || 0,
                     paidRevenue: +data.totals.paidRevenue || 0,
                     partialRevenue: +data.totals.partialRevenue || 0,
-                    pendingRevenue: +data.totals.pendingRevenue || 0
+                    pendingRevenue: +data.totals.pendingRevenue || 0,
+                    collectedRevenue: +(data.totals as any).collectedRevenue || 0,
+                    owedRevenue: +(data.totals as any).owedRevenue || 0
                 };
                 this.monthlyTrend = data.monthlyTrend.map(m => ({
                     ...m,
@@ -136,7 +141,7 @@ export class CourtBillingComponent implements OnInit {
 
     getCollectionRate(): number {
         if (!this.totals.totalRevenue) return 0;
-        return Math.round((this.totals.paidRevenue / this.totals.totalRevenue) * 100);
+        return Math.round((this.totals.collectedRevenue / this.totals.totalRevenue) * 100);
     }
 
     getBarHeight(value: number): string {
@@ -159,9 +164,9 @@ export class CourtBillingComponent implements OnInit {
         });
     }
 
-    getCourtRevenuePercent(court: CourtBilling): number {
-        if (!this.totals.totalRevenue) return 0;
-        return Math.round((court.totalRevenue / this.totals.totalRevenue) * 100);
+    getCourtCollectionRate(court: CourtBilling): number {
+        if (!court.totalRevenue) return 0;
+        return Math.round((court.collectedRevenue / court.totalRevenue) * 100);
     }
 
     getPeriodLabel(): string {

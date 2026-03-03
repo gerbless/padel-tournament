@@ -242,10 +242,25 @@ export class CourtsService {
     async getRevenue(clubId: string, year: number, month?: number): Promise<any> {
         const qb = this.reservationRepository
             .createQueryBuilder('r')
-            .select('COALESCE(SUM(CAST(r.finalPrice AS numeric)), 0)', 'totalRevenue')
+            .select(`COALESCE(SUM(
+                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                     THEN (SELECT COALESCE(SUM((pp->>'amount')::numeric), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                     ELSE CAST(r.finalPrice AS numeric)
+                END
+            ), 0)`, 'totalRevenue')
             .addSelect('COUNT(r.id)', 'totalReservations')
-            .addSelect("COALESCE(SUM(CASE WHEN r.paymentStatus = 'paid' THEN CAST(r.finalPrice AS numeric) ELSE 0 END), 0)", 'paidRevenue')
-            .addSelect("COALESCE(SUM(CASE WHEN r.paymentStatus = 'pending' THEN CAST(r.finalPrice AS numeric) ELSE 0 END), 0)", 'pendingRevenue')
+            .addSelect(`COALESCE(SUM(
+                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                     THEN (SELECT COALESCE(SUM(CASE WHEN (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                     ELSE CASE WHEN r.paymentStatus = 'paid' THEN CAST(r.finalPrice AS numeric) ELSE 0 END
+                END
+            ), 0)`, 'paidRevenue')
+            .addSelect(`COALESCE(SUM(
+                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                     THEN (SELECT COALESCE(SUM(CASE WHEN NOT (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                     ELSE CASE WHEN r.paymentStatus IN ('pending', 'partial') THEN CAST(r.finalPrice AS numeric) ELSE 0 END
+                END
+            ), 0)`, 'pendingRevenue')
             .where('r.clubId = :clubId', { clubId })
             .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
             .andWhere("EXTRACT(YEAR FROM r.date::date) = :year", { year });
@@ -261,9 +276,19 @@ export class CourtsService {
         return this.reservationRepository
             .createQueryBuilder('r')
             .select("EXTRACT(MONTH FROM r.date::date)", 'month')
-            .addSelect('COALESCE(SUM(CAST(r.finalPrice AS numeric)), 0)', 'totalRevenue')
+            .addSelect(`COALESCE(SUM(
+                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                     THEN (SELECT COALESCE(SUM((pp->>'amount')::numeric), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                     ELSE CAST(r.finalPrice AS numeric)
+                END
+            ), 0)`, 'totalRevenue')
             .addSelect('COUNT(r.id)', 'totalReservations')
-            .addSelect("COALESCE(SUM(CASE WHEN r.paymentStatus = 'paid' THEN CAST(r.finalPrice AS numeric) ELSE 0 END), 0)", 'paidRevenue')
+            .addSelect(`COALESCE(SUM(
+                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                     THEN (SELECT COALESCE(SUM(CASE WHEN (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                     ELSE CASE WHEN r.paymentStatus = 'paid' THEN CAST(r.finalPrice AS numeric) ELSE 0 END
+                END
+            ), 0)`, 'paidRevenue')
             .where('r.clubId = :clubId', { clubId })
             .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
             .andWhere("EXTRACT(YEAR FROM r.date::date) = :year", { year })
@@ -277,6 +302,32 @@ export class CourtsService {
             ? `EXTRACT(YEAR FROM r."date"::date) = ${year} AND EXTRACT(MONTH FROM r."date"::date) = ${month}`
             : `EXTRACT(YEAR FROM r."date"::date) = ${year}`;
 
+        /**
+         * Revenue helpers (handle per-player payments via playerPayments JSONB).
+         * - totalRevenue: sum of all player amounts (or finalPrice for non per-player)
+         * - paidRevenue / partialRevenue / pendingRevenue: grouped by reservation paymentStatus (for donuts)
+         * - collectedRevenue: actual money collected (paid playerPayments + fully-paid finalPrice)
+         * - owedRevenue:      actual money still owed  (unpaid playerPayments + pending/partial finalPrice)
+         */
+        const ppTotal = `(SELECT COALESCE(SUM((pp->>'amount')::numeric), 0) FROM jsonb_array_elements(r."playerPayments") pp)`;
+        const ppPaid  = `(SELECT COALESCE(SUM(CASE WHEN (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r."playerPayments") pp)`;
+        const ppOwed  = `(SELECT COALESCE(SUM(CASE WHEN NOT (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r."playerPayments") pp)`;
+        const hasPP   = `r."playerPayments" IS NOT NULL AND jsonb_array_length(r."playerPayments") > 0`;
+        const fp      = `CAST(r."finalPrice" AS numeric)`;
+
+        const revenueColumns = `
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN ${ppTotal} ELSE ${fp} END), 0) AS "totalRevenue",
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN CASE WHEN r."paymentStatus" = 'paid' THEN ${ppTotal} ELSE 0 END
+                                                   ELSE CASE WHEN r."paymentStatus" = 'paid' THEN ${fp} ELSE 0 END END), 0) AS "paidRevenue",
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN CASE WHEN r."paymentStatus" = 'partial' THEN ${ppTotal} ELSE 0 END
+                                                   ELSE CASE WHEN r."paymentStatus" = 'partial' THEN ${fp} ELSE 0 END END), 0) AS "partialRevenue",
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN CASE WHEN r."paymentStatus" = 'pending' THEN ${ppTotal} ELSE 0 END
+                                                   ELSE CASE WHEN r."paymentStatus" = 'pending' THEN ${fp} ELSE 0 END END), 0) AS "pendingRevenue",
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN ${ppPaid}
+                                                   ELSE CASE WHEN r."paymentStatus" = 'paid' THEN ${fp} ELSE 0 END END), 0) AS "collectedRevenue",
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN ${ppOwed}
+                                                   ELSE CASE WHEN r."paymentStatus" IN ('pending','partial') THEN ${fp} ELSE 0 END END), 0) AS "owedRevenue"`;
+
         // Per-court breakdown
         const perCourt = await this.reservationRepository.query(`
             SELECT
@@ -287,10 +338,7 @@ export class CourtsService {
                 COUNT(CASE WHEN r."paymentStatus" = 'paid' THEN 1 END) AS "paidCount",
                 COUNT(CASE WHEN r."paymentStatus" = 'partial' THEN 1 END) AS "partialCount",
                 COUNT(CASE WHEN r."paymentStatus" = 'pending' THEN 1 END) AS "pendingCount",
-                COALESCE(SUM(CAST(r."finalPrice" AS numeric)), 0) AS "totalRevenue",
-                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'paid' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "paidRevenue",
-                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'partial' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "partialRevenue",
-                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'pending' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "pendingRevenue"
+                ${revenueColumns}
             FROM "courts" c
             LEFT JOIN "reservations" r ON r."courtId" = c."id"
                 AND r."status" != 'cancelled'
@@ -307,10 +355,7 @@ export class CourtsService {
                 COUNT(CASE WHEN r."paymentStatus" = 'paid' THEN 1 END) AS "paidCount",
                 COUNT(CASE WHEN r."paymentStatus" = 'partial' THEN 1 END) AS "partialCount",
                 COUNT(CASE WHEN r."paymentStatus" = 'pending' THEN 1 END) AS "pendingCount",
-                COALESCE(SUM(CAST(r."finalPrice" AS numeric)), 0) AS "totalRevenue",
-                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'paid' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "paidRevenue",
-                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'partial' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "partialRevenue",
-                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'pending' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "pendingRevenue"
+                ${revenueColumns}
             FROM "reservations" r
             JOIN "courts" c ON r."courtId" = c."id"
             WHERE c."clubId" = $1
@@ -319,13 +364,19 @@ export class CourtsService {
         `, [clubId]);
 
         // Monthly trend for the year
+        const monthlyRevenueColumns = `
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN ${ppTotal} ELSE ${fp} END), 0) AS "totalRevenue",
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN ${ppPaid}
+                                                   ELSE CASE WHEN r."paymentStatus" = 'paid' THEN ${fp} ELSE 0 END END), 0) AS "paidRevenue",
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN ${ppOwed}
+                                                   ELSE CASE WHEN r."paymentStatus" IN ('pending','partial') THEN ${fp} ELSE 0 END END), 0) AS "pendingRevenue",
+                COALESCE(SUM(CASE WHEN ${hasPP} THEN CASE WHEN r."paymentStatus" = 'partial' THEN ${ppTotal} ELSE 0 END
+                                                   ELSE CASE WHEN r."paymentStatus" = 'partial' THEN ${fp} ELSE 0 END END), 0) AS "partialRevenue"`;
+
         const monthlyTrend = await this.reservationRepository.query(`
             SELECT
                 EXTRACT(MONTH FROM r."date"::date) AS "month",
-                COALESCE(SUM(CAST(r."finalPrice" AS numeric)), 0) AS "totalRevenue",
-                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'paid' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "paidRevenue",
-                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'pending' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "pendingRevenue",
-                COALESCE(SUM(CASE WHEN r."paymentStatus" = 'partial' THEN CAST(r."finalPrice" AS numeric) ELSE 0 END), 0) AS "partialRevenue",
+                ${monthlyRevenueColumns},
                 COUNT(r."id") AS "totalReservations"
             FROM "reservations" r
             JOIN "courts" c ON r."courtId" = c."id"
