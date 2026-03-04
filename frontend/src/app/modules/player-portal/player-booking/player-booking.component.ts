@@ -8,6 +8,7 @@ import { ClubService } from '../../../services/club.service';
 import { AuthService } from '../../../services/auth.service';
 import { ToastService } from '../../../services/toast.service';
 import { ConfirmService } from '../../../services/confirm.service';
+import { PaymentService } from '../../../services/payment.service';
 
 interface CourtSlot {
     startTime: string;
@@ -43,12 +44,15 @@ export class PlayerBookingComponent implements OnInit {
 
     selectedSlot: { court: CourtAvailability; slot: CourtSlot } | null = null;
 
+    mpConfigured = false;
+
     constructor(
         private http: HttpClient,
         private clubService: ClubService,
         private authService: AuthService,
         private toast: ToastService,
         private confirmService: ConfirmService,
+        private paymentService: PaymentService,
         private cdr: ChangeDetectorRef
     ) {
         // Default to today
@@ -63,6 +67,15 @@ export class PlayerBookingComponent implements OnInit {
                 this.clubName = club.name;
                 this.loadSlots();
             }
+        });
+
+        // Check if MP is configured
+        this.paymentService.getConfig().subscribe({
+            next: (config) => {
+                this.mpConfigured = config.configured;
+                this.cdr.markForCheck();
+            },
+            error: () => { /* MP not available */ }
         });
     }
 
@@ -108,10 +121,12 @@ export class PlayerBookingComponent implements OnInit {
         }
 
         const { court, slot } = this.selectedSlot;
+
+        const payLabel = this.mpConfigured ? '<br><br>Serás redirigido a <strong>Mercado Pago</strong> para completar el pago.' : '';
         const ok = await this.confirmService.confirm({
             title: 'Confirmar Reserva',
-            message: `¿Reservar <strong>${court.courtName}</strong> el <strong>${this.formatDate(this.selectedDate)}</strong> de <strong>${slot.startTime} a ${slot.endTime}</strong>?<br><br>Precio: <strong>${this.formatPrice(slot.priceFullCourt)}</strong>`,
-            confirmText: 'Reservar',
+            message: `¿Reservar <strong>${court.courtName}</strong> el <strong>${this.formatDate(this.selectedDate)}</strong> de <strong>${slot.startTime} a ${slot.endTime}</strong>?<br><br>Precio: <strong>${this.formatPrice(slot.priceFullCourt)}</strong>${payLabel}`,
+            confirmText: this.mpConfigured ? 'Reservar y Pagar' : 'Reservar',
             confirmClass: 'btn-primary'
         });
 
@@ -120,18 +135,38 @@ export class PlayerBookingComponent implements OnInit {
         this.booking = true;
         this.cdr.markForCheck();
 
-        this.http.post(`${environment.apiUrl}/courts/player-booking`, {
+        this.http.post<any>(`${environment.apiUrl}/courts/player-booking`, {
             courtId: court.courtId,
             clubId: this.clubId,
             date: this.selectedDate,
             startTime: slot.startTime,
             endTime: slot.endTime,
         }).subscribe({
-            next: () => {
-                this.booking = false;
-                this.toast.success('¡Reserva confirmada!');
-                this.selectedSlot = null;
-                this.loadSlots(); // Refresh availability
+            next: (reservation) => {
+                if (this.mpConfigured && reservation?.id) {
+                    // Create MP preference and redirect
+                    this.paymentService.createPreference(reservation.id).subscribe({
+                        next: (pref) => {
+                            this.booking = false;
+                            this.toast.success('Reserva creada. Redirigiendo al pago...');
+                            this.cdr.markForCheck();
+                            // Redirect to Mercado Pago checkout
+                            window.location.href = pref.initPoint;
+                        },
+                        error: () => {
+                            // Reservation created but payment failed - still ok
+                            this.booking = false;
+                            this.toast.warning('Reserva creada, pero no se pudo iniciar el pago. Puedes pagar desde "Mis Reservas".');
+                            this.selectedSlot = null;
+                            this.loadSlots();
+                        }
+                    });
+                } else {
+                    this.booking = false;
+                    this.toast.success('¡Reserva confirmada!');
+                    this.selectedSlot = null;
+                    this.loadSlots();
+                }
             },
             error: (err) => {
                 this.booking = false;

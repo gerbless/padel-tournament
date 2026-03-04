@@ -7,6 +7,7 @@ import { Reservation, ReservationStatus, PriceType, PaymentStatus } from './enti
 import { CreateCourtDto } from './dto/create-court.dto';
 import { CreatePriceBlockDto } from './dto/create-price-block.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { MercadoPagoPayment } from '../payments/entities/mercadopago-payment.entity';
 
 @Injectable()
 export class CourtsService {
@@ -17,6 +18,8 @@ export class CourtsService {
         private priceBlockRepository: Repository<CourtPriceBlock>,
         @InjectRepository(Reservation)
         private reservationRepository: Repository<Reservation>,
+        @InjectRepository(MercadoPagoPayment)
+        private mpPaymentRepository: Repository<MercadoPagoPayment>,
     ) { }
 
     // ==========================================
@@ -522,7 +525,7 @@ export class CourtsService {
         } as CreateReservationDto);
     }
 
-    async getPlayerBookings(playerId: string, playerName: string, clubId?: string): Promise<Reservation[]> {
+    async getPlayerBookings(playerId: string, playerName: string, clubId?: string): Promise<any[]> {
         const qb = this.reservationRepository
             .createQueryBuilder('r')
             .leftJoinAndSelect('r.court', 'court')
@@ -533,9 +536,33 @@ export class CourtsService {
             qb.andWhere('r.clubId = :clubId', { clubId });
         }
 
-        return qb.orderBy('r.date', 'DESC')
+        const reservations = await qb.orderBy('r.date', 'DESC')
             .addOrderBy('r.startTime', 'ASC')
             .getMany();
+
+        // Enrich with MP payment statusDetail
+        const reservationIds = reservations.map(r => r.id);
+        let mpPaymentMap: Record<string, { status: string; statusDetail: string | null }> = {};
+        if (reservationIds.length > 0) {
+            const mpPayments = await this.mpPaymentRepository
+                .createQueryBuilder('mp')
+                .where('mp.reservationId IN (:...ids)', { ids: reservationIds })
+                .orderBy('mp.createdAt', 'DESC')
+                .getMany();
+
+            // Keep only the latest payment per reservation
+            for (const mp of mpPayments) {
+                if (!mpPaymentMap[mp.reservationId]) {
+                    mpPaymentMap[mp.reservationId] = { status: mp.status, statusDetail: mp.statusDetail };
+                }
+            }
+        }
+
+        return reservations.map(r => ({
+            ...r,
+            mpStatus: mpPaymentMap[r.id]?.status || null,
+            mpStatusDetail: mpPaymentMap[r.id]?.statusDetail || null,
+        }));
     }
 
     async cancelPlayerBooking(playerId: string, playerName: string, reservationId: string): Promise<Reservation> {
@@ -547,7 +574,15 @@ export class CourtsService {
             throw new ForbiddenException('No tienes permiso para cancelar esta reserva');
         }
 
-        reservation.status = ReservationStatus.CANCELLED;
-        return this.reservationRepository.save(reservation);
+        // Prevent cancellation of paid reservations
+        if (reservation.paymentStatus === PaymentStatus.PAID) {
+            throw new ForbiddenException('No puedes cancelar una reserva que ya fue pagada');
+        }
+
+        // Delete the reservation (cascades to mercadopago_payments via FK)
+        await this.reservationRepository.remove(reservation);
+
+        // Return the deleted entity (id will be gone but data is still in memory)
+        return reservation;
     }
 }

@@ -47,7 +47,7 @@
                         (click)="openEditModal(res); $event.stopPropagation()">
                         <div class="res-time">{{ res.startTime }} – {{ res.endTime }}</div>
                         <div class="res-title">{{ res.title || 'Reserva' }}</div>
-                        <div class="res-players" *ngIf="res.players?.length">
+                        <div class="res-players" *ngIf="res.players.length">
                             {{ res.players.join(', ') }}
                         </div>
                         <div class="res-price" *ngIf="enablePricing && res.finalPrice">
@@ -228,6 +228,11 @@
         <div class="modal-footer">
             <button *ngIf="editingReservation" (click)="cancelReservation()" class="btn btn-danger">
                 🗑️ Cancelar Reserva
+            </button>
+            <button *ngIf="editingReservation && mpConfigured && reservationForm.paymentStatus !== 'paid'"
+                (click)="generatePaymentLink()" class="btn btn-mp"
+                [disabled]="generatingPayLink">
+                {{ generatingPayLink ? '⏳ Generando...' : '💳 Link de Pago MP' }}
             </button>
             <div class="spacer"></div>
             <button (click)="showModal = false" class="btn btn-secondary">Cerrar</button>

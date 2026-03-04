@@ -115,4 +115,70 @@ export class EmailService implements OnModuleInit {
             this.logger.warn(`⚠️  Configura SMTP_USER y SMTP_PASS en docker-compose.yml para enviar emails reales`);
         }
     }
+
+    /**
+     * Send payment confirmation email with reservation details
+     */
+    async sendPaymentConfirmationEmail(
+        to: string,
+        reservation: { date: string; startTime: string; endTime: string; courtName: string; finalPrice: number },
+        mpPaymentId?: string,
+    ): Promise<void> {
+        const from = this.configService.get<string>('SMTP_FROM', this.configService.get<string>('SMTP_USER', 'noreply@padelmgr.com'));
+
+        // Format date nicely (YYYY-MM-DD → DD/MM/YYYY)
+        const [year, month, day] = reservation.date.split('-');
+        const formattedDate = `${day}/${month}/${year}`;
+
+        const subject = `✅ Pago confirmado – Reserva ${reservation.courtName} ${formattedDate}`;
+
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+                <h2 style="text-align: center; color: #333;">🎾 PADEL MGR</h2>
+                <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 24px; margin: 20px 0;">
+                    <h3 style="color: #16a34a; margin-top: 0;">✅ ¡Pago recibido exitosamente!</h3>
+                    <p style="color: #333;">Tu reserva ha sido confirmada con los siguientes detalles:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #666; font-weight: bold;">📅 Fecha:</td>
+                            <td style="padding: 8px 0; color: #333;">${formattedDate}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #666; font-weight: bold;">🕐 Horario:</td>
+                            <td style="padding: 8px 0; color: #333;">${reservation.startTime} - ${reservation.endTime}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #666; font-weight: bold;">🏟️ Cancha:</td>
+                            <td style="padding: 8px 0; color: #333;">${reservation.courtName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #666; font-weight: bold;">💰 Monto:</td>
+                            <td style="padding: 8px 0; color: #333; font-weight: bold;">$${Number(reservation.finalPrice).toLocaleString('es-CL')}</td>
+                        </tr>
+                        ${mpPaymentId ? `<tr>
+                            <td style="padding: 8px 0; color: #666; font-weight: bold;">🔖 ID Pago:</td>
+                            <td style="padding: 8px 0; color: #999; font-size: 13px;">${mpPaymentId}</td>
+                        </tr>` : ''}
+                    </table>
+                </div>
+                <p style="color: #666; font-size: 13px;">¡Nos vemos en la cancha! 🎾</p>
+                <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">© Padel MGR</p>
+            </div>
+        `;
+
+        this.logger.log(`--- Enviando email de confirmación de pago ---`);
+        this.logger.log(`  To: ${to}`);
+        this.logger.log(`  Cancha: ${reservation.courtName}, Fecha: ${formattedDate}, Hora: ${reservation.startTime}-${reservation.endTime}`);
+
+        if (this.transporter) {
+            try {
+                const info = await this.transporter.sendMail({ from, to, subject, html });
+                this.logger.log(`✅ Email de confirmación enviado a ${to} (ID: ${info.messageId})`);
+            } catch (error) {
+                this.logger.error(`❌ Error enviando email de confirmación a ${to}: ${error.message}`);
+            }
+        } else {
+            this.logger.warn(`⚠️  [SIN SMTP] Email de confirmación NO enviado a ${to}`);
+        }
+    }
 }

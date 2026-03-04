@@ -8,6 +8,7 @@ import { Court, Reservation } from '../../../../models/court.model';
 import { ToastService } from '../../../../services/toast.service';
 import { ConfirmService } from '../../../../services/confirm.service';
 import { AuthService } from '../../../../services/auth.service';
+import { PaymentService } from '../../../../services/payment.service';
 import { environment } from '../../../../../environments/environment';
 import { PlayerSelectComponent } from '../../../../components/player-select/player-select.component';
 import { PlayerCreateModalComponent } from '../../../../components/player-create-modal/player-create-modal.component';
@@ -61,6 +62,10 @@ export class CourtDailyViewComponent implements OnInit {
 
     noPriceBlockMessage = '';
 
+    // Mercado Pago
+    mpConfigured = false;
+    generatingPayLink = false;
+
     // Player creation
     @ViewChildren(PlayerSelectComponent) playerSelects!: QueryList<PlayerSelectComponent>;
     showPlayerCreateModal = false;
@@ -78,6 +83,7 @@ export class CourtDailyViewComponent implements OnInit {
         private toast: ToastService,
         private confirmService: ConfirmService,
         private authService: AuthService,
+        private paymentService: PaymentService,
         private cdr: ChangeDetectorRef
     ) {
         // Generate 30-min slots from 7:00 to 23:00 (last slot ends at 23:30)
@@ -109,6 +115,15 @@ export class CourtDailyViewComponent implements OnInit {
                 this.loadClub();
                 this.loadCourts();
             }
+        });
+
+        // Check if MP is configured
+        this.paymentService.getConfig().subscribe({
+            next: (config) => {
+                this.mpConfigured = config.configured;
+                this.cdr.markForCheck();
+            },
+            error: () => {}
         });
     }
 
@@ -410,6 +425,34 @@ export class CourtDailyViewComponent implements OnInit {
                 this.toast.success('Reserva cancelada');
             },
             error: () => this.toast.error('Error al cancelar reserva')
+        });
+    }
+
+    // ── Mercado Pago ──────────────────────────────────────
+
+    generatePaymentLink() {
+        if (!this.editingReservation) return;
+        this.generatingPayLink = true;
+        this.cdr.markForCheck();
+
+        this.paymentService.createPaymentLink(this.editingReservation.id).subscribe({
+            next: (result) => {
+                this.generatingPayLink = false;
+                this.cdr.markForCheck();
+                // Copy to clipboard
+                navigator.clipboard.writeText(result.paymentUrl).then(() => {
+                    this.toast.success('Link de pago copiado al portapapeles');
+                }).catch(() => {
+                    // Fallback: show it in a prompt
+                    this.toast.success('Link de pago generado');
+                    window.prompt('Link de pago:', result.paymentUrl);
+                });
+            },
+            error: (err) => {
+                this.generatingPayLink = false;
+                this.toast.error(err.error?.message || 'Error al generar link de pago');
+                this.cdr.markForCheck();
+            }
         });
     }
 

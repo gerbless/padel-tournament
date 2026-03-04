@@ -58,7 +58,7 @@
                         (click)="openEditModal(res); $event.stopPropagation()">
                         <div class="res-time">{{ res.startTime }} – {{ res.endTime }}</div>
                         <div class="res-title">{{ res.title || 'Reserva' }}</div>
-                        <div class="res-players" *ngIf="res.players?.length">
+                        <div class="res-players" *ngIf="res.players.length">
                             {{ res.players.join(', ') }}
                         </div>
                         <div class="res-price" *ngIf="enablePricing && res.finalPrice">

@@ -59,10 +59,10 @@
           <div style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
             <p>
               <strong>Canchas:</strong> {{ tournament.courts || 1 }}
-              · <strong>Parejas:</strong> {{ tournament.teams?.length || 0 }}
+              · <strong>Parejas:</strong> {{ tournament.teams.length || 0 }}
             </p>
             <p>
-              <strong>Partidos:</strong> {{ tournament.matches?.length || 0 }}
+              <strong>Partidos:</strong> {{ tournament.matches.length || 0 }}
             </p>
           </div>
 
@@ -97,10 +97,10 @@
       <div style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
         <p>
           <strong>Canchas:</strong> {{ tournament.courts || 1 }}
-          · <strong>Parejas:</strong> {{ tournament.teams?.length || 0 }}
+          · <strong>Parejas:</strong> {{ tournament.teams.length || 0 }}
         </p>
         <p>
-          <strong>Partidos:</strong> {{ tournament.matches?.length || 0 }}
+          <strong>Partidos:</strong> {{ tournament.matches.length || 0 }}
         </p>
       </div>
 

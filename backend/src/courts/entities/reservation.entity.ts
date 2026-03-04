@@ -87,6 +87,10 @@ export class Reservation {
     @Column({ type: 'jsonb', nullable: true })
     playerPayments: { playerName: string; paid: boolean; amount: number }[];
 
+    /** Deadline for payment — if not paid by this time, reservation is auto-cancelled */
+    @Column({ type: 'timestamptz', nullable: true })
+    paymentExpiresAt: Date;
+
     @CreateDateColumn()
     createdAt: Date;
 

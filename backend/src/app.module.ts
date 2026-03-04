@@ -13,6 +13,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PersonalTrackerModule } from './personal-tracker/personal-tracker.module';
 import { EmailModule } from './email/email.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
     imports: [
@@ -45,6 +46,7 @@ import { EmailModule } from './email/email.module';
         UsersModule,
         PersonalTrackerModule,
         EmailModule,
+        PaymentsModule,
     ],
 })
 export class AppModule { }

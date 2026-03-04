@@ -107,6 +107,44 @@
 }
 .btn-cancel:hover { background: rgba(239, 68, 68, 0.25); }
 
+.booking-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.btn-pay {
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+.btn-pay:hover { background: rgba(59, 130, 246, 0.25); }
+.btn-pay:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.timer-badge {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    padding: 0.25rem 0.6rem;
+    border-radius: 8px;
+    white-space: nowrap;
+    animation: pulse-timer 1s ease-in-out infinite;
+}
+@keyframes pulse-timer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
 .empty-state {
     text-align: center;
     padding: 3rem 1rem;

@@ -82,8 +82,9 @@
             <span class="booking-price">{{ formatPrice(selectedSlot.slot.priceFullCourt) }}</span>
         </div>
         <button class="btn btn-confirm" (click)="confirmBooking()" [disabled]="booking || !isLoggedIn">
-            <span *ngIf="booking">Reservando...</span>
-            <span *ngIf="!booking">✓ Confirmar Reserva</span>
+            <span *ngIf="booking">Procesando...</span>
+            <span *ngIf="!booking && mpConfigured">💳 Reservar y Pagar</span>
+            <span *ngIf="!booking && !mpConfigured">✓ Confirmar Reserva</span>
         </button>
     </div>
 </div>
