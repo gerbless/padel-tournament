@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual, Not } from 'typeorm';
 import { MercadoPagoPayment, MercadoPagoPaymentStatus } from './entities/mercadopago-payment.entity';
-import { Reservation, PaymentStatus, ReservationStatus } from '../courts/entities/reservation.entity';
+import { Reservation, PaymentStatus, PaymentMethod, ReservationStatus } from '../courts/entities/reservation.entity';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { randomUUID } from 'crypto';
 import { EmailService } from '../email/email.service';
@@ -304,6 +304,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             throw new BadRequestException('El jugador no tiene nombre asignado');
         }
 
+        // Get playerId from playerPayments if available
+        const playerIdFromPP = reservation.playerPayments?.[playerIndex]?.playerId || null;
+
         // Determine amount: from playerPayments if exists, otherwise split evenly
         let amount: number;
         const pp = reservation.playerPayments?.[playerIndex];
@@ -396,6 +399,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     reservationId, clubId: reservation.clubId,
                     preferenceId: preferenceResponse.id, externalReference,
                     amount, description, playerIndex, playerName,
+                    playerId: playerIdFromPP,
                     status: MercadoPagoPaymentStatus.PENDING,
                 });
                 await this.mpPaymentRepo.save(mpPayment);
@@ -526,6 +530,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                         description,
                         playerIndex: i,
                         playerName: pp.playerName,
+                        playerId: pp.playerId || null,
                         status: MercadoPagoPaymentStatus.PENDING,
                     });
                     await this.mpPaymentRepo.save(mpPayment);
@@ -583,10 +588,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         const reservation = await this.reservationRepo.findOne({ where: { id: reservationId } });
         if (!reservation || !reservation.playerPayments) return;
 
-        // Mark this player as paid
+        // Mark this player as paid via Mercado Pago
         if (playerIndex >= 0 && playerIndex < reservation.playerPayments.length) {
             reservation.playerPayments[playerIndex].paid = true;
-            this.logger.log(`💰 Player ${playerIndex} (${reservation.playerPayments[playerIndex].playerName}) marked as paid for reservation ${reservationId}`);
+            reservation.playerPayments[playerIndex].paymentMethod = 'mercado_pago';
+            this.logger.log(`💰 Player ${playerIndex} (${reservation.playerPayments[playerIndex].playerName}) marked as paid via MP for reservation ${reservationId}`);
         }
 
         // Check overall status
@@ -668,6 +674,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     // Full-court payment
                     await this.reservationRepo.update(payment.reservationId, {
                         paymentStatus: PaymentStatus.PAID,
+                        paymentMethod: PaymentMethod.MERCADO_PAGO,
                         paymentNotes: `Pagado via Mercado Pago (ID: ${paymentId})`,
                         paymentExpiresAt: null,
                     });

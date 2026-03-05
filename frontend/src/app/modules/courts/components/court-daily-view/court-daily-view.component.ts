@@ -61,8 +61,9 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
         basePrice: 0,
         finalPrice: 0,
         paymentStatus: 'pending' as 'pending' | 'paid' | 'partial',
+        paymentMethod: '' as '' | 'cash' | 'transfer' | 'mercado_pago' | 'red_compras',
         paymentNotes: '',
-        playerPayments: [] as { playerId?: string; playerName: string; paid: boolean; amount: number }[]
+        playerPayments: [] as { playerId?: string; playerName: string; paid: boolean; amount: number; paymentMethod?: string }[]
     };
 
     noPriceBlockMessage = '';
@@ -82,6 +83,11 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
     paymentLinks: PaymentLinkData[] = [];
     paymentLinkLoading = false;
     paymentLinkError = '';
+
+    // Accordion sections
+    accordionInfo = true;
+    accordionPlayers = false;
+    accordionPricing = false;
 
     // Player creation
     @ViewChildren(PlayerSelectComponent) playerSelects!: QueryList<PlayerSelectComponent>;
@@ -192,6 +198,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
         // Build a snapshot of the NEW server payment state
         const newServerSnapshot = JSON.stringify({
             paymentStatus: updated.paymentStatus || 'pending',
+            paymentMethod: (updated as any).paymentMethod || '',
             playerPayments: updated.playerPayments || [],
         });
 
@@ -205,6 +212,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
 
         // Server has genuinely changed → update only payment fields
         this.reservationForm.paymentStatus = updated.paymentStatus || 'pending';
+        this.reservationForm.paymentMethod = (updated as any).paymentMethod || '';
         if (updated.playerPayments?.length) {
             this.reservationForm.playerPayments = JSON.parse(JSON.stringify(updated.playerPayments));
         }
@@ -233,6 +241,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
         this.formSnapshot = JSON.stringify(this.reservationForm);
         this._lastServerPaymentSnapshot = JSON.stringify({
             paymentStatus: this.reservationForm.paymentStatus,
+            paymentMethod: this.reservationForm.paymentMethod,
             playerPayments: this.reservationForm.playerPayments,
         });
     }
@@ -374,6 +383,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
             basePrice: 0,
             finalPrice: 0,
             paymentStatus: 'pending',
+            paymentMethod: '',
             paymentNotes: '',
             playerPayments: []
         };
@@ -402,6 +412,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
             basePrice: Number(res.basePrice) || 0,
             finalPrice: Number(res.finalPrice) || 0,
             paymentStatus: res.paymentStatus || 'pending',
+            paymentMethod: (res as any).paymentMethod || '',
             paymentNotes: res.paymentNotes || '',
             playerPayments: JSON.parse(JSON.stringify(res.playerPayments || []))
         };
@@ -412,6 +423,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
         // Store server payment state independently
         this._lastServerPaymentSnapshot = JSON.stringify({
             paymentStatus: res.paymentStatus || 'pending',
+            paymentMethod: (res as any).paymentMethod || '',
             playerPayments: res.playerPayments || [],
         });
         this.cdr.markForCheck();
@@ -516,6 +528,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
             priceType: this.reservationForm.priceType,
             finalPrice: this.reservationForm.finalPrice,
             paymentStatus: this.reservationForm.paymentStatus,
+            paymentMethod: this.reservationForm.paymentMethod || undefined,
             paymentNotes: this.reservationForm.paymentNotes || undefined,
             playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null
         };
@@ -582,6 +595,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
             priceType: this.reservationForm.priceType,
             finalPrice: this.reservationForm.finalPrice,
             paymentStatus: this.reservationForm.paymentStatus,
+            paymentMethod: this.reservationForm.paymentMethod || undefined,
             paymentNotes: this.reservationForm.paymentNotes || undefined,
             playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null
         };
@@ -687,6 +701,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
             players, playerCount: this.reservationForm.playerCount,
             priceType: this.reservationForm.priceType, finalPrice: this.reservationForm.finalPrice,
             paymentStatus: this.reservationForm.paymentStatus,
+            paymentMethod: this.reservationForm.paymentMethod || undefined,
             paymentNotes: this.reservationForm.paymentNotes || undefined,
             playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null
         };
@@ -860,8 +875,17 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
             const prev = existing.find(pp => (playerId && pp.playerId === playerId) || pp.playerName === name);
             return prev
                 ? { ...prev, playerId: playerId || prev.playerId, playerName: name, amount: prev.amount || perPlayerAmount }
-                : { playerId, playerName: name, paid: false, amount: perPlayerAmount };
+                : { playerId, playerName: name, paid: false, amount: perPlayerAmount, paymentMethod: undefined };
         });
+        this.updateOverallPaymentStatus();
+    }
+
+    /** Called when the per-player toggle is clicked (Pendiente → Pagado) */
+    onPlayerPaidToggle(pp: any) {
+        pp.paid = true;
+        if (!pp.paymentMethod) {
+            pp.paymentMethod = 'cash'; // default to cash for manual admin toggle
+        }
         this.updateOverallPaymentStatus();
     }
 

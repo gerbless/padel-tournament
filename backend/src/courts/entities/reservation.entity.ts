@@ -19,6 +19,13 @@ export enum PaymentStatus {
     PARTIAL = 'partial'
 }
 
+export enum PaymentMethod {
+    CASH = 'cash',
+    TRANSFER = 'transfer',
+    MERCADO_PAGO = 'mercado_pago',
+    RED_COMPRAS = 'red_compras'
+}
+
 @Entity('reservations')
 export class Reservation {
     @PrimaryGeneratedColumn('uuid')
@@ -84,8 +91,12 @@ export class Reservation {
     @Column({ type: 'text', nullable: true })
     paymentNotes: string;
 
+    /** Payment method for full-court payments */
+    @Column({ type: 'enum', enum: PaymentMethod, nullable: true })
+    paymentMethod: PaymentMethod;
+
     @Column({ type: 'jsonb', nullable: true })
-    playerPayments: { playerId?: string; playerName: string; paid: boolean; amount: number }[];
+    playerPayments: { playerId?: string; playerName: string; paid: boolean; amount: number; paymentMethod?: string }[];
 
     /** Deadline for payment — if not paid by this time, reservation is auto-cancelled */
     @Column({ type: 'timestamptz', nullable: true })

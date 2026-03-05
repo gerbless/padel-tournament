@@ -213,6 +213,7 @@ export class CourtsService {
             basePrice: (dto as any).basePrice || dto.finalPrice || 0,
             finalPrice: dto.finalPrice || 0,
             paymentStatus: (dto.paymentStatus as any) || PaymentStatus.PENDING,
+            paymentMethod: (dto.paymentMethod as any) || null,
             paymentNotes: dto.paymentNotes,
             playerPayments: dto.playerPayments || null,
         } as Partial<Reservation>);

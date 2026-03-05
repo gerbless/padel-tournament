@@ -62,6 +62,10 @@ export class MercadoPagoPayment {
     @Column({ nullable: true })
     playerName: string;
 
+    /** Player ID (from players table) for per-player payments */
+    @Column({ nullable: true })
+    playerId: string;
+
     /** Status from Mercado Pago */
     @Column({
         type: 'enum',

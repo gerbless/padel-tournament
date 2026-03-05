@@ -87,50 +87,64 @@
             <button class="modal-close" (click)="showModal = false">×</button>
         </div>
         <div class="modal-body">
-            <div class="form-grid">
-                <!-- Date -->
-                <div class="form-group">
-                    <label>Fecha</label>
-                    <input type="date" [(ngModel)]="reservationForm.date" class="form-control"
-                        (ngModelChange)="calculatePrice()" [readonly]="isFullyPaid">
+            <!-- Info Section (accordion) -->
+            <div class="accordion-section">
+                <div class="accordion-header" (click)="accordionInfo = !accordionInfo">
+                    <span class="accordion-chevron" [class.open]="accordionInfo">▶</span>
+                    <h3>📋 Datos de Reserva</h3>
                 </div>
+                <div class="accordion-body" *ngIf="accordionInfo">
+                    <div class="form-grid">
+                        <!-- Date -->
+                        <div class="form-group">
+                            <label>Fecha</label>
+                            <input type="date" [(ngModel)]="reservationForm.date" class="form-control"
+                                (ngModelChange)="calculatePrice()" [readonly]="isFullyPaid">
+                        </div>
 
-                <!-- Nº Jugadores -->
-                <div class="form-group">
-                    <label>Nº Jugadores</label>
-                    <select [(ngModel)]="reservationForm.playerCount" class="form-control" [disabled]="isFullyPaid"
-                        (ngModelChange)="onPlayerCountChange()">
-                        <option [ngValue]="2">2</option>
-                        <option [ngValue]="3">3</option>
-                        <option [ngValue]="4">4</option>
-                    </select>
-                </div>
+                        <!-- Nº Jugadores -->
+                        <div class="form-group">
+                            <label>Nº Jugadores</label>
+                            <select [(ngModel)]="reservationForm.playerCount" class="form-control" [disabled]="isFullyPaid"
+                                (ngModelChange)="onPlayerCountChange()">
+                                <option [ngValue]="2">2</option>
+                                <option [ngValue]="3">3</option>
+                                <option [ngValue]="4">4</option>
+                            </select>
+                        </div>
 
-                <!-- Times -->
-                <div class="form-group">
-                    <label>Hora inicio</label>
-                    <select [(ngModel)]="reservationForm.startTime" class="form-control"
-                        (ngModelChange)="onStartTimeChange()" [disabled]="isFullyPaid">
-                        <option *ngFor="let t of timeSlots" [value]="t">{{ t }}</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Hora fin</label>
-                    <input type="text" [ngModel]="reservationForm.endTime" class="form-control" readonly>
-                    <small>Bloque fijo de 1 hora 30 min</small>
-                </div>
+                        <!-- Times -->
+                        <div class="form-group">
+                            <label>Hora inicio</label>
+                            <select [(ngModel)]="reservationForm.startTime" class="form-control"
+                                (ngModelChange)="onStartTimeChange()" [disabled]="isFullyPaid">
+                                <option *ngFor="let t of timeSlots" [value]="t">{{ t }}</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Hora fin</label>
+                            <input type="text" [ngModel]="reservationForm.endTime" class="form-control" readonly>
+                            <small>Bloque fijo de 1 hora 30 min</small>
+                        </div>
 
-                <!-- Title (full width) -->
-                <div class="form-group col-span-full">
-                    <label>Título / Nombre de reserva <span class="optional">(Op)</span></label>
-                    <input type="text" [(ngModel)]="reservationForm.title" class="form-control"
-                        placeholder="Ej: Partido amistoso, Clase grupal…" [readonly]="isFullyPaid">
+                        <!-- Title (full width) -->
+                        <div class="form-group col-span-full">
+                            <label>Título / Nombre de reserva <span class="optional">(Op)</span></label>
+                            <input type="text" [(ngModel)]="reservationForm.title" class="form-control"
+                                placeholder="Ej: Partido amistoso, Clase grupal…" [readonly]="isFullyPaid">
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Players Section -->
+            <!-- Players Section (accordion) -->
+            <div class="accordion-section">
+                <div class="accordion-header" (click)="accordionPlayers = !accordionPlayers">
+                    <span class="accordion-chevron" [class.open]="accordionPlayers">▶</span>
+                    <h3>👥 Jugadores</h3>
+                </div>
+                <div class="accordion-body" *ngIf="accordionPlayers">
             <div class="players-section">
-                <h3>👥 Jugadores</h3>
                 <p class="section-hint">Busca jugadores existentes o escribe el nombre directamente</p>
                 <div class="players-grid">
                     <div *ngFor="let p of reservationForm.players; let i = index; trackBy: trackByIndex"
@@ -160,10 +174,17 @@
                     </div>
                 </div>
             </div>
+                </div>
+            </div>
 
-            <!-- Pricing section -->
-            <div class="pricing-section" *ngIf="enablePricing">
-                <h3>💰 Precio</h3>
+            <!-- Pricing section (accordion) -->
+            <div class="accordion-section" *ngIf="enablePricing">
+                <div class="accordion-header" (click)="accordionPricing = !accordionPricing">
+                    <span class="accordion-chevron" [class.open]="accordionPricing">▶</span>
+                    <h3>💰 Precio</h3>
+                </div>
+                <div class="accordion-body" *ngIf="accordionPricing">
+            <div class="pricing-section">
 
                 <div class="form-grid">
                     <div class="form-group">
@@ -200,6 +221,16 @@
                             <option value="partial">½ Pago parcial</option>
                         </select>
                     </div>
+                    <div class="form-group" *ngIf="reservationForm.priceType !== 'per_player' && reservationForm.paymentStatus !== 'pending'">
+                        <label>Método de pago</label>
+                        <select [(ngModel)]="reservationForm.paymentMethod" class="form-control">
+                            <option value="">— Seleccionar —</option>
+                            <option value="cash">💵 Efectivo</option>
+                            <option value="transfer">🏦 Transferencia</option>
+                            <option value="mercado_pago">💳 Mercado Pago</option>
+                            <option value="red_compras">🏧 Red Compras</option>
+                        </select>
+                    </div>
 
                     <div class="form-group col-span-full" *ngIf="reservationForm.priceType !== 'per_player'">
                         <label>Notas de pago <span class="optional">(Op)</span></label>
@@ -228,9 +259,18 @@
                             <div class="pp-status">
                                 <button class="pp-toggle" [class.is-paid]="pp.paid"
                                     [disabled]="pp.paid"
-                                    (click)="pp.paid = !pp.paid; updateOverallPaymentStatus()">
+                                    (click)="onPlayerPaidToggle(pp)">
                                     {{ pp.paid ? '✅ Pagado' : '⏳ Pendiente' }}
                                 </button>
+                            </div>
+                            <div class="pp-method" *ngIf="pp.paid">
+                                <select [(ngModel)]="pp.paymentMethod" class="form-control form-control-sm pp-method-select">
+                                    <option value="">—</option>
+                                    <option value="cash">💵 Efectivo</option>
+                                    <option value="transfer">🏦 Transferencia</option>
+                                    <option value="mercado_pago">💳 Mercado Pago</option>
+                                    <option value="red_compras">🏧 Red Compras</option >
+                                </select>
                             </div>
                             <div class="pp-link" *ngIf="canEdit && mpConfigured && !pp.paid">
                                 <button class="btn-player-link" title="Generar link MP para {{ pp.playerName }}"
@@ -246,6 +286,8 @@
                             {{ reservationForm.paymentStatus === 'paid' ? '✅ Todo pagado' : reservationForm.paymentStatus === 'partial' ? '½ Pago parcial' : '⏳ Pendiente' }}
                         </span>
                     </div>
+                </div>
+            </div>
                 </div>
             </div>
         </div>

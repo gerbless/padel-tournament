@@ -35,8 +35,9 @@ export interface Reservation {
     basePrice: number;
     finalPrice: number;
     paymentStatus: 'pending' | 'paid' | 'partial';
+    paymentMethod?: 'cash' | 'transfer' | 'mercado_pago' | 'red_compras';
     paymentNotes?: string;
-    playerPayments?: { playerId?: string; playerName: string; paid: boolean; amount: number }[];
+    playerPayments?: { playerId?: string; playerName: string; paid: boolean; amount: number; paymentMethod?: string }[];
     court?: Court;
     createdAt: Date;
     updatedAt: Date;
