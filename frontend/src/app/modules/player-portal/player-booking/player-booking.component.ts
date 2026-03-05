@@ -199,7 +199,17 @@ export class PlayerBookingComponent implements OnInit {
     }
 
     getAvailableSlots(court: CourtAvailability): CourtSlot[] {
-        return court.slots.filter(s => s.available);
+        return court.slots.filter(s => s.available && !this.isSlotPast(s.startTime));
+    }
+
+    private isSlotPast(time: string): boolean {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        if (this.selectedDate !== `${yyyy}-${mm}-${dd}`) return false;
+        const [h, m] = time.split(':').map(Number);
+        return h * 60 + m <= now.getHours() * 60 + now.getMinutes();
     }
 
     hasAnyAvailableSlot(): boolean {

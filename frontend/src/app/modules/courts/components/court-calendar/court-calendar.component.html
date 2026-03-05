@@ -118,7 +118,7 @@
                             <label>Hora inicio</label>
                             <select [(ngModel)]="reservationForm.startTime" class="form-control"
                                 (ngModelChange)="onStartTimeChange()" [disabled]="isFullyPaid">
-                                <option *ngFor="let t of timeSlots" [value]="t">{{ t }}</option>
+                                <option *ngFor="let t of timeSlots" [value]="t" [disabled]="isTimeSlotPast(t)">{{ t }}{{ isTimeSlotPast(t) ? ' ✗' : '' }}</option>
                             </select>
                         </div>
                         <div class="form-group">

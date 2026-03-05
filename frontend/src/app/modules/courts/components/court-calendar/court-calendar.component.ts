@@ -459,6 +459,19 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
         return `${endH.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
     }
 
+    isTimeSlotPast(time: string): boolean {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+        if (this.reservationForm.date !== todayStr) return false;
+        const [h, m] = time.split(':').map(Number);
+        const slotMinutes = h * 60 + m;
+        const nowMinutes = today.getHours() * 60 + today.getMinutes();
+        return slotMinutes <= nowMinutes;
+    }
+
     onStartTimeChange() {
         this.reservationForm.endTime = this.calcEndTime(this.reservationForm.startTime);
         this.calculatePrice();
@@ -521,6 +534,10 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
 
     saveReservation() {
         if (!this.court) return;
+        if (!this.editingReservation && this.isTimeSlotPast(this.reservationForm.startTime)) {
+            this.toast.error('No se puede reservar un horario que ya pasó');
+            return;
+        }
         const players = this.reservationForm.players.filter(p => p.trim());
         const data: any = {
             courtId: this.court.id,

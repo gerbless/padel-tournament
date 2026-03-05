@@ -366,6 +366,10 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
 
     openCreateModal(courtId: string, slotStartTime: string) {
         if (!this.canEdit) return;
+        if (this.isTimeSlotPast(slotStartTime)) {
+            this.toast.error('No se puede reservar un horario que ya pasó');
+            return;
+        }
         this.editingReservation = null;
         this.selectedCourtId = courtId;
 
@@ -441,6 +445,19 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
         return `${endH.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
     }
 
+    isTimeSlotPast(time: string): boolean {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+        if (this.dateStr !== todayStr) return false;
+        const [h, m] = time.split(':').map(Number);
+        const slotMinutes = h * 60 + m;
+        const nowMinutes = today.getHours() * 60 + today.getMinutes();
+        return slotMinutes <= nowMinutes;
+    }
+
     onStartTimeChange() {
         this.reservationForm.endTime = this.calcEndTime(this.reservationForm.startTime);
         this.calculatePrice();
@@ -514,6 +531,10 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
 
     saveReservation() {
         if (!this.selectedCourtId) return;
+        if (!this.editingReservation && this.isTimeSlotPast(this.reservationForm.startTime)) {
+            this.toast.error('No se puede reservar un horario que ya pasó');
+            return;
+        }
         const court = this.courts.find(c => c.id === this.selectedCourtId);
         const players = this.reservationForm.players.filter(p => p.trim());
         const data: any = {

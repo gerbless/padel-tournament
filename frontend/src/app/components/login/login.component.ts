@@ -40,7 +40,12 @@ export class LoginComponent {
             next: () => {
                 this.loading = false;
                 this.cdr.markForCheck();
-                this.router.navigate(['/courts']);
+                const user = this.authService.getCurrentUser();
+                if (user && user.role === 'user' && (!user.clubRoles || user.clubRoles.length === 0)) {
+                    this.router.navigate(['/player/booking']);
+                } else {
+                    this.router.navigate(['/courts']);
+                }
             },
             error: (err) => {
                 console.error(err);
