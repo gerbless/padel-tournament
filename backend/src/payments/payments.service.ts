@@ -59,7 +59,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     /**
      * Cancel reservations whose payment deadline has expired.
      * Skips reservations whose MP payment has statusDetail = 'pending_contingency'
-     * (MP is still reviewing the payment).
+     * or where any player has already paid (partial payment).
      */
     private async cancelExpiredReservations(): Promise<void> {
         try {
@@ -73,6 +73,13 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             });
 
             for (const reservation of expired) {
+                // Check if any player has already paid — if so, never auto-cancel
+                if (reservation.playerPayments?.some(p => p.paid)) {
+                    await this.reservationRepo.update(reservation.id, { paymentExpiresAt: null });
+                    this.logger.log(`💰 Reservation ${reservation.id} has partial player payments – skipping auto-cancel`);
+                    continue;
+                }
+
                 // Check if there's a pending_contingency MP payment — if so, skip
                 const mpPayment = await this.mpPaymentRepo.findOne({
                     where: { reservationId: reservation.id },
@@ -82,6 +89,16 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     // Clear the deadline so we don't keep checking this one
                     await this.reservationRepo.update(reservation.id, { paymentExpiresAt: null });
                     this.logger.log(`⏳ Reservation ${reservation.id} has pending_contingency – skipping auto-cancel`);
+                    continue;
+                }
+
+                // Also check if any MP payment for this reservation is approved
+                const approvedPayment = await this.mpPaymentRepo.findOne({
+                    where: { reservationId: reservation.id, status: MercadoPagoPaymentStatus.APPROVED },
+                });
+                if (approvedPayment) {
+                    await this.reservationRepo.update(reservation.id, { paymentExpiresAt: null });
+                    this.logger.log(`💰 Reservation ${reservation.id} has an approved payment – skipping auto-cancel`);
                     continue;
                 }
 
@@ -250,9 +267,346 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     /**
      * Create a payment link for billing (admin sends to player)
      */
-    async createPaymentLink(reservationId: string): Promise<{ paymentUrl: string }> {
+    async createPaymentLink(reservationId: string): Promise<{ paymentUrl: string; shortUrl: string }> {
         const result = await this.createPreference(reservationId);
-        return { paymentUrl: result.initPoint };
+        const shortUrl = await this.shortenUrl(result.initPoint);
+        return { paymentUrl: result.initPoint, shortUrl };
+    }
+
+    /**
+     * Create a payment link for a single player (on-demand, by player index).
+     * Works regardless of priceType — uses the player name from reservation.players[].
+     * If playerPayments exists, uses the configured amount; otherwise splits finalPrice evenly.
+     */
+    async createSinglePlayerLink(
+        reservationId: string,
+        playerIndex: number,
+    ): Promise<{ playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string }> {
+        if (!this.preferenceClient) {
+            throw new BadRequestException('Mercado Pago no está configurado. Contacte al administrador.');
+        }
+
+        const reservation = await this.reservationRepo.findOne({
+            where: { id: reservationId },
+            relations: ['court'],
+        });
+        if (!reservation) {
+            throw new NotFoundException('Reserva no encontrada');
+        }
+
+        const players = reservation.players || [];
+        if (playerIndex < 0 || playerIndex >= players.length) {
+            throw new BadRequestException(`Jugador con índice ${playerIndex} no existe en esta reserva`);
+        }
+
+        const playerName = players[playerIndex];
+        if (!playerName || !playerName.trim()) {
+            throw new BadRequestException('El jugador no tiene nombre asignado');
+        }
+
+        // Determine amount: from playerPayments if exists, otherwise split evenly
+        let amount: number;
+        const pp = reservation.playerPayments?.[playerIndex];
+        if (pp) {
+            if (pp.paid) {
+                return {
+                    playerIndex, playerName, amount: Number(pp.amount),
+                    paymentUrl: '', shortUrl: '', status: 'paid',
+                };
+            }
+            amount = Number(pp.amount);
+        } else {
+            const filledPlayers = players.filter(p => p.trim()).length || 1;
+            amount = Math.round(((Number(reservation.finalPrice) || 0) / filledPlayers) * 100) / 100;
+        }
+
+        if (amount <= 0) {
+            throw new BadRequestException('El monto del jugador debe ser mayor a 0');
+        }
+
+        // Check for existing pending payment for this player
+        const existingPayment = await this.mpPaymentRepo.findOne({
+            where: { reservationId, playerIndex },
+            order: { createdAt: 'DESC' },
+        });
+
+        if (existingPayment && existingPayment.preferenceId &&
+            existingPayment.status !== MercadoPagoPaymentStatus.APPROVED &&
+            existingPayment.status !== MercadoPagoPaymentStatus.REJECTED &&
+            existingPayment.status !== MercadoPagoPaymentStatus.CANCELLED) {
+            const paymentUrl = `https://www.mercadopago.cl/checkout/v1/redirect?pref_id=${existingPayment.preferenceId}`;
+            const shortUrl = await this.shortenUrl(paymentUrl);
+            return { playerIndex, playerName, amount, paymentUrl, shortUrl, status: existingPayment.status };
+        }
+
+        const appUrl = this.configService.get<string>('APP_URL', 'http://localhost');
+        const backendUrl = this.configService.get<string>('BACKEND_URL', 'http://localhost:3000');
+        const courtName = reservation.court?.name || 'Cancha';
+        const externalReference = `res_${reservationId}_p${playerIndex}_${randomUUID().substring(0, 8)}`;
+        const description = `${playerName} - ${courtName} - ${reservation.date} ${reservation.startTime}-${reservation.endTime}`;
+
+        try {
+            const preferenceResponse = await this.preferenceClient.create({
+                body: {
+                    items: [{
+                        id: `${reservationId}_p${playerIndex}`,
+                        title: description,
+                        quantity: 1,
+                        unit_price: amount,
+                        currency_id: 'CLP',
+                    }],
+                    external_reference: externalReference,
+                    back_urls: {
+                        success: `${appUrl}/player/my-bookings?payment=success&rid=${reservationId}`,
+                        failure: `${appUrl}/player/my-bookings?payment=failure&rid=${reservationId}`,
+                        pending: `${appUrl}/player/my-bookings?payment=pending&rid=${reservationId}`,
+                    },
+                    auto_return: 'approved',
+                    notification_url: `${backendUrl}/api/payments/webhook`,
+                    statement_descriptor: 'PADEL MGR',
+                },
+            });
+
+            // Ensure playerPayments entry exists on the reservation
+            if (!reservation.playerPayments) {
+                reservation.playerPayments = [];
+            }
+            const existingPP = reservation.playerPayments[playerIndex];
+            if (!existingPP) {
+                reservation.playerPayments.push({ playerName, paid: false, amount });
+                await this.reservationRepo.update(reservationId, {
+                    playerPayments: reservation.playerPayments,
+                });
+            }
+
+            // Create or update payment record
+            if (existingPayment) {
+                existingPayment.preferenceId = preferenceResponse.id;
+                existingPayment.externalReference = externalReference;
+                existingPayment.amount = amount;
+                existingPayment.description = description;
+                existingPayment.status = MercadoPagoPaymentStatus.PENDING;
+                existingPayment.mpPaymentId = null;
+                existingPayment.mpData = null;
+                existingPayment.statusDetail = null;
+                existingPayment.paymentMethod = null;
+                await this.mpPaymentRepo.save(existingPayment);
+            } else {
+                const mpPayment = this.mpPaymentRepo.create({
+                    reservationId, clubId: reservation.clubId,
+                    preferenceId: preferenceResponse.id, externalReference,
+                    amount, description, playerIndex, playerName,
+                    status: MercadoPagoPaymentStatus.PENDING,
+                });
+                await this.mpPaymentRepo.save(mpPayment);
+            }
+
+            const paymentUrl = preferenceResponse.init_point;
+            const shortUrl = await this.shortenUrl(paymentUrl);
+            return { playerIndex, playerName, amount, paymentUrl, shortUrl, status: 'pending' };
+        } catch (error) {
+            this.logger.error(`❌ Error creating single player link for ${playerName}: ${error.message}`);
+            throw new BadRequestException(`Error al generar link para ${playerName}: ${error.message}`);
+        }
+    }
+
+    /**
+     * Create per-player payment links for a reservation with per_player pricing
+     */
+    async createPerPlayerPaymentLinks(reservationId: string): Promise<{
+        links: { playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string }[];
+    }> {
+        if (!this.preferenceClient) {
+            throw new BadRequestException('Mercado Pago no está configurado. Contacte al administrador.');
+        }
+
+        const reservation = await this.reservationRepo.findOne({
+            where: { id: reservationId },
+            relations: ['court'],
+        });
+        if (!reservation) {
+            throw new NotFoundException('Reserva no encontrada');
+        }
+
+        if (!reservation.playerPayments || reservation.playerPayments.length === 0) {
+            throw new BadRequestException('Esta reserva no tiene pagos por jugador configurados');
+        }
+
+        const appUrl = this.configService.get<string>('APP_URL', 'http://localhost');
+        const backendUrl = this.configService.get<string>('BACKEND_URL', 'http://localhost:3000');
+        const courtName = reservation.court?.name || 'Cancha';
+
+        const links: { playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string }[] = [];
+
+        for (let i = 0; i < reservation.playerPayments.length; i++) {
+            const pp = reservation.playerPayments[i];
+
+            // Skip already paid players
+            if (pp.paid) {
+                links.push({
+                    playerIndex: i,
+                    playerName: pp.playerName,
+                    amount: Number(pp.amount),
+                    paymentUrl: '',
+                    shortUrl: '',
+                    status: 'paid',
+                });
+                continue;
+            }
+
+            // Check for existing payment record for this player
+            const existingPayment = await this.mpPaymentRepo.findOne({
+                where: { reservationId, playerIndex: i },
+                order: { createdAt: 'DESC' },
+            });
+
+            // If there's already a valid pending preference, reuse it
+            if (existingPayment && existingPayment.preferenceId &&
+                existingPayment.status !== MercadoPagoPaymentStatus.APPROVED) {
+                const paymentUrl = `https://www.mercadopago.cl/checkout/v1/redirect?pref_id=${existingPayment.preferenceId}`;
+                const shortUrl = await this.shortenUrl(paymentUrl);
+                links.push({
+                    playerIndex: i,
+                    playerName: pp.playerName,
+                    amount: Number(pp.amount),
+                    paymentUrl,
+                    shortUrl,
+                    status: existingPayment.status,
+                });
+                continue;
+            }
+
+            const amount = Number(pp.amount);
+            const externalReference = `res_${reservationId}_p${i}_${randomUUID().substring(0, 8)}`;
+            const description = `${pp.playerName} - ${courtName} - ${reservation.date} ${reservation.startTime}-${reservation.endTime}`;
+
+            try {
+                const preferenceResponse = await this.preferenceClient.create({
+                    body: {
+                        items: [
+                            {
+                                id: `${reservationId}_p${i}`,
+                                title: description,
+                                quantity: 1,
+                                unit_price: amount,
+                                currency_id: 'CLP',
+                            },
+                        ],
+                        external_reference: externalReference,
+                        back_urls: {
+                            success: `${appUrl}/player/my-bookings?payment=success&rid=${reservationId}`,
+                            failure: `${appUrl}/player/my-bookings?payment=failure&rid=${reservationId}`,
+                            pending: `${appUrl}/player/my-bookings?payment=pending&rid=${reservationId}`,
+                        },
+                        auto_return: 'approved',
+                        notification_url: `${backendUrl}/api/payments/webhook`,
+                        statement_descriptor: 'PADEL MGR',
+                    },
+                });
+
+                // Create or update payment record
+                if (existingPayment) {
+                    existingPayment.preferenceId = preferenceResponse.id;
+                    existingPayment.externalReference = externalReference;
+                    existingPayment.amount = amount;
+                    existingPayment.description = description;
+                    existingPayment.status = MercadoPagoPaymentStatus.PENDING;
+                    existingPayment.mpPaymentId = null;
+                    existingPayment.mpData = null;
+                    existingPayment.statusDetail = null;
+                    existingPayment.paymentMethod = null;
+                    await this.mpPaymentRepo.save(existingPayment);
+                } else {
+                    const mpPayment = this.mpPaymentRepo.create({
+                        reservationId,
+                        clubId: reservation.clubId,
+                        preferenceId: preferenceResponse.id,
+                        externalReference,
+                        amount,
+                        description,
+                        playerIndex: i,
+                        playerName: pp.playerName,
+                        status: MercadoPagoPaymentStatus.PENDING,
+                    });
+                    await this.mpPaymentRepo.save(mpPayment);
+                }
+
+                const paymentUrl = preferenceResponse.init_point;
+                const shortUrl = await this.shortenUrl(paymentUrl);
+
+                links.push({
+                    playerIndex: i,
+                    playerName: pp.playerName,
+                    amount,
+                    paymentUrl,
+                    shortUrl,
+                    status: 'pending',
+                });
+            } catch (error) {
+                this.logger.error(`Error creating per-player preference for player ${i}: ${error.message}`);
+                links.push({
+                    playerIndex: i,
+                    playerName: pp.playerName,
+                    amount,
+                    paymentUrl: '',
+                    shortUrl: '',
+                    status: 'error',
+                });
+            }
+        }
+
+        return { links };
+    }
+
+    /**
+     * Shorten a URL using is.gd free service
+     */
+    private async shortenUrl(url: string): Promise<string> {
+        try {
+            const response = await fetch(
+                `https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`,
+            );
+            if (response.ok) {
+                return await response.text();
+            }
+        } catch (error) {
+            this.logger.warn(`URL shortening failed: ${error.message}`);
+        }
+        return url; // Fallback to original URL
+    }
+
+    /**
+     * Reconcile a per-player payment: mark the player as paid,
+     * then check if all players have paid to update overall reservation status.
+     */
+    private async reconcilePerPlayerPayment(reservationId: string, playerIndex: number, mpPaymentId: string): Promise<void> {
+        const reservation = await this.reservationRepo.findOne({ where: { id: reservationId } });
+        if (!reservation || !reservation.playerPayments) return;
+
+        // Mark this player as paid
+        if (playerIndex >= 0 && playerIndex < reservation.playerPayments.length) {
+            reservation.playerPayments[playerIndex].paid = true;
+            this.logger.log(`💰 Player ${playerIndex} (${reservation.playerPayments[playerIndex].playerName}) marked as paid for reservation ${reservationId}`);
+        }
+
+        // Check overall status
+        const allPaid = reservation.playerPayments.every(p => p.paid);
+        const somePaid = reservation.playerPayments.some(p => p.paid);
+
+        reservation.paymentStatus = allPaid ? PaymentStatus.PAID : somePaid ? PaymentStatus.PARTIAL : PaymentStatus.PENDING;
+
+        if (allPaid) {
+            reservation.paymentNotes = `Todos los jugadores pagaron via Mercado Pago`;
+            reservation.paymentExpiresAt = null;
+            this.logger.log(`✅ All players paid for reservation ${reservationId} – marking as PAID`);
+        } else {
+            const paidNames = reservation.playerPayments.filter(p => p.paid).map(p => p.playerName).join(', ');
+            reservation.paymentNotes = `Pagaron: ${paidNames}`;
+            reservation.paymentExpiresAt = null; // Never auto-cancel when any player has paid
+            this.logger.log(`½ Partial payment for reservation ${reservationId}: ${paidNames} – timer cleared`);
+        }
+
+        await this.reservationRepo.save(reservation);
     }
 
     /**
@@ -306,13 +660,19 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             // If approved, update reservation payment status and send confirmation email
             if (status === 'approved') {
                 this.logger.log(`✅ Payment approved for reservation ${payment.reservationId}`);
-                await this.reservationRepo.update(payment.reservationId, {
-                    paymentStatus: PaymentStatus.PAID,
-                    paymentNotes: `Pagado via Mercado Pago (ID: ${paymentId})`,
-                    paymentExpiresAt: null, // Clear deadline
-                });
-                // Send confirmation email
-                await this.sendPaymentConfirmationEmail(payment.reservationId, String(paymentId), payment.payerEmail);
+
+                if (payment.playerIndex !== null && payment.playerIndex !== undefined) {
+                    // Per-player payment – reconcile
+                    await this.reconcilePerPlayerPayment(payment.reservationId, payment.playerIndex, String(paymentId));
+                } else {
+                    // Full-court payment
+                    await this.reservationRepo.update(payment.reservationId, {
+                        paymentStatus: PaymentStatus.PAID,
+                        paymentNotes: `Pagado via Mercado Pago (ID: ${paymentId})`,
+                        paymentExpiresAt: null,
+                    });
+                    await this.sendPaymentConfirmationEmail(payment.reservationId, String(paymentId), payment.payerEmail);
+                }
             } else if (statusDetail === 'pending_contingency') {
                 this.logger.log(`⏳ Payment pending_contingency for reservation ${payment.reservationId} – clearing deadline`);
                 await this.reservationRepo.update(payment.reservationId, {

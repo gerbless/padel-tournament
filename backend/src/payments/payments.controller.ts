@@ -1,6 +1,8 @@
 import { Controller, Post, Get, Body, Param, Query, HttpCode, HttpStatus, UseGuards, Request, Logger } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ClubRoleGuard } from '../auth/club-role.guard';
+import { ClubRoles } from '../auth/club-roles.decorator';
 
 @Controller('payments')
 export class PaymentsController {
@@ -32,12 +34,36 @@ export class PaymentsController {
     }
 
     /**
-     * Create a payment link (admin billing flow)
+     * Create a payment link (admin/editor billing flow)
      */
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin', 'editor')
     @Post('payment-link/:reservationId')
     async createPaymentLink(@Param('reservationId') reservationId: string) {
         return this.paymentsService.createPaymentLink(reservationId);
+    }
+
+    /**
+     * Create a payment link for a single player (on-demand)
+     */
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin', 'editor')
+    @Post('player-link/:reservationId/:playerIndex')
+    async createSinglePlayerLink(
+        @Param('reservationId') reservationId: string,
+        @Param('playerIndex') playerIndex: string,
+    ) {
+        return this.paymentsService.createSinglePlayerLink(reservationId, parseInt(playerIndex, 10));
+    }
+
+    /**
+     * Create per-player payment links (admin/editor billing flow for per_player pricing)
+     */
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin', 'editor')
+    @Post('per-player-links/:reservationId')
+    async createPerPlayerLinks(@Param('reservationId') reservationId: string) {
+        return this.paymentsService.createPerPlayerPaymentLinks(reservationId);
     }
 
     /**

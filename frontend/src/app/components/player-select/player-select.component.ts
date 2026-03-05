@@ -364,6 +364,11 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
 
   private _selectedPlayerId: string | null = null;
 
+  /** Public getter so parent components can read the selected player's ID */
+  get selectedPlayerId(): string | null {
+    return this._selectedPlayerId;
+  }
+
   // --- Create Modal Logic ---
 
   openCreateModal() {

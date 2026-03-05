@@ -36,7 +36,7 @@ export interface Reservation {
     finalPrice: number;
     paymentStatus: 'pending' | 'paid' | 'partial';
     paymentNotes?: string;
-    playerPayments?: { playerName: string; paid: boolean; amount: number }[];
+    playerPayments?: { playerId?: string; playerName: string; paid: boolean; amount: number }[];
     court?: Court;
     createdAt: Date;
     updatedAt: Date;

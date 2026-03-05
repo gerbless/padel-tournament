@@ -348,6 +348,54 @@ textarea.form-control {
     gap: 0.75rem;
 }
 .player-slot { position: relative; }
+
+.player-input-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.player-input-row app-player-select { flex: 1; min-width: 0; }
+
+.btn-player-link {
+    width: 32px;
+    height: 32px;
+    border: 1px solid rgba(0, 158, 227, 0.3);
+    border-radius: 6px;
+    background: rgba(0, 158, 227, 0.1);
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+.btn-player-link:hover { background: rgba(0, 158, 227, 0.25); }
+.btn-player-link:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Paid player badge */
+.paid-badge {
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-left: 2px;
+}
+
+/* Locked fields (player already paid) */
+.locked {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+input.locked {
+    background: rgba(255,255,255,0.03) !important;
+    color: var(--text-secondary) !important;
+}
+
+/* Disabled save button */
+.btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.3);
+}
 .player-label {
     display: block;
     margin-bottom: 0.35rem;
@@ -478,6 +526,10 @@ textarea.form-control {
 }
 .pp-toggle:hover {
     opacity: 0.85;
+}
+.pp-toggle:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
 }
 .pp-summary {
     display: flex;

@@ -54,6 +54,14 @@ export class MercadoPagoPayment {
     @Column({ nullable: true })
     payerEmail: string;
 
+    /** Player index for per-player payments (0-3), null for full-court */
+    @Column({ type: 'int', nullable: true })
+    playerIndex: number;
+
+    /** Player name for per-player payments */
+    @Column({ nullable: true })
+    playerName: string;
+
     /** Status from Mercado Pago */
     @Column({
         type: 'enum',

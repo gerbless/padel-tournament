@@ -44,8 +44,20 @@ export class PaymentService {
         });
     }
 
-    createPaymentLink(reservationId: string): Observable<{ paymentUrl: string }> {
-        return this.http.post<{ paymentUrl: string }>(`${this.apiUrl}/payment-link/${reservationId}`, {});
+    createPaymentLink(reservationId: string): Observable<{ paymentUrl: string; shortUrl: string }> {
+        return this.http.post<{ paymentUrl: string; shortUrl: string }>(`${this.apiUrl}/payment-link/${reservationId}`, {});
+    }
+
+    createPerPlayerLinks(reservationId: string): Observable<{
+        links: { playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string }[];
+    }> {
+        return this.http.post<any>(`${this.apiUrl}/per-player-links/${reservationId}`, {});
+    }
+
+    createSinglePlayerLink(reservationId: string, playerIndex: number): Observable<{
+        playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string;
+    }> {
+        return this.http.post<any>(`${this.apiUrl}/player-link/${reservationId}/${playerIndex}`, {});
     }
 
     getPaymentStatus(reservationId: string): Observable<PaymentStatus | null> {

@@ -92,13 +92,14 @@
                 <div class="form-group">
                     <label>Fecha</label>
                     <input type="date" [(ngModel)]="reservationForm.date" class="form-control"
-                        (ngModelChange)="calculatePrice()">
+                        (ngModelChange)="calculatePrice()" [readonly]="isFullyPaid">
                 </div>
 
                 <!-- Nº Jugadores -->
                 <div class="form-group">
                     <label>Nº Jugadores</label>
-                    <select [(ngModel)]="reservationForm.playerCount" class="form-control">
+                    <select [(ngModel)]="reservationForm.playerCount" class="form-control" [disabled]="isFullyPaid"
+                        (ngModelChange)="onPlayerCountChange()">
                         <option [ngValue]="2">2</option>
                         <option [ngValue]="3">3</option>
                         <option [ngValue]="4">4</option>
@@ -109,7 +110,7 @@
                 <div class="form-group">
                     <label>Hora inicio</label>
                     <select [(ngModel)]="reservationForm.startTime" class="form-control"
-                        (ngModelChange)="onStartTimeChange()">
+                        (ngModelChange)="onStartTimeChange()" [disabled]="isFullyPaid">
                         <option *ngFor="let t of timeSlots" [value]="t">{{ t }}</option>
                     </select>
                 </div>
@@ -123,7 +124,7 @@
                 <div class="form-group col-span-full">
                     <label>Título / Nombre de reserva <span class="optional">(Op)</span></label>
                     <input type="text" [(ngModel)]="reservationForm.title" class="form-control"
-                        placeholder="Ej: Partido amistoso, Clase grupal…">
+                        placeholder="Ej: Partido amistoso, Clase grupal…" [readonly]="isFullyPaid">
                 </div>
             </div>
 
@@ -135,15 +136,27 @@
                     <div *ngFor="let p of reservationForm.players; let i = index; trackBy: trackByIndex"
                          class="player-slot">
                         <label class="player-label">Jugador {{ i + 1 }}</label>
-                        <app-player-select
-                            [mode]="'name'"
-                            [(ngModel)]="reservationForm.players[i]"
-                            [placeholder]="'Buscar o escribir nombre…'"
-                            [currentClubId]="court?.clubId || null"
-                            [excludeNames]="getExcludedPlayerNames(i)"
-                            (ngModelChange)="onPlayerChange()"
-                            (requestCreatePlayer)="onRequestCreatePlayer($event, i)">
-                        </app-player-select>
+                        <div class="player-input-row">
+                            <app-player-select
+                                [mode]="'name'"
+                                [(ngModel)]="reservationForm.players[i]"
+                                [placeholder]="'Buscar o escribir nombre…'"
+                                [currentClubId]="court?.clubId || null"
+                                [excludeNames]="getExcludedPlayerNames(i)"
+                                [class.locked]="isPlayerPaid(i) || isFullyPaid"
+                                [style.pointer-events]="(isPlayerPaid(i) || isFullyPaid) ? 'none' : 'auto'"
+                                [style.opacity]="(isPlayerPaid(i) || isFullyPaid) ? '0.7' : '1'"
+                                (ngModelChange)="onPlayerChange()"
+                                (requestCreatePlayer)="onRequestCreatePlayer($event, i)">
+                            </app-player-select>
+                            <!-- Generate MP link button for individual player -->
+                            <!-- <button *ngIf="canEdit && mpConfigured && reservationForm.players[i]?.trim() && !isPlayerPaid(i) && !isFullyPaid"
+                                class="btn-player-link" title="Generar link de pago para este jugador"
+                                (click)="generatePlayerLink(i)" [disabled]="paymentLinkLoading">
+                                💳
+                            </button>
+                            <span *ngIf="isPlayerPaid(i)" class="paid-badge" title="Jugador ya pagó">✅</span> -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -156,7 +169,7 @@
                     <div class="form-group">
                         <label>Tipo de cobro</label>
                         <select [(ngModel)]="reservationForm.priceType" class="form-control"
-                            (ngModelChange)="onPriceTypeChange()">
+                            (ngModelChange)="onPriceTypeChange()" [disabled]="isFullyPaid">
                             <option value="full_court">Cancha completa</option>
                             <option value="per_player" [disabled]="!allPlayersFilled">Por jugador (1/4)</option>
                         </select>
@@ -174,14 +187,14 @@
                         <label>Precio final</label>
                         <div class="input-with-suffix">
                             <input type="number" [(ngModel)]="reservationForm.finalPrice"
-                                min="0" class="form-control">
+                                min="0" class="form-control" [readonly]="isFullyPaid">
                             <span class="suffix">$</span>
                         </div>
                         <small>Modifica para dar un precio especial</small>
                     </div>
                     <div class="form-group" *ngIf="reservationForm.priceType !== 'per_player'">
                         <label>Estado de pago</label>
-                        <select [(ngModel)]="reservationForm.paymentStatus" class="form-control">
+                        <select [(ngModel)]="reservationForm.paymentStatus" class="form-control" [disabled]="isFullyPaid">
                             <option value="pending">⏳ Pendiente</option>
                             <option value="paid">✅ Pagado</option>
                             <option value="partial">½ Pago parcial</option>
@@ -191,7 +204,7 @@
                     <div class="form-group col-span-full" *ngIf="reservationForm.priceType !== 'per_player'">
                         <label>Notas de pago <span class="optional">(Op)</span></label>
                         <textarea [(ngModel)]="reservationForm.paymentNotes" class="form-control"
-                            rows="2" placeholder="Ej: Pagó 50%, debe el resto…"></textarea>
+                            rows="2" placeholder="Ej: Pagó 50%, debe el resto…" [readonly]="isFullyPaid"></textarea>
                     </div>
                 </div>
 
@@ -207,13 +220,22 @@
                             </div>
                             <div class="pp-amount">
                                 <input type="number" [(ngModel)]="pp.amount" min="0" class="form-control form-control-sm"
+                                    [readonly]="pp.paid"
+                                    [class.locked]="pp.paid"
                                     (ngModelChange)="updateOverallPaymentStatus()">
                                 <span class="suffix-sm">$</span>
                             </div>
                             <div class="pp-status">
                                 <button class="pp-toggle" [class.is-paid]="pp.paid"
+                                    [disabled]="pp.paid"
                                     (click)="pp.paid = !pp.paid; updateOverallPaymentStatus()">
                                     {{ pp.paid ? '✅ Pagado' : '⏳ Pendiente' }}
+                                </button>
+                            </div>
+                            <div class="pp-link" *ngIf="canEdit && mpConfigured && !pp.paid">
+                                <button class="btn-player-link" title="Generar link MP para {{ pp.playerName }}"
+                                    (click)="generatePlayerLink(i)" [disabled]="paymentLinkLoading">
+                                    💳
                                 </button>
                             </div>
                         </div>
@@ -229,17 +251,31 @@
         </div>
 
         <div class="modal-footer">
-            <button *ngIf="editingReservation" (click)="cancelReservation()" class="btn btn-danger">
+            <button *ngIf="editingReservation && reservationForm.paymentStatus !== 'paid'" (click)="cancelReservation()" class="btn btn-danger">
                 🗑️ Cancelar Reserva
+            </button>
+            <button *ngIf="canEdit && mpConfigured && reservationForm.paymentStatus !== 'paid' && !hasAnyPlayerPaid"
+                (click)="generatePaymentLink()" class="btn btn-info" [disabled]="paymentLinkLoading">
+                {{ paymentLinkLoading ? '⏳ Generando...' : '💳 Link de Pago MP' }}
             </button>
             <div class="spacer"></div>
             <button (click)="showModal = false" class="btn btn-secondary">Cerrar</button>
-            <button (click)="saveReservation()" class="btn btn-primary">
+            <button *ngIf="!isFullyPaid || hasFormChanged" (click)="saveReservation()" class="btn btn-primary"
+                [disabled]="editingReservation && !hasFormChanged">
                 {{ editingReservation ? 'Guardar Cambios' : 'Crear Reserva' }}
             </button>
         </div>
     </div>
 </div>
+
+<!-- Payment Link Modal -->
+<app-payment-link-modal
+    *ngIf="showPaymentLinkModal"
+    [links]="paymentLinks"
+    [loading]="paymentLinkLoading"
+    [error]="paymentLinkError"
+    (close)="showPaymentLinkModal = false">
+</app-payment-link-modal>
 
 <!-- Player Create Modal -->
 <app-player-create-modal

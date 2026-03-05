@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, ViewChildren, QueryList } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, ViewChildren, QueryList } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -12,16 +12,17 @@ import { PaymentService } from '../../../../services/payment.service';
 import { environment } from '../../../../../environments/environment';
 import { PlayerSelectComponent } from '../../../../components/player-select/player-select.component';
 import { PlayerCreateModalComponent } from '../../../../components/player-create-modal/player-create-modal.component';
+import { PaymentLinkModalComponent, PaymentLinkData } from '../../../../components/payment-link-modal/payment-link-modal.component';
 
 @Component({
     selector: 'app-court-daily-view',
     standalone: true,
-    imports: [CommonModule, FormsModule, RouterLink, PlayerSelectComponent, PlayerCreateModalComponent],
+    imports: [CommonModule, FormsModule, RouterLink, PlayerSelectComponent, PlayerCreateModalComponent, PaymentLinkModalComponent],
     templateUrl: './court-daily-view.component.html',
     styleUrls: ['./court-daily-view.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class CourtDailyViewComponent implements OnInit {
+export class CourtDailyViewComponent implements OnInit, OnDestroy {
     clubId = '';
     clubName = '';
     courts: Court[] = [];
@@ -30,6 +31,10 @@ export class CourtDailyViewComponent implements OnInit {
     isLoggedIn = false;
     canEdit = false;
     enablePricing = false;
+
+    // Auto-refresh
+    private refreshInterval: any = null;
+    private readonly REFRESH_MS = 15_000;
 
     // Current day
     currentDate: Date = new Date();
@@ -57,14 +62,26 @@ export class CourtDailyViewComponent implements OnInit {
         finalPrice: 0,
         paymentStatus: 'pending' as 'pending' | 'paid' | 'partial',
         paymentNotes: '',
-        playerPayments: [] as { playerName: string; paid: boolean; amount: number }[]
+        playerPayments: [] as { playerId?: string; playerName: string; paid: boolean; amount: number }[]
     };
 
     noPriceBlockMessage = '';
 
+    // Dirty-tracking: snapshot of form when modal opens
+    private formSnapshot = '';
+
+    // Last known server-side payment state (deep-cloned, immune to user mutations)
+    private _lastServerPaymentSnapshot = '';
+
     // Mercado Pago
     mpConfigured = false;
     generatingPayLink = false;
+
+    // Payment link modal
+    showPaymentLinkModal = false;
+    paymentLinks: PaymentLinkData[] = [];
+    paymentLinkLoading = false;
+    paymentLinkError = '';
 
     // Player creation
     @ViewChildren(PlayerSelectComponent) playerSelects!: QueryList<PlayerSelectComponent>;
@@ -124,6 +141,99 @@ export class CourtDailyViewComponent implements OnInit {
                 this.cdr.markForCheck();
             },
             error: () => {}
+        });
+
+        // Start auto-refresh
+        this.startAutoRefresh();
+    }
+
+    ngOnDestroy() {
+        this.stopAutoRefresh();
+    }
+
+    private startAutoRefresh() {
+        this.stopAutoRefresh();
+        this.refreshInterval = setInterval(() => this.silentRefresh(), this.REFRESH_MS);
+    }
+
+    private stopAutoRefresh() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+        }
+    }
+
+    /** Refresh reservations without showing loading state; sync open modal */
+    private silentRefresh() {
+        if (!this.clubId) return;
+        this.courtService.getReservationsByClub(this.clubId, this.dateStr, this.dateStr).subscribe({
+            next: (res) => {
+                this.reservations = res;
+                // If a reservation modal is open, always sync payment data from server
+                if (this.showModal && this.editingReservation) {
+                    const updated = res.find(r => r.id === this.editingReservation!.id);
+                    if (updated) {
+                        this.syncModalPaymentData(updated);
+                    } else {
+                        // Reservation was deleted externally
+                        this.showModal = false;
+                        this.toast.info('La reserva fue eliminada');
+                    }
+                }
+                this.cdr.markForCheck();
+            },
+            error: () => {} // silent
+        });
+    }
+
+    /** Sync payment-related fields from a refreshed reservation into the open modal form.
+     *  Only updates when the SERVER data actually changed – never overwrites user edits. */
+    private syncModalPaymentData(updated: Reservation) {
+        // Build a snapshot of the NEW server payment state
+        const newServerSnapshot = JSON.stringify({
+            paymentStatus: updated.paymentStatus || 'pending',
+            playerPayments: updated.playerPayments || [],
+        });
+
+        // Compare against last known server state (immune to user mutations)
+        if (newServerSnapshot === this._lastServerPaymentSnapshot) {
+            return; // Server hasn't changed → don't touch the form
+        }
+
+        // Extract previous server status before updating
+        const prevStatus = JSON.parse(this._lastServerPaymentSnapshot || '{}').paymentStatus || 'pending';
+
+        // Server has genuinely changed → update only payment fields
+        this.reservationForm.paymentStatus = updated.paymentStatus || 'pending';
+        if (updated.playerPayments?.length) {
+            this.reservationForm.playerPayments = JSON.parse(JSON.stringify(updated.playerPayments));
+        }
+        if (updated.paymentNotes !== undefined) {
+            this.reservationForm.paymentNotes = updated.paymentNotes || '';
+        }
+
+        // Update server snapshot
+        this._lastServerPaymentSnapshot = newServerSnapshot;
+
+        // Update the editingReservation reference
+        this.editingReservation = updated;
+
+        // Re-take form snapshot so these server changes don't make the form look "dirty"
+        this.formSnapshot = JSON.stringify(this.reservationForm);
+
+        const newStatus = updated.paymentStatus || 'pending';
+        if (prevStatus !== newStatus && newStatus !== 'pending') {
+            const label = newStatus === 'paid' ? 'completamente pagada' : 'parcialmente pagada';
+            this.toast.success(`Reserva ${label}`);
+        }
+    }
+
+    /** After a successful save, align both snapshots with the current form state */
+    private _syncSnapshotsAfterSave() {
+        this.formSnapshot = JSON.stringify(this.reservationForm);
+        this._lastServerPaymentSnapshot = JSON.stringify({
+            paymentStatus: this.reservationForm.paymentStatus,
+            playerPayments: this.reservationForm.playerPayments,
         });
     }
 
@@ -269,6 +379,7 @@ export class CourtDailyViewComponent implements OnInit {
         };
 
         this.calculatePrice();
+        this.formSnapshot = ''; // new reservation → no snapshot
         this.showModal = true;
         this.cdr.markForCheck();
     }
@@ -292,10 +403,17 @@ export class CourtDailyViewComponent implements OnInit {
             finalPrice: Number(res.finalPrice) || 0,
             paymentStatus: res.paymentStatus || 'pending',
             paymentNotes: res.paymentNotes || '',
-            playerPayments: res.playerPayments || []
+            playerPayments: JSON.parse(JSON.stringify(res.playerPayments || []))
         };
 
         this.showModal = true;
+        // Take a snapshot AFTER populating the form so we can detect changes
+        this.formSnapshot = JSON.stringify(this.reservationForm);
+        // Store server payment state independently
+        this._lastServerPaymentSnapshot = JSON.stringify({
+            paymentStatus: res.paymentStatus || 'pending',
+            playerPayments: res.playerPayments || [],
+        });
         this.cdr.markForCheck();
     }
 
@@ -368,6 +486,20 @@ export class CourtDailyViewComponent implements OnInit {
         this.calculatePrice();
     }
 
+    onPlayerCountChange() {
+        const count = this.reservationForm.playerCount;
+        const current = this.reservationForm.players;
+        if (current.length < count) {
+            while (this.reservationForm.players.length < count) {
+                this.reservationForm.players.push('');
+            }
+        } else if (current.length > count) {
+            this.reservationForm.players = current.slice(0, count);
+        }
+        this.onPlayerChange();
+        this.cdr.markForCheck();
+    }
+
     saveReservation() {
         if (!this.selectedCourtId) return;
         const court = this.courts.find(c => c.id === this.selectedCourtId);
@@ -431,26 +563,187 @@ export class CourtDailyViewComponent implements OnInit {
     // ── Mercado Pago ──────────────────────────────────────
 
     generatePaymentLink() {
-        if (!this.editingReservation) return;
-        this.generatingPayLink = true;
+        this.showPaymentLinkModal = true;
+        this.paymentLinks = [];
+        this.paymentLinkLoading = true;
+        this.paymentLinkError = '';
         this.cdr.markForCheck();
 
-        this.paymentService.createPaymentLink(this.editingReservation.id).subscribe({
-            next: (result) => {
-                this.generatingPayLink = false;
+        const players = this.reservationForm.players.filter(p => p.trim());
+        const data: any = {
+            courtId: this.selectedCourtId,
+            clubId: this.clubId,
+            date: this.reservationForm.date,
+            startTime: this.reservationForm.startTime,
+            endTime: this.reservationForm.endTime,
+            title: this.reservationForm.title || undefined,
+            players,
+            playerCount: this.reservationForm.playerCount,
+            priceType: this.reservationForm.priceType,
+            finalPrice: this.reservationForm.finalPrice,
+            paymentStatus: this.reservationForm.paymentStatus,
+            paymentNotes: this.reservationForm.paymentNotes || undefined,
+            playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null
+        };
+
+        if (this.editingReservation) {
+            // Update existing reservation first to sync data
+            this.courtService.updateReservation(this.editingReservation.id, data).subscribe({
+                next: () => {
+                    // Re-snapshot so auto-refresh can detect future payment changes
+                    this._syncSnapshotsAfterSave();
+                    this.doGeneratePaymentLinks(this.editingReservation!.id);
+                },
+                error: (err) => {
+                    this.paymentLinkError = err.error?.message || 'Error al guardar reserva';
+                    this.paymentLinkLoading = false;
+                    this.cdr.markForCheck();
+                }
+            });
+        } else {
+            if (!this.selectedCourtId) {
+                this.paymentLinkError = 'Selecciona una cancha primero';
+                this.paymentLinkLoading = false;
                 this.cdr.markForCheck();
-                // Copy to clipboard
-                navigator.clipboard.writeText(result.paymentUrl).then(() => {
-                    this.toast.success('Link de pago copiado al portapapeles');
-                }).catch(() => {
-                    // Fallback: show it in a prompt
-                    this.toast.success('Link de pago generado');
-                    window.prompt('Link de pago:', result.paymentUrl);
-                });
+                return;
+            }
+            this.courtService.createReservation(data).subscribe({
+                next: (created) => {
+                    this.editingReservation = created;
+                    this.loadReservations();
+                    this.toast.success('Reserva creada');
+                    this.doGeneratePaymentLinks(created.id);
+                },
+                error: (err) => {
+                    this.paymentLinkError = err.error?.message || 'Error al crear reserva';
+                    this.paymentLinkLoading = false;
+                    this.cdr.markForCheck();
+                }
+            });
+        }
+    }
+
+    private doGeneratePaymentLinks(reservationId: string) {
+        // Check if per-player pricing
+        if (this.reservationForm.priceType === 'per_player' && this.reservationForm.playerPayments.length > 0) {
+            this.paymentService.createPerPlayerLinks(reservationId).subscribe({
+                next: (result) => {
+                    this.paymentLinks = result.links.map(l => ({
+                        playerName: l.playerName,
+                        amount: l.amount,
+                        paymentUrl: l.paymentUrl,
+                        shortUrl: l.shortUrl,
+                        status: l.status,
+                    }));
+                    this.paymentLinkLoading = false;
+                    this.cdr.markForCheck();
+                },
+                error: (err) => {
+                    this.paymentLinkError = err.error?.message || 'Error al generar links de pago';
+                    this.paymentLinkLoading = false;
+                    this.cdr.markForCheck();
+                }
+            });
+        } else {
+            this.paymentService.createPaymentLink(reservationId).subscribe({
+                next: (result) => {
+                    this.paymentLinks = [{
+                        paymentUrl: result.paymentUrl,
+                        shortUrl: result.shortUrl,
+                        amount: this.reservationForm.finalPrice,
+                        status: 'pending',
+                    }];
+                    this.paymentLinkLoading = false;
+                    this.cdr.markForCheck();
+                },
+                error: (err) => {
+                    this.paymentLinkError = err.error?.message || 'Error al generar link de pago';
+                    this.paymentLinkLoading = false;
+                    this.cdr.markForCheck();
+                }
+            });
+        }
+    }
+
+    // ── Per-player link on demand ───────────────────────────
+
+    generatePlayerLink(playerIndex: number) {
+        const playerName = this.reservationForm.players[playerIndex];
+        if (!playerName || !playerName.trim()) {
+            this.toast.error('El jugador no tiene nombre');
+            return;
+        }
+        this.showPaymentLinkModal = true;
+        this.paymentLinks = [];
+        this.paymentLinkLoading = true;
+        this.paymentLinkError = '';
+        this.cdr.markForCheck();
+
+        const players = this.reservationForm.players.filter(p => p.trim());
+        const data: any = {
+            courtId: this.selectedCourtId, clubId: this.clubId,
+            date: this.reservationForm.date, startTime: this.reservationForm.startTime,
+            endTime: this.reservationForm.endTime, title: this.reservationForm.title || undefined,
+            players, playerCount: this.reservationForm.playerCount,
+            priceType: this.reservationForm.priceType, finalPrice: this.reservationForm.finalPrice,
+            paymentStatus: this.reservationForm.paymentStatus,
+            paymentNotes: this.reservationForm.paymentNotes || undefined,
+            playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null
+        };
+
+        if (this.editingReservation) {
+            // Update existing reservation to sync data, then generate link
+            this.courtService.updateReservation(this.editingReservation.id, data).subscribe({
+                next: () => {
+                    // Re-snapshot so auto-refresh can detect future payment changes
+                    this._syncSnapshotsAfterSave();
+                    this.doGenerateSinglePlayerLink(this.editingReservation!.id, playerIndex);
+                },
+                error: (err) => {
+                    this.paymentLinkError = err.error?.message || 'Error al guardar reserva';
+                    this.paymentLinkLoading = false;
+                    this.cdr.markForCheck();
+                }
+            });
+        } else {
+            if (!this.selectedCourtId) {
+                this.paymentLinkError = 'Selecciona una cancha primero';
+                this.paymentLinkLoading = false;
+                this.cdr.markForCheck();
+                return;
+            }
+            this.courtService.createReservation(data).subscribe({
+                next: (created) => {
+                    this.editingReservation = created;
+                    this.loadReservations();
+                    this.toast.success('Reserva creada');
+                    this.doGenerateSinglePlayerLink(created.id, playerIndex);
+                },
+                error: (err) => {
+                    this.paymentLinkError = err.error?.message || 'Error al crear reserva';
+                    this.paymentLinkLoading = false;
+                    this.cdr.markForCheck();
+                }
+            });
+        }
+    }
+
+    private doGenerateSinglePlayerLink(reservationId: string, playerIndex: number) {
+        this.paymentService.createSinglePlayerLink(reservationId, playerIndex).subscribe({
+            next: (result) => {
+                this.paymentLinks = [{
+                    playerName: result.playerName,
+                    amount: result.amount,
+                    paymentUrl: result.paymentUrl,
+                    shortUrl: result.shortUrl,
+                    status: result.status,
+                }];
+                this.paymentLinkLoading = false;
+                this.cdr.markForCheck();
             },
             error: (err) => {
-                this.generatingPayLink = false;
-                this.toast.error(err.error?.message || 'Error al generar link de pago');
+                this.paymentLinkError = err.error?.message || 'Error al generar link';
+                this.paymentLinkLoading = false;
                 this.cdr.markForCheck();
             }
         });
@@ -505,6 +798,42 @@ export class CourtDailyViewComponent implements OnInit {
         return this.reservationForm.players.filter(p => p.trim()).length >= 4;
     }
 
+    /** True when at least one player in the per-player grid has paid */
+    get hasAnyPlayerPaid(): boolean {
+        return this.reservationForm.playerPayments.some(pp => pp.paid);
+    }
+
+    /** True when the reservation payment is fully completed */
+    get isFullyPaid(): boolean {
+        return this.reservationForm.paymentStatus === 'paid';
+    }
+
+    /** True if the form differs from the snapshot taken when the modal opened */
+    get hasFormChanged(): boolean {
+        if (!this.formSnapshot) return true; // new reservation → always allow save
+        return JSON.stringify(this.reservationForm) !== this.formSnapshot;
+    }
+
+    /** Get the player ID from the player-select component at the given index */
+    private getPlayerIdForIndex(index: number): string | null {
+        const selects = this.playerSelects?.toArray();
+        return selects?.[index]?.selectedPlayerId || null;
+    }
+
+    /** Check if a specific player (by index) has already paid */
+    isPlayerPaid(index: number): boolean {
+        const pp = this.reservationForm.playerPayments;
+        if (!pp || !pp.length) return false;
+        // Match by playerId first, then fall back to playerName
+        const playerId = this.getPlayerIdForIndex(index);
+        if (playerId) {
+            return pp.some(p => p.playerId === playerId && p.paid);
+        }
+        const playerName = this.reservationForm.players[index]?.trim();
+        if (!playerName) return false;
+        return pp.some(p => p.playerName === playerName && p.paid);
+    }
+
     onPlayerChange() {
         // If players changed and we're in per_player mode, reset to full_court if not all filled
         if (this.reservationForm.priceType === 'per_player' && !this.allPlayersFilled) {
@@ -523,10 +852,15 @@ export class CourtDailyViewComponent implements OnInit {
         const filledPlayers = this.reservationForm.players.filter(p => p.trim());
         const perPlayerAmount = Math.round(((this.reservationForm.basePrice || 0) / 4) * 100) / 100;
         const existing = this.reservationForm.playerPayments || [];
+        const selects = this.playerSelects?.toArray() || [];
 
-        this.reservationForm.playerPayments = filledPlayers.map(name => {
-            const prev = existing.find(pp => pp.playerName === name);
-            return prev ? { ...prev, amount: prev.amount || perPlayerAmount } : { playerName: name, paid: false, amount: perPlayerAmount };
+        this.reservationForm.playerPayments = filledPlayers.map((name, idx) => {
+            const playerId = selects[idx]?.selectedPlayerId || undefined;
+            // Match existing entry by playerId first, then by name
+            const prev = existing.find(pp => (playerId && pp.playerId === playerId) || pp.playerName === name);
+            return prev
+                ? { ...prev, playerId: playerId || prev.playerId, playerName: name, amount: prev.amount || perPlayerAmount }
+                : { playerId, playerName: name, paid: false, amount: perPlayerAmount };
         });
         this.updateOverallPaymentStatus();
     }
