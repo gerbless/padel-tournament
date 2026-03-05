@@ -440,11 +440,168 @@ export class CourtsService {
             ORDER BY "month" ASC
         `, [clubId]);
 
+        // Payment method statistics
+        // Counts from full-court reservations (non per-player) — only paid/partial
+        const fullCourtMethods = await this.reservationRepository.query(`
+            SELECT COALESCE(r."paymentMethod"::text, 'sin_especificar') AS method,
+                   COUNT(*) AS count,
+                   COALESCE(SUM(${fp}), 0) AS revenue
+            FROM "reservations" r
+            JOIN "courts" c ON r."courtId" = c."id"
+            WHERE c."clubId" = $1
+                AND r."status" != 'cancelled'
+                AND ${dateFilter}
+                AND (r."playerPayments" IS NULL OR jsonb_array_length(r."playerPayments") = 0)
+                AND r."paymentStatus" IN ('paid', 'partial')
+            GROUP BY COALESCE(r."paymentMethod"::text, 'sin_especificar')
+        `, [clubId]);
+
+        // Counts from per-player payments (only paid individual payments)
+        const perPlayerMethods = await this.reservationRepository.query(`
+            SELECT COALESCE(NULLIF(pp->>'paymentMethod', ''), 'sin_especificar') AS method,
+                   COUNT(*) AS count,
+                   COALESCE(SUM((pp->>'amount')::numeric), 0) AS revenue
+            FROM "reservations" r
+            JOIN "courts" c ON r."courtId" = c."id",
+                 jsonb_array_elements(r."playerPayments") pp
+            WHERE c."clubId" = $1
+                AND r."status" != 'cancelled'
+                AND ${dateFilter}
+                AND r."playerPayments" IS NOT NULL
+                AND jsonb_array_length(r."playerPayments") > 0
+                AND (pp->>'paid')::boolean = true
+            GROUP BY COALESCE(NULLIF(pp->>'paymentMethod', ''), 'sin_especificar')
+        `, [clubId]);
+
+        // Merge both sources
+        const methodMap: Record<string, { count: number; revenue: number }> = {};
+        for (const row of [...fullCourtMethods, ...perPlayerMethods]) {
+            const m = row.method;
+            if (!m) continue;
+            if (!methodMap[m]) methodMap[m] = { count: 0, revenue: 0 };
+            methodMap[m].count += +row.count;
+            methodMap[m].revenue += +row.revenue;
+        }
+        const paymentMethodStats = Object.entries(methodMap).map(([method, data]) => ({
+            method,
+            count: data.count,
+            revenue: data.revenue
+        }));
+
         return {
             courts: perCourt,
             totals: totals[0] || {},
-            monthlyTrend
+            monthlyTrend,
+            paymentMethodStats
         };
+    }
+
+    async getPlayerBillingHistory(clubId: string, year: number, month?: number): Promise<any> {
+        const dateFilter = month
+            ? `EXTRACT(YEAR FROM r."date"::date) = ${year} AND EXTRACT(MONTH FROM r."date"::date) = ${month}`
+            : `EXTRACT(YEAR FROM r."date"::date) = ${year}`;
+
+        // Get all reservations for the period with their player data
+        const reservations = await this.reservationRepository.query(`
+            SELECT
+                r."id",
+                r."players",
+                r."playerCount",
+                r."priceType",
+                r."finalPrice"::numeric AS "finalPrice",
+                r."paymentStatus",
+                r."paymentMethod",
+                r."playerPayments"
+            FROM "reservations" r
+            JOIN "courts" c ON r."courtId" = c."id"
+            WHERE c."clubId" = $1
+                AND r."status" != 'cancelled'
+                AND ${dateFilter}
+        `, [clubId]);
+
+        // Build per-player stats
+        const playerMap: Record<string, {
+            name: string;
+            gamesPlayed: number;
+            totalBilled: number;
+            totalPaid: number;
+            totalOwed: number;
+            paymentMethods: Record<string, number>;
+        }> = {};
+
+        for (const res of reservations) {
+            const players: string[] = res.players || [];
+            const fp = +res.finalPrice || 0;
+            const pp: any[] = res.playerPayments || [];
+            const hasPP = pp.length > 0;
+            const playerCount = players.length || res.playerCount || 4;
+
+            for (const playerName of players) {
+                if (!playerName || !playerName.trim()) continue;
+                const key = playerName.trim().toLowerCase();
+
+                if (!playerMap[key]) {
+                    playerMap[key] = {
+                        name: playerName.trim(),
+                        gamesPlayed: 0,
+                        totalBilled: 0,
+                        totalPaid: 0,
+                        totalOwed: 0,
+                        paymentMethods: {}
+                    };
+                }
+                const p = playerMap[key];
+                p.gamesPlayed++;
+
+                if (hasPP) {
+                    // Per-player payment: find this player's payment entry
+                    const ppEntry = pp.find((e: any) => e.playerName?.trim().toLowerCase() === key);
+                    if (ppEntry) {
+                        const amount = +(ppEntry.amount || 0);
+                        p.totalBilled += amount;
+                        if (ppEntry.paid) {
+                            p.totalPaid += amount;
+                            const method = ppEntry.paymentMethod || 'sin_especificar';
+                            p.paymentMethods[method] = (p.paymentMethods[method] || 0) + 1;
+                        } else {
+                            p.totalOwed += amount;
+                        }
+                    } else {
+                        // Player is in list but no payment entry
+                        const share = fp / playerCount;
+                        p.totalBilled += share;
+                        p.totalOwed += share;
+                    }
+                } else {
+                    // Full-court: divide evenly
+                    const share = fp / playerCount;
+                    p.totalBilled += share;
+                    if (res.paymentStatus === 'paid') {
+                        p.totalPaid += share;
+                        const method = res.paymentMethod || 'sin_especificar';
+                        p.paymentMethods[method] = (p.paymentMethods[method] || 0) + 1;
+                    } else if (res.paymentStatus === 'partial') {
+                        // For partial, count half as approximation
+                        p.totalPaid += share * 0.5;
+                        p.totalOwed += share * 0.5;
+                    } else {
+                        p.totalOwed += share;
+                    }
+                }
+            }
+        }
+
+        const playerStats = Object.values(playerMap)
+            .map(p => ({
+                ...p,
+                totalBilled: Math.round(p.totalBilled),
+                totalPaid: Math.round(p.totalPaid),
+                totalOwed: Math.round(p.totalOwed),
+                paymentMethods: Object.entries(p.paymentMethods).map(([method, count]) => ({ method, count }))
+            }))
+            .sort((a, b) => b.gamesPlayed - a.gamesPlayed);
+
+        return { players: playerStats };
     }
 
     // ==========================================

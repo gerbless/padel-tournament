@@ -116,4 +116,10 @@ export class CourtService {
         if (month) params.month = month;
         return this.http.get<BillingDashboard>(`${this.apiUrl}/club/${clubId}/billing`, { params });
     }
+
+    getPlayerBillingHistory(clubId: string, year: number, month?: number): Observable<{ players: any[] }> {
+        const params: any = { year };
+        if (month) params.month = month;
+        return this.http.get<{ players: any[] }>(`${this.apiUrl}/club/${clubId}/billing/players`, { params });
+    }
 }

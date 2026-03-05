@@ -520,4 +520,244 @@
     .status-grid { grid-template-columns: 1fr 1fr; }
     .court-bar-row { flex-wrap: wrap; }
     .court-bar-track { order: 3; width: 100%; flex: auto; }
+    .pm-layout { flex-direction: column; }
+    .pm-chart { max-width: 160px; margin: 0 auto; }
+}
+
+/* ═══ Payment Method Statistics ═══ */
+.payment-methods-section {
+    background: var(--card-bg, #1e293b);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+}
+.payment-methods-section h2 {
+    margin: 0 0 1.25rem 0;
+    font-size: 1.1rem;
+}
+.pm-layout {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+.pm-chart {
+    flex: 0 0 auto;
+    width: 140px;
+}
+.pm-donut {
+    width: 100%;
+    height: auto;
+}
+.pm-donut-bg {
+    fill: none;
+    stroke: rgba(255,255,255,0.06);
+    stroke-width: 3;
+}
+.pm-donut-segment {
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.6s ease;
+}
+.pm-donut-total {
+    fill: #fff;
+    font-size: 6px;
+    font-weight: 700;
+    text-anchor: middle;
+    dominant-baseline: auto;
+}
+.pm-donut-label {
+    fill: rgba(255,255,255,0.5);
+    font-size: 3px;
+    text-anchor: middle;
+    dominant-baseline: hanging;
+}
+.pm-counters {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.pm-counter-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-left: calc(12px + 0.6rem); /* offset for color dot */
+}
+.pm-counter-header span {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgba(255,255,255,0.4);
+}
+.pm-h-method { flex: 1; }
+.pm-h-count { min-width: 2rem; text-align: right; }
+.pm-h-pct { min-width: 2.5rem; text-align: right; }
+.pm-h-revenue { min-width: 5rem; text-align: right; }
+.pm-counter-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.pm-color-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+.pm-method-name {
+    flex: 1;
+    font-size: 0.9rem;
+}
+.pm-count {
+    font-weight: 700;
+    font-size: 0.95rem;
+    min-width: 2rem;
+    text-align: right;
+}
+.pm-pct {
+    color: rgba(255,255,255,0.5);
+    font-size: 0.8rem;
+    min-width: 2.5rem;
+    text-align: right;
+}
+.pm-revenue {
+    color: #22c55e;
+    font-weight: 600;
+    font-size: 0.85rem;
+    min-width: 5rem;
+    text-align: right;
+}
+.pm-counter-total {
+    border-top: 1px solid rgba(255,255,255,0.12);
+    padding-top: 0.4rem;
+    margin-top: 0.15rem;
+}
+
+/* Horizontal bars */
+.pm-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.pm-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.pm-bar-label {
+    font-size: 0.8rem;
+    min-width: 8rem;
+    white-space: nowrap;
+}
+.pm-bar-track {
+    flex: 1;
+    height: 18px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.pm-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    min-width: 2px;
+    transition: width 0.5s ease;
+}
+.pm-bar-value {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.7);
+    min-width: 5rem;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* ═══ Player Billing History ═══ */
+.player-history-section {
+    background: var(--card-bg, #1e293b);
+    border-radius: 12px;
+    padding: 0;
+    margin-top: 1.5rem;
+    overflow: hidden;
+}
+.ph-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.25rem 1.5rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+.ph-header:hover {
+    background: rgba(255,255,255,0.03);
+}
+.ph-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    flex: 1;
+}
+.ph-chevron {
+    font-size: 0.7rem;
+    transition: transform 0.25s ease;
+    color: var(--text-secondary, rgba(255,255,255,0.5));
+}
+.ph-chevron.open {
+    transform: rotate(90deg);
+}
+.ph-hint {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.4);
+}
+.ph-body {
+    padding: 0 1.5rem 1.5rem;
+}
+.ph-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem 0;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.9rem;
+}
+.ph-loading .spinner {
+    width: 24px;
+    height: 24px;
+}
+.ph-empty {
+    text-align: center;
+    padding: 2rem 0;
+    color: rgba(255,255,255,0.4);
+    font-size: 0.9rem;
+}
+.ph-table {
+    font-size: 0.85rem;
+}
+.td-player-name {
+    font-weight: 500;
+    white-space: nowrap;
+}
+.td-owed-highlight {
+    color: #f87171 !important;
+    font-weight: 600;
+}
+.td-methods {
+    white-space: nowrap;
+}
+.pm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-right: 0.25rem;
+    background: rgba(255,255,255,0.04);
+}
+.pm-badge-none {
+    color: rgba(255,255,255,0.3);
 }

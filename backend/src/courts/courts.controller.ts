@@ -196,6 +196,15 @@ export class CourtsController {
         return this.courtsService.getBillingDashboard(clubId, +year, month ? +month : undefined);
     }
 
+    @Get('club/:clubId/billing/players')
+    getPlayerBillingHistory(
+        @Param('clubId') clubId: string,
+        @Query('year') year: number,
+        @Query('month') month?: number
+    ) {
+        return this.courtsService.getPlayerBillingHistory(clubId, +year, month ? +month : undefined);
+    }
+
     // ==========================================
     // PUBLIC: AVAILABLE SLOTS
     // ==========================================

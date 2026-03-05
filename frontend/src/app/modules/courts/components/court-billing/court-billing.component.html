@@ -175,6 +175,62 @@
             </div>
         </div>
 
+        <!-- ═══ Payment Method Statistics ═══ -->
+        <div class="payment-methods-section" *ngIf="paymentMethodStats.length > 0">
+            <h2>💳 Métodos de Pago Utilizados</h2>
+            <div class="pm-layout">
+                <!-- Donut chart -->
+                <div class="pm-chart">
+                    <svg viewBox="0 0 42 42" class="pm-donut">
+                        <circle class="pm-donut-bg" cx="21" cy="21" r="15.9155" />
+                        <circle *ngFor="let stat of paymentMethodStats; let i = index"
+                            class="pm-donut-segment"
+                            cx="21" cy="21" r="15.9155"
+                            [attr.stroke]="paymentMethodColor(stat.method)"
+                            [attr.stroke-dasharray]="paymentMethodPct(stat) + ' ' + (100 - paymentMethodPct(stat))"
+                            [attr.stroke-dashoffset]="getDonutOffset(i)" />
+                        <text x="21" y="20" class="pm-donut-total">{{ paymentMethodTotal }}</text>
+                        <text x="21" y="24.5" class="pm-donut-label">pagos</text>
+                    </svg>
+                </div>
+                <!-- Counters list -->
+                <div class="pm-counters">
+                    <div class="pm-counter-header">
+                        <span class="pm-h-method">Método</span>
+                        <span class="pm-h-count">Pagos</span>
+                        <span class="pm-h-pct">%</span>
+                        <span class="pm-h-revenue">Total recaudado</span>
+                    </div>
+                    <div *ngFor="let stat of paymentMethodStats" class="pm-counter-row">
+                        <div class="pm-color-dot" [style.background]="paymentMethodColor(stat.method)"></div>
+                        <span class="pm-method-name">{{ paymentMethodLabel(stat.method) }}</span>
+                        <span class="pm-count">{{ stat.count }}</span>
+                        <span class="pm-pct">{{ paymentMethodPct(stat) }}%</span>
+                        <span class="pm-revenue">{{ formatCurrency(stat.revenue) }}</span>
+                    </div>
+                    <div class="pm-counter-row pm-counter-total">
+                        <div class="pm-color-dot" style="background: transparent;"></div>
+                        <span class="pm-method-name"><strong>Total</strong></span>
+                        <span class="pm-count"><strong>{{ paymentMethodTotal }}</strong></span>
+                        <span class="pm-pct"><strong>100%</strong></span>
+                        <span class="pm-revenue"><strong>{{ formatCurrency(paymentMethodTotalRevenue) }}</strong></span>
+                    </div>
+                </div>
+            </div>
+            <!-- Horizontal bars -->
+            <div class="pm-bars">
+                <div *ngFor="let stat of paymentMethodStats" class="pm-bar-row">
+                    <span class="pm-bar-label">{{ paymentMethodIcon(stat.method) }} {{ paymentMethodLabel(stat.method).split(' ').slice(1).join(' ') }}</span>
+                    <div class="pm-bar-track">
+                        <div class="pm-bar-fill" [style.width]="paymentMethodPct(stat) + '%'"
+                             [style.background]="paymentMethodColor(stat.method)">
+                        </div>
+                    </div>
+                    <span class="pm-bar-value">{{ stat.count }} ({{ paymentMethodPct(stat) }}%)</span>
+                </div>
+            </div>
+        </div>
+
         <!-- ═══ Per-Court Breakdown Table ═══ -->
         <div class="court-table-section">
             <h2>🏟️ Facturación por Cancha</h2>
@@ -249,6 +305,62 @@
                         <div class="court-bar-pending" [style.width]="(totals.totalRevenue ? (court.pendingRevenue / totals.totalRevenue * 100) : 0) + '%'"></div>
                     </div>
                     <span class="court-bar-total">{{ formatCurrency(court.totalRevenue) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ Player Billing History (Accordion) ═══ -->
+        <div class="player-history-section">
+            <div class="ph-header" (click)="togglePlayerHistory()">
+                <span class="ph-chevron" [class.open]="playerHistoryOpen">▶</span>
+                <h2>👤 Historial por Jugador</h2>
+                <span class="ph-hint">{{ getPeriodLabel() }}</span>
+            </div>
+            <div class="ph-body" *ngIf="playerHistoryOpen">
+                <!-- Loading spinner -->
+                <div *ngIf="playerHistoryLoading" class="ph-loading">
+                    <div class="spinner"></div>
+                    <span>Cargando historial de jugadores…</span>
+                </div>
+                <!-- Data table -->
+                <div *ngIf="!playerHistoryLoading && playerHistoryLoaded" class="ph-content">
+                    <div *ngIf="playerStats.length === 0" class="ph-empty">
+                        No hay jugadores registrados en el período seleccionado.
+                    </div>
+                    <div *ngIf="playerStats.length > 0" class="table-wrapper">
+                        <table class="billing-table ph-table">
+                            <thead>
+                                <tr>
+                                    <th class="th-court">#</th>
+                                    <th>Jugador</th>
+                                    <th class="th-right">Partidos</th>
+                                    <th class="th-right">Facturado</th>
+                                    <th class="th-right">Pagado</th>
+                                    <th class="th-right">Deuda</th>
+                                    <th>Métodos de pago</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let p of playerStats; let i = index">
+                                    <td class="td-court-num">{{ i + 1 }}</td>
+                                    <td class="td-player-name">{{ p.name }}</td>
+                                    <td class="td-right">{{ p.gamesPlayed }}</td>
+                                    <td class="td-right td-revenue">{{ formatCurrency(p.totalBilled) }}</td>
+                                    <td class="td-right td-paid-amount">{{ formatCurrency(p.totalPaid) }}</td>
+                                    <td class="td-right" [class.td-owed-highlight]="p.totalOwed > 0">
+                                        {{ p.totalOwed > 0 ? formatCurrency(p.totalOwed) : '—' }}
+                                    </td>
+                                    <td class="td-methods">
+                                        <span *ngFor="let pm of p.paymentMethods" class="pm-badge"
+                                              [style.borderColor]="paymentMethodColor(pm.method)">
+                                            {{ paymentMethodIcon(pm.method) }} ×{{ pm.count }}
+                                        </span>
+                                        <span *ngIf="p.paymentMethods.length === 0" class="pm-badge-none">—</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

@@ -95,8 +95,24 @@ export interface MonthlyTrend {
     totalReservations: number;
 }
 
+export interface PaymentMethodStat {
+    method: string;
+    count: number;
+    revenue: number;
+}
+
+export interface PlayerBillingStat {
+    name: string;
+    gamesPlayed: number;
+    totalBilled: number;
+    totalPaid: number;
+    totalOwed: number;
+    paymentMethods: { method: string; count: number }[];
+}
+
 export interface BillingDashboard {
     courts: CourtBilling[];
     totals: BillingTotals;
     monthlyTrend: MonthlyTrend[];
+    paymentMethodStats: PaymentMethodStat[];
 }

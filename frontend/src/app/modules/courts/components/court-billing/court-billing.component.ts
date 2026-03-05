@@ -5,7 +5,7 @@ import { RouterModule } from '@angular/router';
 import { CourtService } from '../../../../services/court.service';
 import { ClubService } from '../../../../services/club.service';
 import { AuthService } from '../../../../services/auth.service';
-import { BillingDashboard, CourtBilling, BillingTotals, MonthlyTrend } from '../../../../models/court.model';
+import { BillingDashboard, CourtBilling, BillingTotals, MonthlyTrend, PaymentMethodStat, PlayerBillingStat } from '../../../../models/court.model';
 
 @Component({
     selector: 'app-court-billing',
@@ -33,6 +33,9 @@ export class CourtBillingComponent implements OnInit {
     };
     monthlyTrend: MonthlyTrend[] = [];
     chartMaxRevenue = 0;
+    paymentMethodStats: PaymentMethodStat[] = [];
+    paymentMethodTotal = 0;
+    paymentMethodTotalRevenue = 0;
 
     monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     monthFullNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -109,6 +112,11 @@ export class CourtBillingComponent implements OnInit {
                     ...this.monthlyTrend.map(m => m.totalRevenue),
                     1
                 );
+                this.paymentMethodStats = (data.paymentMethodStats || [])
+                    .map(s => ({ method: s.method, count: +s.count, revenue: +s.revenue }))
+                    .sort((a, b) => b.count - a.count);
+                this.paymentMethodTotal = this.paymentMethodStats.reduce((s, m) => s + m.count, 0);
+                this.paymentMethodTotalRevenue = this.paymentMethodStats.reduce((s, m) => s + m.revenue, 0);
                 this.loading = false;
                 this.cdr.markForCheck();
             },
@@ -121,6 +129,7 @@ export class CourtBillingComponent implements OnInit {
 
     onFilterChange() {
         this.loadBilling();
+        this.resetPlayerHistory();
     }
 
     clearMonth() {
@@ -174,5 +183,93 @@ export class CourtBillingComponent implements OnInit {
             return `${this.monthFullNames[this.selectedMonth - 1]} ${this.selectedYear}`;
         }
         return `Año ${this.selectedYear}`;
+    }
+
+    // ── Payment method helpers ───────────────────────
+
+    paymentMethodLabel(method: string): string {
+        const map: Record<string, string> = {
+            cash: '💵 Efectivo',
+            transfer: '🏦 Transferencia',
+            mercado_pago: '💳 Mercado Pago',
+            red_compras: '🏧 Red Compras',
+            sin_especificar: '❔ Sin especificar'
+        };
+        return map[method] || method;
+    }
+
+    paymentMethodIcon(method: string): string {
+        const map: Record<string, string> = { cash: '💵', transfer: '🏦', mercado_pago: '💳', red_compras: '🏧', sin_especificar: '❔' };
+        return map[method] || '💳';
+    }
+
+    paymentMethodColor(method: string): string {
+        const map: Record<string, string> = {
+            cash: '#22c55e',
+            transfer: '#3b82f6',
+            mercado_pago: '#00b4ff',
+            red_compras: '#f59e0b',
+            sin_especificar: '#6b7280'
+        };
+        return map[method] || '#8b5cf6';
+    }
+
+    paymentMethodPct(stat: PaymentMethodStat): number {
+        if (!this.paymentMethodTotal) return 0;
+        return Math.round((stat.count / this.paymentMethodTotal) * 100);
+    }
+
+    getDonutOffset(index: number): number {
+        let offset = 25; // start at top (SVG circle starts at 3 o'clock, 25 shifts to 12 o'clock)
+        for (let i = 0; i < index; i++) {
+            offset -= this.paymentMethodPct(this.paymentMethodStats[i]);
+        }
+        return offset;
+    }
+
+    // ── Player billing history (accordion) ───────────
+
+    playerHistoryOpen = false;
+    playerHistoryLoading = false;
+    playerHistoryLoaded = false;
+    playerStats: PlayerBillingStat[] = [];
+
+    togglePlayerHistory() {
+        this.playerHistoryOpen = !this.playerHistoryOpen;
+        if (this.playerHistoryOpen && !this.playerHistoryLoaded) {
+            this.loadPlayerHistory();
+        }
+    }
+
+    loadPlayerHistory() {
+        this.playerHistoryLoading = true;
+        this.playerHistoryLoaded = false;
+        this.cdr.markForCheck();
+
+        this.courtService.getPlayerBillingHistory(
+            this.clubId,
+            this.selectedYear,
+            this.selectedMonth || undefined
+        ).subscribe({
+            next: (data) => {
+                this.playerStats = data.players || [];
+                this.playerHistoryLoading = false;
+                this.playerHistoryLoaded = true;
+                this.cdr.markForCheck();
+            },
+            error: () => {
+                this.playerHistoryLoading = false;
+                this.cdr.markForCheck();
+            }
+        });
+    }
+
+    // Reset player history when filters change so it reloads on next expand
+    private resetPlayerHistory() {
+        this.playerHistoryLoaded = false;
+        this.playerStats = [];
+        if (this.playerHistoryOpen) {
+            this.loadPlayerHistory();
+        }
     }
 }
