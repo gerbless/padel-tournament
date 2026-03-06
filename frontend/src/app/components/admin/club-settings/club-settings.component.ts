@@ -42,6 +42,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
     saving = false;
     loadingUsers = false;
     activeTab: 'modules' | 'users' = 'modules';
+    freePlayPointsPerWin = 3;
 
     // Role assignment form
     selectedUserId = '';
@@ -79,6 +80,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
                 this.club = club;
                 if (club) {
                     this.modules = { ...DEFAULT_ENABLED_MODULES, ...(club.enabledModules || {}) };
+                    this.freePlayPointsPerWin = club.freePlayPointsPerWin || 3;
                     this.loadClubUsers();
                     this.loadAllUsers();
                     this.loadPlayers();
@@ -138,12 +140,12 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
         try {
             const updated = await this.http.patch<Club>(
                 `${environment.apiUrl}/clubs/${this.club.id}`,
-                { enabledModules: this.modules }
+                { enabledModules: this.modules, freePlayPointsPerWin: this.freePlayPointsPerWin }
             ).toPromise();
 
             if (updated) {
                 // Update the stored club in ClubService
-                const updatedClub = { ...this.club, enabledModules: this.modules };
+                const updatedClub = { ...this.club, enabledModules: this.modules, freePlayPointsPerWin: this.freePlayPointsPerWin };
                 this.clubService.selectClub(updatedClub);
             }
         } catch (e) {

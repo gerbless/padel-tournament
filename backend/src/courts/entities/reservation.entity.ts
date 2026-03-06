@@ -102,6 +102,10 @@ export class Reservation {
     @Column({ type: 'timestamptz', nullable: true })
     paymentExpiresAt: Date;
 
+    /** Whether this reservation's match counts for the free-play ranking */
+    @Column({ default: false })
+    countsForRanking: boolean;
+
     @CreateDateColumn()
     createdAt: Date;
 

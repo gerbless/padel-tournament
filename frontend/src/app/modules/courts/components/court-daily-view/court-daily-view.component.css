@@ -634,3 +634,14 @@ input.locked {
     .player-payment-row { flex-wrap: wrap; }
     .pp-amount { width: 100%; }
 }
+
+.btn-score {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.btn-score:hover { opacity: 0.9; }

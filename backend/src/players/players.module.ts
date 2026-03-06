@@ -6,12 +6,13 @@ import { PlayerRecommendationService } from './player-recommendation.service';
 import { PlayersController } from './players.controller';
 import { Player } from './entities/player.entity';
 import { PlayerClubStats } from './entities/player-club-stats.entity';
+import { FreePlayMatch } from '../courts/entities/free-play-match.entity';
 import { UsersModule } from '../users/users.module';
 import { ClubRoleGuard } from '../auth/club-role.guard';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Player, PlayerClubStats]),
+        TypeOrmModule.forFeature([Player, PlayerClubStats, FreePlayMatch]),
         UsersModule
     ],
     controllers: [PlayersController],

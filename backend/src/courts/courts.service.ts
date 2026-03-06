@@ -5,6 +5,7 @@ import { Court } from './entities/court.entity';
 import { CourtPriceBlock } from './entities/court-price-block.entity';
 import { Reservation, ReservationStatus, PriceType, PaymentStatus } from './entities/reservation.entity';
 import { CourtBlock, BlockType } from './entities/court-block.entity';
+import { FreePlayMatch } from './entities/free-play-match.entity';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { CreatePriceBlockDto } from './dto/create-price-block.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -24,6 +25,8 @@ export class CourtsService {
         private mpPaymentRepository: Repository<MercadoPagoPayment>,
         @InjectRepository(CourtBlock)
         private courtBlockRepository: Repository<CourtBlock>,
+        @InjectRepository(FreePlayMatch)
+        private freePlayMatchRepository: Repository<FreePlayMatch>,
     ) { }
 
     // ==========================================
@@ -812,5 +815,123 @@ export class CourtsService {
             }
         }
         return { blocked: false };
+    }
+
+    // ==========================================
+    // FREE-PLAY MATCHES (Score tracking for reservations)
+    // ==========================================
+
+    async getFreePlayMatch(reservationId: string): Promise<FreePlayMatch | null> {
+        return this.freePlayMatchRepository.findOne({ where: { reservationId } });
+    }
+
+    async getFreePlayMatchesByClub(clubId: string, startDate?: string, endDate?: string): Promise<FreePlayMatch[]> {
+        const query = this.freePlayMatchRepository.createQueryBuilder('fpm')
+            .where('fpm.clubId = :clubId', { clubId });
+
+        if (startDate) query.andWhere('fpm.date >= :startDate', { startDate });
+        if (endDate) query.andWhere('fpm.date <= :endDate', { endDate });
+
+        return query.orderBy('fpm.date', 'DESC').getMany();
+    }
+
+    async saveFreePlayMatch(data: {
+        reservationId: string;
+        clubId: string;
+        date: string;
+        team1PlayerIds: string[];
+        team2PlayerIds: string[];
+        team1Names: string[];
+        team2Names: string[];
+        sets: { team1: number; team2: number }[];
+        countsForRanking: boolean;
+        pointsPerWin: number;
+    }): Promise<FreePlayMatch> {
+        // Determine winner from sets
+        let team1Sets = 0;
+        let team2Sets = 0;
+        for (const s of data.sets) {
+            if (s.team1 > s.team2) team1Sets++;
+            else if (s.team2 > s.team1) team2Sets++;
+        }
+        const winner = team1Sets > team2Sets ? 1 : team2Sets > team1Sets ? 2 : null;
+        const status = data.sets.length > 0 ? 'completed' : 'pending';
+
+        // Check if match already exists for this reservation
+        let match = await this.freePlayMatchRepository.findOne({ where: { reservationId: data.reservationId } });
+
+        if (match) {
+            // Update existing
+            match.team1PlayerIds = data.team1PlayerIds;
+            match.team2PlayerIds = data.team2PlayerIds;
+            match.team1Names = data.team1Names;
+            match.team2Names = data.team2Names;
+            match.sets = data.sets;
+            match.winner = winner;
+            match.status = status;
+            match.countsForRanking = data.countsForRanking;
+            match.pointsPerWin = data.pointsPerWin;
+        } else {
+            // Create new
+            match = this.freePlayMatchRepository.create({
+                ...data,
+                winner,
+                status,
+            });
+        }
+
+        // Also update reservation countsForRanking flag
+        await this.reservationRepository.update(data.reservationId, { countsForRanking: data.countsForRanking });
+
+        return this.freePlayMatchRepository.save(match);
+    }
+
+    async deleteFreePlayMatch(reservationId: string): Promise<void> {
+        await this.freePlayMatchRepository.delete({ reservationId });
+        await this.reservationRepository.update(reservationId, { countsForRanking: false });
+    }
+
+    /** Get free-play stats for a player across all completed matches */
+    async getFreePlayStatsForPlayer(playerId: string, clubId?: string): Promise<{ matchesWon: number; matchesLost: number; matchesPlayed: number; points: number }> {
+        const query = this.freePlayMatchRepository.createQueryBuilder('fpm')
+            .where('fpm.status = :status', { status: 'completed' })
+            .andWhere('fpm.countsForRanking = true');
+
+        if (clubId) query.andWhere('fpm.clubId = :clubId', { clubId });
+
+        const matches = await query.getMany();
+
+        let matchesWon = 0;
+        let matchesLost = 0;
+        let points = 0;
+
+        for (const m of matches) {
+            const inTeam1 = (m.team1PlayerIds || []).includes(playerId);
+            const inTeam2 = (m.team2PlayerIds || []).includes(playerId);
+            if (!inTeam1 && !inTeam2) continue;
+
+            if (m.winner === 1 && inTeam1) {
+                matchesWon++;
+                points += m.pointsPerWin;
+            } else if (m.winner === 2 && inTeam2) {
+                matchesWon++;
+                points += m.pointsPerWin;
+            } else if (m.winner !== null) {
+                matchesLost++;
+            }
+        }
+
+        return { matchesWon, matchesLost, matchesPlayed: matchesWon + matchesLost, points };
+    }
+
+    /** Get all free-play matches for bulk stats computation */
+    async getAllFreePlayMatches(clubId?: string): Promise<FreePlayMatch[]> {
+        const query = this.freePlayMatchRepository.createQueryBuilder('fpm')
+            .where('fpm.status = :status', { status: 'completed' })
+            .andWhere('fpm.countsForRanking = true');
+
+        if (clubId) query.andWhere('fpm.clubId = :clubId', { clubId });
+
+        return query.getMany();
     }
 }

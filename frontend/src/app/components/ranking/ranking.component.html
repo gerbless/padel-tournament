@@ -1,10 +1,20 @@
 <div class="container fade-in">
     <div class="flex-between mb-4">
-        <h1>🏆 Ranking Global</h1>
+        <h1>{{ tabTitle }}</h1>
         <div class="search-box">
             <input type="text" [(ngModel)]="searchTerm" (input)="filterPlayers()" placeholder="🔍 Buscar jugador..."
                 class="input search-input">
         </div>
+    </div>
+
+    <!-- Ranking Tabs -->
+    <div class="ranking-tabs mb-4">
+        <button *ngFor="let tab of tabs"
+            class="ranking-tab"
+            [class.active]="activeTab === tab.key"
+            (click)="switchTab(tab.key)">
+            {{ tab.icon }} {{ tab.label }}
+        </button>
     </div>
 
     <div *ngIf="loading" class="flex-center" style="min-height: 400px;">
@@ -25,8 +35,8 @@
                     <tr>
                         <th style="width: 80px;">Pos</th>
                         <th>Jugador</th>
-                        <th class="text-center">Puntos</th>
-                        <th class="text-center">Torneos</th>
+                        <th class="text-center">{{ pointsLabel }}</th>
+                        <th class="text-center" *ngIf="activeTab !== 'free-play'">Torneos</th>
                         <th class="text-center">Victorias</th>
                     </tr>
                 </thead>
@@ -41,8 +51,8 @@
                             </div>
                         </td>
                         <td class="player-cell" data-label="Jugador">{{ player.name }}</td>
-                        <td class="text-center font-bold text-accent" data-label="Puntos">{{ player.totalPoints }}</td>
-                        <td class="text-center" data-label="Torneos">{{ player.tournamentsPlayed }}</td>
+                        <td class="text-center font-bold text-accent" [attr.data-label]="pointsLabel">{{ getPointsField(player) }}</td>
+                        <td class="text-center" data-label="Torneos" *ngIf="activeTab !== 'free-play'">{{ player.tournamentsPlayed }}</td>
                         <td class="text-center" data-label="Victorias">{{ player.matchesWon }}</td>
                     </tr>
                 </tbody>

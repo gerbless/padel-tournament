@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Player } from './entities/player.entity';
 import { PlayerClubStats } from './entities/player-club-stats.entity';
+import { FreePlayMatch } from '../courts/entities/free-play-match.entity';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
 import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
@@ -16,6 +17,8 @@ export class PlayersService {
         private playerRepository: Repository<Player>,
         @InjectRepository(PlayerClubStats)
         private playerClubStatsRepository: Repository<PlayerClubStats>,
+        @InjectRepository(FreePlayMatch)
+        private freePlayMatchRepository: Repository<FreePlayMatch>,
         private rankingService: PlayerRankingService,
         private recommendationService: PlayerRecommendationService,
     ) { }
@@ -257,6 +260,7 @@ export class PlayersService {
                         totalPoints: 0,
                         leaguePoints: 0,
                         tournamentPoints: 0,
+                        freePlayPoints: 0,
                         matchesWon: 0,
                         matchesLost: 0,
                         gamesWon: 0,
@@ -357,18 +361,47 @@ export class PlayersService {
             processLeagueTeams(player.leagueTeamsAsPlayer1 || []);
             processLeagueTeams(player.leagueTeamsAsPlayer2 || []);
 
+            // Process free-play matches
+            let globalFreePlayPoints = 0;
+            let globalFreePlayWins = 0;
+
+            const freePlayMatches = await this.freePlayMatchRepository.createQueryBuilder('fpm')
+                .where('fpm.status = :status', { status: 'completed' })
+                .andWhere('fpm.countsForRanking = true')
+                .getMany();
+
+            for (const m of freePlayMatches) {
+                const inTeam1 = (m.team1PlayerIds || []).includes(player.id);
+                const inTeam2 = (m.team2PlayerIds || []).includes(player.id);
+                if (!inTeam1 && !inTeam2) continue;
+
+                const clubId = m.clubId || null;
+                const clubStats = ensureClubStats(clubId);
+
+                if ((m.winner === 1 && inTeam1) || (m.winner === 2 && inTeam2)) {
+                    globalFreePlayPoints += m.pointsPerWin;
+                    globalFreePlayWins++;
+                    globalMatchesWon++;
+                    clubStats.freePlayPoints = (clubStats.freePlayPoints || 0) + m.pointsPerWin;
+                    clubStats.matchesWon++;
+                } else if (m.winner !== null) {
+                    clubStats.matchesLost++;
+                }
+            }
+
             // Calculate total points for each club
             statsByClub.forEach(stats => {
-                stats.totalPoints = stats.tournamentPoints + stats.leaguePoints;
+                stats.totalPoints = stats.tournamentPoints + stats.leaguePoints + (stats.freePlayPoints || 0);
                 stats.tournamentsPlayed = stats.tournamentIds.size;
                 stats.leaguesPlayed = stats.leagueIds.size;
             });
 
             // Update global player stats
-            globalTotalPoints = globalTournamentPoints + globalLeaguePoints;
+            globalTotalPoints = globalTournamentPoints + globalLeaguePoints + globalFreePlayPoints;
             player.totalPoints = globalTotalPoints;
             player.tournamentPoints = globalTournamentPoints;
             player.leaguePoints = globalLeaguePoints;
+            player.freePlayPoints = globalFreePlayPoints;
             player.matchesWon = globalMatchesWon;
             player.tournamentsPlayed = globalTournamentIds.size;
             player.leaguesPlayed = globalLeagueIds.size;
@@ -387,6 +420,7 @@ export class PlayersService {
                     clubStats.totalPoints = stats.totalPoints;
                     clubStats.leaguePoints = stats.leaguePoints;
                     clubStats.tournamentPoints = stats.tournamentPoints;
+                    clubStats.freePlayPoints = stats.freePlayPoints || 0;
                     clubStats.matchesWon = stats.matchesWon;
                     clubStats.matchesLost = stats.matchesLost;
                     clubStats.tournamentsPlayed = stats.tournamentsPlayed;
@@ -404,6 +438,10 @@ export class PlayersService {
 
     async getTournamentRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
         return this.rankingService.getTournamentRanking(categoryId, clubId);
+    }
+
+    async getFreePlayRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
+        return this.rankingService.getFreePlayRanking(categoryId, clubId);
     }
 
     async getPairRankings(type: 'global' | 'league' | 'tournament', categoryId?: string, clubId?: string): Promise<any[]> {

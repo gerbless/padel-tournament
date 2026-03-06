@@ -10,6 +10,7 @@ export interface Player {
     totalPoints: number;
     leaguePoints?: number;
     tournamentPoints?: number;
+    freePlayPoints?: number;
     matchesWon: number;
     gamesWon: number;
     tournamentsPlayed: number;
@@ -81,6 +82,13 @@ export class PlayerService {
         if (categoryId) params.categoryId = categoryId;
         if (clubId) params.clubId = clubId;
         return this.http.get<{ p1: Player, p2: Player, points: number }[]>(`${this.apiUrl}/ranking/pairs`, { params });
+    }
+
+    getFreePlayRanking(categoryId?: string, clubId?: string): Observable<Player[]> {
+        const params: any = {};
+        if (categoryId) params.categoryId = categoryId;
+        if (clubId) params.clubId = clubId;
+        return this.http.get<Player[]>(`${this.apiUrl}/ranking/free-play`, { params });
     }
 
     getRecommendedMatches(clubId?: string): Observable<any[]> {

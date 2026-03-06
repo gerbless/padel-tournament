@@ -267,4 +267,67 @@ export class CourtsController {
         const player = await this.playersService.findOne(req.user.playerId);
         return this.courtsService.cancelPlayerBooking(req.user.playerId, player.name, id);
     }
+
+    // ==========================================
+    // FREE-PLAY MATCHES (Score tracking)
+    // ==========================================
+
+    @Get('free-play-match/:reservationId')
+    getFreePlayMatch(@Param('reservationId') reservationId: string) {
+        return this.courtsService.getFreePlayMatch(reservationId);
+    }
+
+    @Get('free-play-matches/club/:clubId')
+    getFreePlayMatchesByClub(
+        @Param('clubId') clubId: string,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+    ) {
+        return this.courtsService.getFreePlayMatchesByClub(clubId, startDate, endDate);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('free-play-match')
+    async saveFreePlayMatch(@Body() body: {
+        reservationId: string;
+        clubId: string;
+        date: string;
+        team1PlayerIds: string[];
+        team2PlayerIds: string[];
+        team1Names: string[];
+        team2Names: string[];
+        sets: { team1: number; team2: number }[];
+        countsForRanking: boolean;
+        pointsPerWin: number;
+    }) {
+        const match = await this.courtsService.saveFreePlayMatch(body);
+        // Recalculate ranking points for all players involved
+        const allPlayerIds = [...(body.team1PlayerIds || []), ...(body.team2PlayerIds || [])].filter(id => id);
+        if (allPlayerIds.length > 0) {
+            await this.playersService.recalculateTotalPoints(allPlayerIds);
+        }
+        return match;
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Delete('free-play-match/:reservationId')
+    async deleteFreePlayMatch(@Param('reservationId') reservationId: string) {
+        // Get match before deleting to know which players to recalculate
+        const match = await this.courtsService.getFreePlayMatch(reservationId);
+        await this.courtsService.deleteFreePlayMatch(reservationId);
+        if (match) {
+            const allPlayerIds = [...(match.team1PlayerIds || []), ...(match.team2PlayerIds || [])].filter(id => id);
+            if (allPlayerIds.length > 0) {
+                await this.playersService.recalculateTotalPoints(allPlayerIds);
+            }
+        }
+    }
+
+    @Get('free-play-stats/:playerId')
+    getFreePlayStatsForPlayer(
+        @Param('playerId') playerId: string,
+        @Query('clubId') clubId?: string,
+    ) {
+        return this.courtsService.getFreePlayStatsForPlayer(playerId, clubId);
+    }
 }

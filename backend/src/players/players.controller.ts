@@ -64,6 +64,11 @@ export class PlayersController {
         return this.playersService.getTournamentRanking(categoryId, clubId);
     }
 
+    @Get('ranking/free-play')
+    getFreePlayRanking(@Query('categoryId') categoryId?: string, @Query('clubId') clubId?: string) {
+        return this.playersService.getFreePlayRanking(categoryId, clubId);
+    }
+
     @Get('ranking/pairs')
     getPairRanking(@Query('type') type: 'global' | 'league' | 'tournament' = 'global', @Query('categoryId') categoryId?: string, @Query('clubId') clubId?: string) {
         return this.playersService.getPairRankings(type, categoryId, clubId);

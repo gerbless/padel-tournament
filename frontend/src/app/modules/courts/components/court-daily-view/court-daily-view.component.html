@@ -171,6 +171,7 @@
                                 [style.pointer-events]="(isPlayerPaid(i) || isFullyPaid) ? 'none' : 'auto'"
                                 [style.opacity]="(isPlayerPaid(i) || isFullyPaid) ? '0.7' : '1'"
                                 (ngModelChange)="onPlayerChange()"
+                                (playerIdResolved)="onPlayerIdResolved()"
                                 (requestCreatePlayer)="onRequestCreatePlayer($event, i)">
                             </app-player-select>
                             <!-- <button *ngIf="canEdit && mpConfigured && reservationForm.players[i]?.trim() && !isPlayerPaid(i) && !isFullyPaid"
@@ -303,18 +304,22 @@
 
         <div class="modal-footer">
             <button *ngIf="editingReservation && reservationForm.paymentStatus !== 'paid'" (click)="cancelReservation()" class="btn btn-danger">
-                🗑️ Cancelar Reserva
+                🗑️ Cancelar
+            </button>
+            <button *ngIf="allPlayersRegistered"
+                (click)="openScoreModal()" class="btn btn-score">
+                📊 Marcador
             </button>
             <button *ngIf="canEdit && mpConfigured && reservationForm.paymentStatus !== 'paid' && !hasAnyPlayerPaid"
                 (click)="generatePaymentLink()" class="btn btn-mp"
                 [disabled]="paymentLinkLoading">
-                {{ paymentLinkLoading ? '⏳ Generando...' : '💳 Link de Pago MP' }}
+                {{ paymentLinkLoading ? '⏳ Generando...' : '💳 Pago MP' }}
             </button>
             <div class="spacer"></div>
             <button (click)="showModal = false" class="btn btn-secondary">Cerrar</button>
             <button *ngIf="!isFullyPaid || hasFormChanged" (click)="saveReservation()" class="btn btn-primary"
                 [disabled]="editingReservation && !hasFormChanged">
-                {{ editingReservation ? 'Guardar Cambios' : 'Crear Reserva' }}
+                {{ editingReservation ? 'Guardar' : 'Crear Reserva' }}
             </button>
         </div>
     </div>
@@ -337,3 +342,16 @@
     (playerCreated)="onPlayerCreated($event)"
     (close)="onClosePlayerCreateModal()">
 </app-player-create-modal>
+
+<!-- Score Modal -->
+<app-score-modal
+    *ngIf="showScoreModal && editingReservation"
+    [reservationId]="editingReservation.id"
+    [clubId]="clubId"
+    [date]="editingReservation.date"
+    [playerNames]="reservationForm.players"
+    [playerIds]="getRegisteredPlayerIds()"
+    [pointsPerWin]="freePlayPointsPerWin"
+    (close)="showScoreModal = false"
+    (saved)="onScoreModalSaved()">
+</app-score-modal>

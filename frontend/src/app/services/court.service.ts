@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Court, CourtPriceBlock, Reservation, RevenueReport, MonthlyRevenue, BillingDashboard, CourtBlock } from '../models/court.model';
+import { Court, CourtPriceBlock, Reservation, RevenueReport, MonthlyRevenue, BillingDashboard, CourtBlock, FreePlayMatch } from '../models/court.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -134,5 +134,25 @@ export class CourtService {
 
     deleteCourtBlock(id: string): Observable<void> {
         return this.http.delete<void>(`${this.apiUrl}/blocks/${id}`);
+    }
+
+    // Free Play Matches
+    getFreePlayMatch(reservationId: string): Observable<FreePlayMatch> {
+        return this.http.get<FreePlayMatch>(`${this.apiUrl}/free-play-match/${reservationId}`);
+    }
+
+    saveFreePlayMatch(data: Partial<FreePlayMatch>): Observable<FreePlayMatch> {
+        return this.http.post<FreePlayMatch>(`${this.apiUrl}/free-play-match`, data);
+    }
+
+    deleteFreePlayMatch(reservationId: string): Observable<void> {
+        return this.http.delete<void>(`${this.apiUrl}/free-play-match/${reservationId}`);
+    }
+
+    getFreePlayMatchesByClub(clubId: string, startDate?: string, endDate?: string): Observable<FreePlayMatch[]> {
+        let params: any = {};
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+        return this.http.get<FreePlayMatch[]>(`${this.apiUrl}/free-play-matches/club/${clubId}`, { params });
     }
 }

@@ -19,6 +19,7 @@ export class PlayerRankingService {
             player.totalPoints = s.totalPoints;
             player.leaguePoints = s.leaguePoints;
             player.tournamentPoints = s.tournamentPoints;
+            player.freePlayPoints = s.freePlayPoints;
             player.matchesWon = s.matchesWon;
             return player;
         });
@@ -251,5 +252,39 @@ export class PlayerRankingService {
             order: { totalPoints: 'DESC', matchesWon: 'DESC' },
             take: limit
         });
+    }
+
+    async getFreePlayRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
+        if (!clubId) {
+            let query = this.playerRepository.createQueryBuilder('player')
+                .leftJoinAndSelect('player.category', 'category')
+                .where('player.freePlayPoints > 0');
+
+            if (categoryId) {
+                query = query.andWhere('player.categoryId = :categoryId', { categoryId });
+            }
+
+            return query
+                .orderBy('player.freePlayPoints', 'DESC')
+                .addOrderBy('player.matchesWon', 'DESC')
+                .getMany();
+        }
+
+        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
+            .leftJoinAndSelect('stats.player', 'player')
+            .leftJoinAndSelect('player.category', 'category')
+            .where('stats.club.id = :clubId', { clubId })
+            .andWhere('stats.freePlayPoints > 0');
+
+        if (categoryId) {
+            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
+        }
+
+        const stats = await statsQuery
+            .orderBy('stats.freePlayPoints', 'DESC')
+            .addOrderBy('stats.matchesWon', 'DESC')
+            .getMany();
+
+        return this.mapClubStatsToPlayers(stats);
     }
 }

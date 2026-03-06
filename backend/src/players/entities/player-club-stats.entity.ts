@@ -24,6 +24,9 @@ export class PlayerClubStats {
     tournamentPoints: number;
 
     @Column({ default: 0, type: 'int' })
+    freePlayPoints: number;
+
+    @Column({ default: 0, type: 'int' })
     matchesWon: number;
 
     @Column({ default: 0, type: 'int' })

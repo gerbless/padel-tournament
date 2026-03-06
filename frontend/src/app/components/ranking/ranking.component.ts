@@ -5,6 +5,8 @@ import { PlayerService, Player } from '../../services/player.service';
 import { ClubService } from '../../services/club.service';
 import { Subscription } from 'rxjs';
 
+type RankingTab = 'global' | 'tournament' | 'league' | 'free-play';
+
 @Component({
     selector: 'app-ranking',
     standalone: true,
@@ -19,7 +21,15 @@ export class RankingComponent implements OnInit, OnDestroy {
     loading = true;
     searchTerm = '';
     currentClubId: string | undefined;
+    activeTab: RankingTab = 'global';
     private clubSubscription: Subscription | undefined;
+
+    tabs: { key: RankingTab; label: string; icon: string }[] = [
+        { key: 'global', label: 'Global', icon: '🏆' },
+        { key: 'tournament', label: 'Torneos', icon: '🎯' },
+        { key: 'league', label: 'Ligas', icon: '📋' },
+        { key: 'free-play', label: 'Juego Libre', icon: '🎾' },
+    ];
 
     constructor(
         private playerService: PlayerService,
@@ -39,9 +49,30 @@ export class RankingComponent implements OnInit, OnDestroy {
         this.clubSubscription?.unsubscribe();
     }
 
+    switchTab(tab: RankingTab) {
+        this.activeTab = tab;
+        this.searchTerm = '';
+        this.loadRanking();
+    }
+
     loadRanking() {
         this.loading = true;
-        this.playerService.getRanking(undefined, this.currentClubId).subscribe({
+        this.cdr.markForCheck();
+        let obs;
+        switch (this.activeTab) {
+            case 'tournament':
+                obs = this.playerService.getTournamentRanking(undefined, this.currentClubId);
+                break;
+            case 'league':
+                obs = this.playerService.getLeagueRanking(undefined, this.currentClubId);
+                break;
+            case 'free-play':
+                obs = this.playerService.getFreePlayRanking(undefined, this.currentClubId);
+                break;
+            default:
+                obs = this.playerService.getRanking(undefined, this.currentClubId);
+        }
+        obs.subscribe({
             next: (players) => {
                 this.players = players;
                 this.filterPlayers();
@@ -67,11 +98,35 @@ export class RankingComponent implements OnInit, OnDestroy {
         this.filteredPlayers = this.calculateRanks(result);
     }
 
+    getPointsField(player: Player): number {
+        switch (this.activeTab) {
+            case 'tournament': return player.tournamentPoints || 0;
+            case 'league': return player.leaguePoints || 0;
+            case 'free-play': return player.freePlayPoints || 0;
+            default: return player.totalPoints || 0;
+        }
+    }
+
+    get pointsLabel(): string {
+        switch (this.activeTab) {
+            case 'tournament': return 'Pts Torneo';
+            case 'league': return 'Pts Liga';
+            case 'free-play': return 'Pts Juego Libre';
+            default: return 'Puntos';
+        }
+    }
+
+    get tabTitle(): string {
+        const tab = this.tabs.find(t => t.key === this.activeTab);
+        return tab ? `${tab.icon} Ranking ${tab.label}` : '🏆 Ranking Global';
+    }
+
     private calculateRanks(players: Player[]): (Player & { rank: number })[] {
         const rankedPlayers: (Player & { rank: number })[] = [];
         let currentRank = 1;
         for (let i = 0; i < players.length; i++) {
-            if (i > 0 && players[i].totalPoints < players[i - 1].totalPoints) {
+            const pts = this.getPointsField(players[i]);
+            if (i > 0 && pts < this.getPointsField(players[i - 1])) {
                 currentRank++;
             }
             rankedPlayers.push({ ...players[i], rank: currentRank });

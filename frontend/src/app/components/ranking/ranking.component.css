@@ -72,6 +72,33 @@
     font-weight: 800;
 }
 
+/* Ranking Tabs */
+.ranking-tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.ranking-tab {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border, #333);
+    background: var(--bg-card, #1e1e2e);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+.ranking-tab:hover {
+    border-color: var(--primary);
+    color: var(--text);
+}
+.ranking-tab.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    font-weight: 600;
+}
+
 .text-accent {
     color: var(--primary);
 }

@@ -24,6 +24,7 @@ export interface Club {
     description?: string;
     logo?: string;
     enableCourtPricing?: boolean;
+    freePlayPointsPerWin?: number;
     enabledModules?: EnabledModules;
     createdAt: Date;
     updatedAt: Date;
@@ -40,5 +41,6 @@ export interface UpdateClubDto {
     description?: string;
     logo?: string;
     enableCourtPricing?: boolean;
+    freePlayPointsPerWin?: number;
     enabledModules?: Partial<EnabledModules>;
 }

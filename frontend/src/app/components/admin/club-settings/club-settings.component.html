@@ -40,6 +40,19 @@
             </div>
         </div>
 
+        <!-- Free Play Ranking Config -->
+        <div class="section-info" style="margin-top: 1.5rem;">
+            <h2>🎾 Juego Libre - Ranking</h2>
+            <p>Configura los puntos que otorga un partido de juego libre ganado. Estos puntos se suman al ranking global junto con torneos y ligas.</p>
+        </div>
+        <div class="free-play-config">
+            <div class="config-row">
+                <label class="config-label">⭐ Puntos por victoria</label>
+                <input type="number" [(ngModel)]="freePlayPointsPerWin" min="1" max="100" class="form-control config-input">
+                <span class="config-hint">puntos por partido ganado</span>
+            </div>
+        </div>
+
         <div class="actions-bar">
             <button class="btn btn-primary" (click)="saveModules()" [disabled]="saving">
                 {{ saving ? 'Guardando...' : '💾 Guardar Configuración' }}

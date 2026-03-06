@@ -13,11 +13,12 @@ import { environment } from '../../../../../environments/environment';
 import { PlayerSelectComponent } from '../../../../components/player-select/player-select.component';
 import { PlayerCreateModalComponent } from '../../../../components/player-create-modal/player-create-modal.component';
 import { PaymentLinkModalComponent, PaymentLinkData } from '../../../../components/payment-link-modal/payment-link-modal.component';
+import { ScoreModalComponent } from '../../../../components/score-modal/score-modal.component';
 
 @Component({
     selector: 'app-court-calendar',
     standalone: true,
-    imports: [CommonModule, FormsModule, RouterLink, PlayerSelectComponent, PlayerCreateModalComponent, PaymentLinkModalComponent],
+    imports: [CommonModule, FormsModule, RouterLink, PlayerSelectComponent, PlayerCreateModalComponent, PaymentLinkModalComponent, ScoreModalComponent],
     templateUrl: './court-calendar.component.html',
     styleUrls: ['./court-calendar.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -31,6 +32,7 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
     isLoggedIn = false;
     canEdit = false;
     enablePricing = false;
+    freePlayPointsPerWin = 3;
 
     // Auto-refresh
     private refreshInterval: any = null;
@@ -40,6 +42,9 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
     accordionInfo = true;
     accordionPlayers = false;
     accordionPricing = false;
+
+    // Score modal
+    showScoreModal = false;
 
     // Player creation
     @ViewChildren(PlayerSelectComponent) playerSelects!: QueryList<PlayerSelectComponent>;
@@ -398,6 +403,7 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
                 this.http.get<any>(`${environment.apiUrl}/clubs/${court.clubId}`).subscribe({
                     next: (club) => {
                         this.enablePricing = club.enableCourtPricing || false;
+                        this.freePlayPointsPerWin = club.freePlayPointsPerWin || 3;
                         this.cdr.markForCheck();
                     }
                 });
@@ -1057,5 +1063,63 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
                 this.cdr.markForCheck();
             }
         });
+    }
+
+    // ── Score modal helpers ───────────────────────────
+
+    get allPlayersRegistered(): boolean {
+        if (!this.allPlayersFilled) return false;
+        const selects = this.playerSelects?.toArray() || [];
+        return selects.length >= 4 && selects.slice(0, 4).every(s => !!s.selectedPlayerId);
+    }
+
+    getRegisteredPlayerIds(): string[] {
+        const selects = this.playerSelects?.toArray() || [];
+        return selects.map(s => s.selectedPlayerId || '');
+    }
+
+    openScoreModal() {
+        if (!this.editingReservation) {
+            // Auto-save reservation first, then open modal
+            if (!this.court) return;
+            const players = this.reservationForm.players.filter(p => p.trim());
+            const data: any = {
+                courtId: this.court.id,
+                clubId: this.court.clubId,
+                date: this.reservationForm.date,
+                startTime: this.reservationForm.startTime,
+                endTime: this.reservationForm.endTime,
+                title: this.reservationForm.title || undefined,
+                players,
+                playerCount: this.reservationForm.playerCount,
+                priceType: this.reservationForm.priceType,
+                finalPrice: this.reservationForm.finalPrice,
+                paymentStatus: this.reservationForm.paymentStatus,
+                paymentMethod: this.reservationForm.paymentMethod || undefined,
+                paymentNotes: this.reservationForm.paymentNotes || undefined,
+                playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null
+            };
+            this.courtService.createReservation(data).subscribe({
+                next: (reservation) => {
+                    this.editingReservation = reservation;
+                    this.toast.success('Reserva creada');
+                    this.loadReservations();
+                    this.showScoreModal = true;
+                    this.cdr.markForCheck();
+                },
+                error: (err) => this.toast.error(err.error?.message || 'Error al crear reserva')
+            });
+            return;
+        }
+        this.showScoreModal = true;
+        this.cdr.markForCheck();
+    }
+
+    onScoreModalSaved() {
+        this.loadReservations();
+    }
+
+    onPlayerIdResolved() {
+        this.cdr.markForCheck();
     }
 }

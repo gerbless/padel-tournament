@@ -20,16 +20,16 @@
     </div>
 
     <!-- No data -->
-    <div *ngIf="!loading && stats.totalTournaments === 0" class="card text-center" style="padding: 3rem;">
+    <div *ngIf="!loading && stats.totalTournaments === 0 && freePlayMatches.length === 0" class="card text-center" style="padding: 3rem;">
         <div style="font-size: 3rem; margin-bottom: 1rem;">🏆</div>
-        <h3>No hay torneos en {{ monthNames[selectedMonth - 1] }} {{ selectedYear }}</h3>
+        <h3>No hay actividad en {{ monthNames[selectedMonth - 1] }} {{ selectedYear }}</h3>
         <p style="color: var(--text-muted); margin-top: 0.5rem;">
             Intenta con otro mes o crea un nuevo torneo
         </p>
     </div>
 
     <!-- Stats Content -->
-    <div *ngIf="!loading && stats.totalTournaments > 0">
+    <div *ngIf="!loading && (stats.totalTournaments > 0 || freePlayMatches.length > 0)">
         <!-- Summary KPIs -->
         <div class="grid grid-2 mb-4">
             <div class="card kpi-card">
@@ -188,6 +188,56 @@
                         </div>
                         <div class="hierarchy-tournaments">
                             🏆 {{ p.tournamentsPlayed }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== FREE PLAY VIEW ==================== -->
+        <div *ngIf="freePlayMatches.length > 0" class="fade-in" style="margin-top: 2rem;">
+            <h2 class="section-title" style="margin-bottom: 1rem;">🎾 Juego Libre del Mes</h2>
+
+            <div class="grid grid-2 mb-4">
+                <div class="card kpi-card">
+                    <div class="kpi-icon">🎾</div>
+                    <div class="kpi-info">
+                        <h3>Partidos Libres</h3>
+                        <div class="kpi-value">{{ freePlayMatches.length }}</div>
+                    </div>
+                </div>
+                <div class="card kpi-card">
+                    <div class="kpi-icon">👥</div>
+                    <div class="kpi-info">
+                        <h3>Jugadores Activos</h3>
+                        <div class="kpi-value">{{ freePlayTopPlayers.length }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4" *ngIf="freePlayTopPlayers.length > 0">
+                <h2 class="section-title">📊 Ranking Juego Libre</h2>
+                <div class="hierarchy">
+                    <div *ngFor="let p of freePlayTopPlayers; let i = index" class="hierarchy-row">
+                        <div class="hierarchy-rank">
+                            <span *ngIf="i === 0" class="medal">🥇</span>
+                            <span *ngIf="i === 1" class="medal">🥈</span>
+                            <span *ngIf="i === 2" class="medal">🥉</span>
+                            <span *ngIf="i > 2" class="rank-num">{{ i + 1 }}</span>
+                        </div>
+                        <div class="hierarchy-name">{{ p.name }}</div>
+                        <div class="hierarchy-bar-container">
+                            <div class="hierarchy-bar" [style.width.%]="freePlayTopPlayers[0].wins > 0 ? (p.wins / freePlayTopPlayers[0].wins) * 100 : 0"
+                                [class.bar-gold]="i === 0"
+                                [class.bar-silver]="i === 1"
+                                [class.bar-bronze]="i === 2">
+                            </div>
+                        </div>
+                        <div class="hierarchy-stats">
+                            <span class="stat-wins">{{ p.wins }}V</span>
+                            <span class="stat-sep">/</span>
+                            <span class="stat-played">{{ p.played }}J</span>
+                            <span class="stat-pct">({{ getWinRate(p.wins, p.played) }}%)</span>
                         </div>
                     </div>
                 </div>

@@ -38,9 +38,28 @@ export interface Reservation {
     paymentMethod?: 'cash' | 'transfer' | 'mercado_pago' | 'red_compras';
     paymentNotes?: string;
     playerPayments?: { playerId?: string; playerName: string; paid: boolean; amount: number; paymentMethod?: string }[];
+    countsForRanking?: boolean;
     court?: Court;
     createdAt: Date;
     updatedAt: Date;
+}
+
+export interface FreePlayMatch {
+    id?: string;
+    reservationId: string;
+    clubId: string;
+    date: string;
+    team1PlayerIds: string[];
+    team2PlayerIds: string[];
+    team1Names: string[];
+    team2Names: string[];
+    sets: { team1: number; team2: number }[];
+    winner?: number | null;
+    countsForRanking: boolean;
+    pointsPerWin: number;
+    status: 'pending' | 'completed';
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 
 export interface RevenueReport {

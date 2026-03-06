@@ -27,6 +27,10 @@ export class Club {
     @Column({ default: false })
     enableCourtPricing: boolean;
 
+    /** Points awarded per free-play match win (configurable per club) */
+    @Column({ type: 'int', default: 3 })
+    freePlayPointsPerWin: number;
+
     /**
      * Per-club module visibility configuration.
      * Admins toggle which modules are active for their club.

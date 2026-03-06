@@ -232,6 +232,7 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
   @Input() excludeIds: string[] = []; // Filter out players by ID
   @Input() excludeNames: string[] = []; // Filter out players by name (for backward compatibility)
   @Output() requestCreatePlayer = new EventEmitter<string>();
+  @Output() playerIdResolved = new EventEmitter<string | null>();
 
   private _allPlayers: Player[] = [];
   filteredPlayers: Player[] = [];
@@ -258,6 +259,14 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
         this._allPlayers = players;
         this.filterPlayers();
         this.loading = false;
+        // Re-resolve selectedPlayerId from current searchTerm after players load
+        if (this.searchTerm && !this._selectedPlayerId && this.mode === 'name') {
+          const match = this._allPlayers.find(p => p.name === this.searchTerm);
+          if (match) {
+            this._selectedPlayerId = match.id;
+            this.playerIdResolved.emit(match.id);
+          }
+        }
         this.cdr.markForCheck();
       },
       error: (err) => {
@@ -350,9 +359,9 @@ export class PlayerSelectComponent implements OnInit, ControlValueAccessor {
   selectPlayer(player: Player) {
     this.searchTerm = player.name;
     this.showDropdown = false;
+    this._selectedPlayerId = player.id;
     const value = this.mode === 'id' ? player.id : player.name;
     this.onChange(value);
-    this._selectedPlayerId = player.id;
   }
 
   clearSelection() {

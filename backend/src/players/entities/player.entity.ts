@@ -32,6 +32,9 @@ export class Player {
     tournamentPoints: number;
 
     @Column({ default: 0 })
+    freePlayPoints: number;
+
+    @Column({ default: 0 })
     matchesWon: number;
 
     @Column({ default: 0 })
