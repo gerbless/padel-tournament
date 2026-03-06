@@ -33,7 +33,7 @@ export class EstadisticasComponent implements OnInit, OnDestroy {
 
     // Free-play monthly stats
     freePlayMatches: FreePlayMatch[] = [];
-    freePlayTopPlayers: { name: string; wins: number; played: number }[] = [];
+    freePlayTopPlayers: { name: string; wins: number; played: number; points: number }[] = [];
 
     private clubSubscription?: Subscription;
 
@@ -116,23 +116,24 @@ export class EstadisticasComponent implements OnInit, OnDestroy {
     }
 
     private buildFreePlayTopPlayers() {
-        const playerMap = new Map<string, { name: string; wins: number; played: number }>();
+        const playerMap = new Map<string, { name: string; wins: number; played: number; points: number }>();
         for (const match of this.freePlayMatches) {
             const allNames = [...(match.team1Names || []), ...(match.team2Names || [])];
             for (let i = 0; i < allNames.length; i++) {
                 const name = allNames[i];
                 if (!name) continue;
-                if (!playerMap.has(name)) playerMap.set(name, { name, wins: 0, played: 0 });
+                if (!playerMap.has(name)) playerMap.set(name, { name, wins: 0, played: 0, points: 0 });
                 const p = playerMap.get(name)!;
                 p.played++;
                 const isTeam1 = i < (match.team1Names?.length || 0);
                 if ((isTeam1 && match.winner === 1) || (!isTeam1 && match.winner === 2)) {
                     p.wins++;
+                    p.points += match.pointsPerWin || 0;
                 }
             }
         }
         this.freePlayTopPlayers = Array.from(playerMap.values())
-            .sort((a, b) => b.wins - a.wins || b.played - a.played)
+            .sort((a, b) => b.points - a.points || b.wins - a.wins || b.played - a.played)
             .slice(0, 10);
     }
 

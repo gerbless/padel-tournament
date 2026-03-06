@@ -217,7 +217,14 @@
 
             <div class="card mb-4" *ngIf="freePlayTopPlayers.length > 0">
                 <h2 class="section-title">📊 Ranking Juego Libre</h2>
-                <div class="hierarchy">
+                <div class="hierarchy hierarchy-freeplay">
+                    <div class="hierarchy-header-row">
+                        <div class="hierarchy-rank"></div>
+                        <div class="hierarchy-name">Jugador</div>
+                        <div class="hierarchy-bar-container"></div>
+                        <div class="hierarchy-stats">V/J</div>
+                        <div class="hierarchy-points">Pts</div>
+                    </div>
                     <div *ngFor="let p of freePlayTopPlayers; let i = index" class="hierarchy-row">
                         <div class="hierarchy-rank">
                             <span *ngIf="i === 0" class="medal">🥇</span>
@@ -227,7 +234,7 @@
                         </div>
                         <div class="hierarchy-name">{{ p.name }}</div>
                         <div class="hierarchy-bar-container">
-                            <div class="hierarchy-bar" [style.width.%]="freePlayTopPlayers[0].wins > 0 ? (p.wins / freePlayTopPlayers[0].wins) * 100 : 0"
+                            <div class="hierarchy-bar" [style.width.%]="freePlayTopPlayers[0].points > 0 ? (p.points / freePlayTopPlayers[0].points) * 100 : 0"
                                 [class.bar-gold]="i === 0"
                                 [class.bar-silver]="i === 1"
                                 [class.bar-bronze]="i === 2">
@@ -239,6 +246,7 @@
                             <span class="stat-played">{{ p.played }}J</span>
                             <span class="stat-pct">({{ getWinRate(p.wins, p.played) }}%)</span>
                         </div>
+                        <div class="hierarchy-points"><b>{{ p.points }}</b></div>
                     </div>
                 </div>
             </div>
