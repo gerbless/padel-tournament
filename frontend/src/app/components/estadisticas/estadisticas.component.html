@@ -1,7 +1,9 @@
 <div class="container fade-in">
     <!-- Header -->
     <div class="flex-between mb-4">
-        <h1>📅 Ranking Mensual</h1>
+        <h1>📅 Estadísticas Mensuales
+            <span class="help-icon" title="Aquí puedes ver el resumen de actividad y rankings del club para el mes seleccionado.">ℹ️</span>
+        </h1>
     </div>
 
     <!-- Month Navigator -->
@@ -35,14 +37,20 @@
             <div class="card kpi-card">
                 <div class="kpi-icon">🏆</div>
                 <div class="kpi-info">
-                    <h3>Competiciones</h3>
+                    <h3>
+                        Competiciones (Torneos, Ligas y Juego Libre)
+                        <span class="help-icon" title="Suma total de torneos, ligas y partidos libres jugados este mes.">❔</span>
+                    </h3>
                     <div class="kpi-value">{{ stats.totalCompetitions ?? (stats.totalTournaments + (stats.totalLeagues || 0)) }}</div>
                 </div>
             </div>
             <div class="card kpi-card">
                 <div class="kpi-icon">🎾</div>
                 <div class="kpi-info">
-                    <h3>Partidos Jugados</h3>
+                    <h3>
+                        Partidos Jugados
+                        <span class="help-icon" title="Cantidad total de partidos disputados en todas las modalidades este mes.">❔</span>
+                    </h3>
                     <div class="kpi-value">{{ stats.totalMatches }}</div>
                 </div>
             </div>
@@ -52,11 +60,13 @@
         <div class="view-toggle mb-4">
             <button class="toggle-btn" [class.active]="viewMode === 'players'"
                 (click)="viewMode = 'players'">
-                👤 Jugadores del Mes
+                👤 Ranking Unificado
+                <span class="help-icon" title="Ranking mensual que combina el desempeño en torneos, ligas y partidos libres.">❔</span>
             </button>
             <button class="toggle-btn" [class.active]="viewMode === 'pairs'"
                 (click)="viewMode = 'pairs'">
-                👥 Parejas del Mes
+                👥 Ranking de Parejas
+                <span class="help-icon" title="Ranking mensual de parejas, sumando resultados de torneos, ligas y partidos libres.">❔</span>
             </button>
         </div>
 
@@ -64,7 +74,11 @@
         <div *ngIf="viewMode === 'players'" class="fade-in">
             <!-- Podium -->
             <div class="card podium-card mb-4" *ngIf="monthlyTopPlayersCombined.length >= 3">
-                <h2 class="section-title">🏆 Jugadores del Mes — {{ monthNames[selectedMonth - 1] }} {{ selectedYear }}</h2>
+                <h2 class="section-title">🏆 Ranking Unificado — {{ monthNames[selectedMonth - 1] }} {{ selectedYear }}</h2>
+                <div class="section-subtitle" style="font-size: 1rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    Basado en el desempeño combinado en torneos, ligas y partidos libres.
+                    <span class="help-icon" title="El podio refleja a los jugadores con mejor rendimiento global del mes, considerando todas las modalidades.">❔</span>
+                </div>
                 <div class="podium">
                     <!-- 2nd place -->
                     <div class="podium-place second">
@@ -99,7 +113,11 @@
 
             <!-- Hierarchy / Organigrama -->
             <div class="card mb-4" *ngIf="monthlyTopPlayersCombined.length > 0">
-                <h2 class="section-title">📊 Ranking</h2>
+                <h2 class="section-title">📊 Tabla de Jugadores Destacados</h2>
+                <div class="section-subtitle" style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    Incluye resultados de torneos, ligas y juego libre del mes seleccionado.
+                    <span class="help-icon" title="Tabla completa de jugadores destacados, ordenados por victorias y partidos jugados en todas las modalidades.">❔</span>
+                </div>
                 <div class="hierarchy">
                     <div *ngFor="let p of monthlyTopPlayersCombined; let i = index" class="hierarchy-row">
                         <div class="hierarchy-rank">
@@ -134,7 +152,11 @@
         <div *ngIf="viewMode === 'pairs'" class="fade-in">
             <!-- Podium (torneo + libre) -->
             <div class="card podium-card mb-4" *ngIf="(stats.topPairs.length + freePlayTopPairs.length) >= 3">
-                <h2 class="section-title">🏆 Parejas del Mes — {{ monthNames[selectedMonth - 1] }} {{ selectedYear }}</h2>
+                <h2 class="section-title">🏆 Ranking de Parejas — {{ monthNames[selectedMonth - 1] }} {{ selectedYear }}</h2>
+                <div class="section-subtitle" style="font-size: 1rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    Basado en partidos de torneos, ligas y juego libre.
+                    <span class="help-icon" title="El podio de parejas refleja el mejor desempeño conjunto del mes, sumando todas las modalidades.">❔</span>
+                </div>
                 <div class="podium">
                     <ng-container *ngFor="let pair of (stats.topPairs.concat(freePlayTopPairs)).slice(0,3); let i = index">
                         <div class="podium-place" [ngClass]="{ 'first': i === 0, 'second': i === 1, 'third': i === 2 }">
@@ -151,7 +173,11 @@
 
             <!-- Hierarchy / Organigrama (torneo + libre) -->
             <div class="card mb-4" *ngIf="stats.topPairs.length > 0 || freePlayTopPairs.length > 0">
-                <h2 class="section-title">📊 Organigrama de Ranking</h2>
+                <h2 class="section-title">📊 Tabla de Parejas Destacadas</h2>
+                <div class="section-subtitle" style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    Incluye resultados de torneos, ligas y juego libre del mes seleccionado.
+                    <span class="help-icon" title="Tabla completa de parejas destacadas, ordenadas por victorias y partidos jugados en todas las modalidades.">❔</span>
+                </div>
                 <div class="hierarchy">
                     <ng-container *ngFor="let p of stats.topPairs.concat(freePlayTopPairs); let i = index">
                         <div class="hierarchy-row">
