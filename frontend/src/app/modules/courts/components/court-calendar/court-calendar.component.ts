@@ -54,6 +54,9 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
     startHour = 7;
     endHour = 24;
 
+    // Slot filter toggle
+    showAllSlots = true;
+
     // Reservation modal
     showModal = false;
     editingReservation: Reservation | null = null;
@@ -100,22 +103,107 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
         private paymentService: PaymentService,
         private cdr: ChangeDetectorRef
     ) {
-        // Generate 30-min slots from 7:00 to 23:00 (last slot ends at 23:30)
-        let slotMin = this.startHour * 60;
-        const endMin = 23 * 60 + 30;
-        while (slotMin < endMin) {
+        this.buildSlots();
+        // Time slots for the start-time dropdown in the modal (always full range)
+        for (let t = 7 * 60; t < 24 * 60; t += 30) {
+            const hh = Math.floor(t / 60);
+            const mm = t % 60;
+            this.timeSlots.push(`${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`);
+        }
+    }
+
+    /** Build visible slot list based on configured price blocks or full range.
+     *  When filtering, only slots that overlap with a configured price block are included (gaps allowed). */
+    private buildSlots() {
+        this.slots = [];
+
+        if (!this.showAllSlots && this.court?.priceBlocks?.length) {
+            // For weekly view, union all days-of-week in current week
+            const weekDaysOfWeek = this.weekDays.map(wd => new Date(wd.date + 'T12:00:00').getDay());
+            const uniqueDays = [...new Set(weekDaysOfWeek)];
+            const configuredRanges: { start: number; end: number }[] = [];
+
+            for (const pb of this.court.priceBlocks) {
+                if (uniqueDays.some(d => pb.daysOfWeek.includes(d))) {
+                    const [sh, sm] = pb.startTime.split(':').map(Number);
+                    const [eh, em] = pb.endTime.split(':').map(Number);
+                    configuredRanges.push({ start: sh * 60 + sm, end: eh * 60 + em });
+                }
+            }
+
+            if (configuredRanges.length > 0) {
+                const merged = this.mergeRanges(configuredRanges);
+                for (const range of merged) {
+                    let slotMin = range.start;
+                    while (slotMin < range.end) {
+                        const h = Math.floor(slotMin / 60);
+                        const m = slotMin % 60;
+                        const label = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                        this.slots.push({ label, startTime: label, minutes: slotMin });
+                        slotMin += 30;
+                    }
+                }
+                return;
+            }
+        }
+
+        // Full range: 07:00 – 00:00
+        let slotMin = 7 * 60;
+        while (slotMin < 24 * 60) {
             const h = Math.floor(slotMin / 60);
             const m = slotMin % 60;
             const label = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
             this.slots.push({ label, startTime: label, minutes: slotMin });
             slotMin += 30;
         }
-        // Time slots for the start-time dropdown in the modal
-        for (let t = this.startHour * 60; t < endMin; t += 30) {
-            const hh = Math.floor(t / 60);
-            const mm = t % 60;
-            this.timeSlots.push(`${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`);
+    }
+
+    /** Merge overlapping/adjacent time ranges (in minutes) */
+    private mergeRanges(ranges: { start: number; end: number }[]): { start: number; end: number }[] {
+        if (!ranges.length) return [];
+        const sorted = [...ranges].sort((a, b) => a.start - b.start);
+        const merged = [sorted[0]];
+        for (let i = 1; i < sorted.length; i++) {
+            const last = merged[merged.length - 1];
+            if (sorted[i].start <= last.end) {
+                last.end = Math.max(last.end, sorted[i].end);
+            } else {
+                merged.push({ ...sorted[i] });
+            }
         }
+        return merged;
+    }
+
+    /** Map an absolute time string to its pixel position in the (possibly non-continuous) grid.
+     *  Each slot is 30px tall (1 min = 1 px within a slot). */
+    private timeToGridPx(time: string): number {
+        const [h, m] = time.split(':').map(Number);
+        const timeMin = h * 60 + m;
+        for (let i = 0; i < this.slots.length; i++) {
+            const slotStart = this.slots[i].minutes;
+            const slotEnd = slotStart + 30;
+            if (timeMin >= slotStart && timeMin < slotEnd) {
+                return i * 30 + (timeMin - slotStart);
+            }
+        }
+        // Past last slot
+        if (this.slots.length > 0) {
+            const last = this.slots[this.slots.length - 1];
+            if (timeMin >= last.minutes) {
+                return (this.slots.length - 1) * 30 + (timeMin - last.minutes);
+            }
+        }
+        return 0;
+    }
+
+    /** Toggle between showing all slots or only configured ones */
+    toggleSlotFilter() {
+        this.showAllSlots = !this.showAllSlots;
+        if (this.court?.clubId) {
+            localStorage.setItem(`courtView_showAllSlots_${this.court.clubId}`, JSON.stringify(this.showAllSlots));
+        }
+        this.buildSlots();
+        this.cdr.markForCheck();
     }
 
     ngOnInit() {
@@ -239,6 +327,7 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
         d.setHours(0, 0, 0, 0);
         this.weekStart = d;
         this.buildWeekDays();
+        this.buildSlots(); // week change may affect configured slots by day-of-week
     }
 
     buildWeekDays() {
@@ -297,6 +386,13 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
         this.courtService.getCourt(courtId).subscribe({
             next: (court) => {
                 this.court = court;
+
+                // Restore slot filter preference for this club
+                const saved = localStorage.getItem(`courtView_showAllSlots_${court.clubId}`);
+                if (saved !== null) {
+                    this.showAllSlots = JSON.parse(saved);
+                }
+                this.buildSlots();
 
                 // Check club pricing
                 this.http.get<any>(`${environment.apiUrl}/clubs/${court.clubId}`).subscribe({
@@ -373,15 +469,12 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
     }
 
     getReservationTop(res: Reservation): string {
-        const [h, m] = res.startTime.split(':').map(Number);
-        return ((h - this.startHour) * 60 + m) + 'px';
+        return this.timeToGridPx(res.startTime) + 'px';
     }
 
     getReservationHeight(res: Reservation): string {
-        const [sh, sm] = res.startTime.split(':').map(Number);
-        const [eh, em] = res.endTime.split(':').map(Number);
-        const dur = (eh * 60 + em) - (sh * 60 + sm);
-        return Math.max(dur, 20) + 'px';
+        const height = this.timeToGridPx(res.endTime) - this.timeToGridPx(res.startTime);
+        return Math.max(height, 20) + 'px';
     }
 
     getReservationColor(res: Reservation): string {
@@ -411,10 +504,8 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
             if (block.startDate > date || block.endDate < date) continue;
             if (block.courtIds && !block.courtIds.includes(this.court.id)) continue;
             const { start, end } = this.blockTimeRange(block);
-            const [sh, sm] = start.split(':').map(Number);
-            const [eh, em] = end.split(':').map(Number);
-            const topPx = Math.max(0, (sh - this.startHour) * 60 + sm);
-            const heightPx = Math.max(20, (eh * 60 + em) - (sh * 60 + sm));
+            const topPx = Math.max(0, this.timeToGridPx(start));
+            const heightPx = Math.max(20, this.timeToGridPx(end) - this.timeToGridPx(start));
             result.push({ top: topPx + 'px', height: heightPx + 'px', reason: block.reason || 'Bloqueado' });
         }
         return result;

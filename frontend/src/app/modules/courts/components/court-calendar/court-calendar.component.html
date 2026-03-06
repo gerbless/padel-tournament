@@ -24,6 +24,12 @@
         <span class="week-label">{{ weekLabel }}</span>
         <button (click)="nextWeek()" class="btn btn-secondary btn-sm">Siguiente →</button>
         <button (click)="goToday()" class="btn btn-primary btn-sm">Hoy</button>
+        <button (click)="toggleSlotFilter()" class="btn btn-sm"
+            [class.btn-secondary]="showAllSlots"
+            [class.btn-primary]="!showAllSlots"
+            title="Mostrar solo horarios configurados">
+            🕐 {{ showAllSlots ? 'Todos' : 'Configurados' }}
+        </button>
     </div>
 
     <!-- ── Time Grid ──────────────────────────────────────── -->
