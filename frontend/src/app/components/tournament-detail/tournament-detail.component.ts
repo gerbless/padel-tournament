@@ -227,6 +227,10 @@ export class TournamentDetailComponent implements OnInit {
         return this.getEliminationMatches().find(m => m.round === 2) || null;
     }
 
+    get thirdPlaceMatch(): Match | null {
+        return this.getEliminationMatches().find(m => m.round === 3) || null;
+    }
+
     get allSemiFinalsCompleted(): boolean {
         const semis = this.semiFinalMatches;
         return semis.length === 2 && semis.every(m => m.status === 'completed' && m.winnerId);
@@ -238,6 +242,7 @@ export class TournamentDetailComponent implements OnInit {
 
     getEliminationLabel(match: Match): string {
         if (match.round === 2) return '🏆 Final';
+        if (match.round === 3) return '🥉 3er Puesto';
         return '⚔️ Semifinal';
     }
 
@@ -251,6 +256,10 @@ export class TournamentDetailComponent implements OnInit {
         const finalM = elimMatches.find(m => m.round === 2);
         if (finalM) {
             return finalM.winnerId === teamId ? '🏆 Campeón' : '🥈 Finalista';
+        }
+        const thirdM = elimMatches.find(m => m.round === 3);
+        if (thirdM) {
+            return thirdM.winnerId === teamId ? '🥉 3er Lugar' : '4° Lugar';
         }
         const semiM = elimMatches.find(m => m.round === 1);
         if (semiM) {
@@ -268,7 +277,12 @@ export class TournamentDetailComponent implements OnInit {
             m => m.status === 'completed' && (m.team1Id === teamId || m.team2Id === teamId)
         );
         if (!completedSemi) return '⏳ Semifinal';
-        if (completedSemi.winnerId !== teamId) return '';
+        if (completedSemi.winnerId !== teamId) {
+            // Loser of semi — check if 3rd place match exists
+            if (!this.thirdPlaceMatch) return '⏳ 3er Puesto';
+            if (this.thirdPlaceMatch.status !== 'completed') return '⏳ 3er Puesto';
+            return '';
+        }
         // Winner of semi — check if final exists
         if (!this.finalMatch) return '⏳ Final';
         if (this.finalMatch.status !== 'completed') return '⏳ Final';

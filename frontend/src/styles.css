@@ -357,6 +357,11 @@ h3 {
   color: white;
 }
 
+.badge-bronze {
+  background: linear-gradient(135deg, #cd7f32 0%, #a0522d 100%);
+  color: white;
+}
+
 /* Grid */
 .grid {
   display: grid;

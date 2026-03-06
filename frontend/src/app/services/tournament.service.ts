@@ -114,6 +114,8 @@ export interface MonthlyStats {
     month: number;
     year: number;
     totalTournaments: number;
+    totalLeagues?: number;
+    totalCompetitions?: number;
     totalMatches: number;
     topPlayers: MonthlyPlayerStat[];
     topPairs: MonthlyPairStat[];

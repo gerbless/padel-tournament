@@ -144,7 +144,7 @@
                         [class.clickable]="canEdit && match.status !== 'completed'"
                         (click)="canEdit ? openMatchScoreModal(match) : null">
                         <div class="match-header">
-                            <span class="badge badge-sm" [ngClass]="match.round === 2 ? 'badge-success' : 'badge-warning'">{{ getEliminationLabel(match) }}</span>
+                            <span class="badge badge-sm" [ngClass]="match.round === 2 ? 'badge-success' : match.round === 3 ? 'badge-bronze' : 'badge-warning'">{{ getEliminationLabel(match) }}</span>
                             <span class="badge badge-info badge-sm" *ngIf="match.courtNumber">
                                 Cancha {{ match.courtNumber }}
                             </span>
@@ -227,6 +227,7 @@
                                     [ngClass]="{
                                         'badge-success': getEliminationBadge(standing.teamId).includes('Campeón'),
                                         'badge-warning': getEliminationBadge(standing.teamId).includes('Finalista'),
+                                        'badge-bronze': getEliminationBadge(standing.teamId).includes('3er'),
                                         'badge-info': getEliminationBadge(standing.teamId).includes('Semi')
                                     }">
                                     {{ getEliminationBadge(standing.teamId) }}

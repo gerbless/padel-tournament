@@ -4,6 +4,8 @@ import { Repository, DataSource } from 'typeorm';
 import { Tournament, TournamentType, TournamentStatus, DurationMode } from './entities/tournament.entity';
 import { Team } from '../teams/entities/team.entity';
 import { Match, MatchStatus, MatchPhase } from '../matches/entities/match.entity';
+import { League } from '../leagues/entities/league.entity';
+import { MatchStatus as LeagueMatchStatus } from '../leagues/entities/league-match.entity';
 import { CreateTournamentDto } from './dto/create-tournament.dto';
 import { PlayersService } from '../players/players.service';
 import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
@@ -75,6 +77,8 @@ export class TournamentsService {
         private teamRepository: Repository<Team>,
         @InjectRepository(Match)
         private matchRepository: Repository<Match>,
+        @InjectRepository(League)
+        private leagueRepository: Repository<League>,
         private playersService: PlayersService,
         private dataSource: DataSource,
     ) { }
@@ -564,17 +568,36 @@ export class TournamentsService {
             await queryRunner.startTransaction();
 
             try {
-                const finalMatchData: Partial<Match> = {
-                    tournamentId,
-                    team1Id: semiFinals[0].winnerId!,
-                    team2Id: semiFinals[1].winnerId!,
-                    status: MatchStatus.PENDING,
-                    phase: MatchPhase.ELIMINATION,
-                    round: 2,
-                    courtNumber: 1,
-                };
+                // Losers of each semi play for 3rd place
+                const loser1 = semiFinals[0].team1Id === semiFinals[0].winnerId
+                    ? semiFinals[0].team2Id
+                    : semiFinals[0].team1Id;
+                const loser2 = semiFinals[1].team1Id === semiFinals[1].winnerId
+                    ? semiFinals[1].team2Id
+                    : semiFinals[1].team1Id;
 
-                const saved = await queryRunner.manager.save(Match, [finalMatchData]);
+                const newMatches: Partial<Match>[] = [
+                    {
+                        tournamentId,
+                        team1Id: semiFinals[0].winnerId!,
+                        team2Id: semiFinals[1].winnerId!,
+                        status: MatchStatus.PENDING,
+                        phase: MatchPhase.ELIMINATION,
+                        round: 2,
+                        courtNumber: 1,
+                    },
+                    {
+                        tournamentId,
+                        team1Id: loser1,
+                        team2Id: loser2,
+                        status: MatchStatus.PENDING,
+                        phase: MatchPhase.ELIMINATION,
+                        round: 3,
+                        courtNumber: Math.min(2, tournament.courts),
+                    },
+                ];
+
+                const saved = await queryRunner.manager.save(Match, newMatches);
                 await queryRunner.commitTransaction();
                 return saved as Match[];
             } catch (error) {
@@ -645,7 +668,7 @@ export class TournamentsService {
 
     // ===================== MONTHLY STATS =====================
     async getMonthlyStats(month: number, year: number, clubId?: string) {
-        const qb = this.tournamentRepository.createQueryBuilder('t')
+        const tournamentQb = this.tournamentRepository.createQueryBuilder('t')
             .leftJoinAndSelect('t.matches', 'match')
             .leftJoinAndSelect('match.team1', 'mt1')
             .leftJoinAndSelect('mt1.player1', 'mt1p1')
@@ -657,10 +680,27 @@ export class TournamentsService {
             .andWhere('EXTRACT(YEAR FROM t."createdAt") = :year', { year });
 
         if (clubId) {
-            qb.andWhere('t."clubId" = :clubId', { clubId });
+            tournamentQb.andWhere('t."clubId" = :clubId', { clubId });
         }
 
-        const tournaments = await qb.getMany();
+        const tournaments = await tournamentQb.getMany();
+
+        const leagueQb = this.leagueRepository.createQueryBuilder('l')
+            .leftJoinAndSelect('l.matches', 'lm')
+            .leftJoinAndSelect('lm.team1', 'lt1')
+            .leftJoinAndSelect('lt1.player1', 'lt1p1')
+            .leftJoinAndSelect('lt1.player2', 'lt1p2')
+            .leftJoinAndSelect('lm.team2', 'lt2')
+            .leftJoinAndSelect('lt2.player1', 'lt2p1')
+            .leftJoinAndSelect('lt2.player2', 'lt2p2')
+            .where('EXTRACT(MONTH FROM l."createdAt") = :month', { month })
+            .andWhere('EXTRACT(YEAR FROM l."createdAt") = :year', { year });
+
+        if (clubId) {
+            leagueQb.andWhere('l."clubId" = :clubId', { clubId });
+        }
+
+        const leagues = await leagueQb.getMany();
 
         // Aggregate player stats
         const playerMap = new Map<string, { id: string; name: string; matchesWon: number; matchesPlayed: number; tournamentIds: Set<string> }>();
@@ -704,6 +744,42 @@ export class TournamentsService {
             }
         }
 
+        for (const league of leagues) {
+            const completed = (league.matches || []).filter(m => m.status === LeagueMatchStatus.COMPLETED);
+
+            for (const match of completed) {
+                const sides = [
+                    { team: match.team1, teamId: match.team1Id, isWinner: match.winnerId === match.team1Id },
+                    { team: match.team2, teamId: match.team2Id, isWinner: match.winnerId === match.team2Id },
+                ];
+
+                for (const { team, isWinner } of sides) {
+                    if (!team) continue;
+
+                    for (const player of [team.player1, team.player2]) {
+                        if (!player) continue;
+                        if (!playerMap.has(player.id)) {
+                            playerMap.set(player.id, { id: player.id, name: player.name, matchesWon: 0, matchesPlayed: 0, tournamentIds: new Set() });
+                        }
+                        const ps = playerMap.get(player.id)!;
+                        ps.matchesPlayed++;
+                        if (isWinner) ps.matchesWon++;
+                        ps.tournamentIds.add(league.id);
+                    }
+
+                    const names = [team.player1?.name || '', team.player2?.name || ''].sort();
+                    const pairKey = names.join('|');
+                    if (!pairMap.has(pairKey)) {
+                        pairMap.set(pairKey, { player1Name: names[0], player2Name: names[1], matchesWon: 0, matchesPlayed: 0, tournamentIds: new Set() });
+                    }
+                    const pair = pairMap.get(pairKey)!;
+                    pair.matchesPlayed++;
+                    if (isWinner) pair.matchesWon++;
+                    pair.tournamentIds.add(league.id);
+                }
+            }
+        }
+
         const topPlayers = Array.from(playerMap.values())
             .map(p => ({ id: p.id, name: p.name, matchesWon: p.matchesWon, matchesPlayed: p.matchesPlayed, tournamentsPlayed: p.tournamentIds.size }))
             .sort((a, b) => b.matchesWon - a.matchesWon || b.matchesPlayed - a.matchesPlayed)
@@ -718,7 +794,11 @@ export class TournamentsService {
             month,
             year,
             totalTournaments: tournaments.length,
-            totalMatches: tournaments.reduce((acc, t) => acc + (t.matches || []).filter(m => m.status === MatchStatus.COMPLETED).length, 0),
+            totalLeagues: leagues.length,
+            totalCompetitions: tournaments.length + leagues.length,
+            totalMatches:
+                tournaments.reduce((acc, t) => acc + (t.matches || []).filter(m => m.status === MatchStatus.COMPLETED).length, 0) +
+                leagues.reduce((acc, l) => acc + (l.matches || []).filter(m => m.status === LeagueMatchStatus.COMPLETED).length, 0),
             topPlayers,
             topPairs,
         };

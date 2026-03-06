@@ -26,6 +26,8 @@ export class EstadisticasComponent implements OnInit, OnDestroy {
         month: 0,
         year: 0,
         totalTournaments: 0,
+        totalLeagues: 0,
+        totalCompetitions: 0,
         totalMatches: 0,
         topPlayers: [],
         topPairs: [],
@@ -34,6 +36,55 @@ export class EstadisticasComponent implements OnInit, OnDestroy {
     // Free-play monthly stats
     freePlayMatches: FreePlayMatch[] = [];
     freePlayTopPlayers: { name: string; wins: number; played: number; points: number }[] = [];
+    freePlayTopPairs: import('../../services/tournament.service').MonthlyPairStat[] = [];
+
+    get monthlyTopPlayersCombined(): { name: string; matchesWon: number; matchesPlayed: number; tournamentsPlayed: number; freePlayPoints: number }[] {
+        const map = new Map<string, { name: string; matchesWon: number; matchesPlayed: number; tournamentsPlayed: number; freePlayPoints: number }>();
+
+        for (const p of this.stats.topPlayers) {
+            const key = (p.name || '').trim().toLowerCase();
+            if (!key) continue;
+            if (!map.has(key)) {
+                map.set(key, {
+                    name: p.name,
+                    matchesWon: 0,
+                    matchesPlayed: 0,
+                    tournamentsPlayed: 0,
+                    freePlayPoints: 0,
+                });
+            }
+            const item = map.get(key)!;
+            item.matchesWon += p.matchesWon;
+            item.matchesPlayed += p.matchesPlayed;
+            item.tournamentsPlayed += p.tournamentsPlayed;
+        }
+
+        for (const p of this.freePlayTopPlayers) {
+            const key = (p.name || '').trim().toLowerCase();
+            if (!key) continue;
+            if (!map.has(key)) {
+                map.set(key, {
+                    name: p.name,
+                    matchesWon: 0,
+                    matchesPlayed: 0,
+                    tournamentsPlayed: 0,
+                    freePlayPoints: 0,
+                });
+            }
+            const item = map.get(key)!;
+            item.matchesWon += p.wins;
+            item.matchesPlayed += p.played;
+            item.freePlayPoints += p.points;
+        }
+
+        return Array.from(map.values())
+            .sort((a, b) =>
+                b.matchesWon - a.matchesWon ||
+                b.matchesPlayed - a.matchesPlayed ||
+                b.freePlayPoints - a.freePlayPoints
+            )
+            .slice(0, 20);
+    }
 
     private clubSubscription?: Subscription;
 
@@ -89,7 +140,16 @@ export class EstadisticasComponent implements OnInit, OnDestroy {
             },
             error: (err) => {
                 console.error('Error loading monthly stats:', err);
-                this.stats = { month: this.selectedMonth, year: this.selectedYear, totalTournaments: 0, totalMatches: 0, topPlayers: [], topPairs: [] };
+                this.stats = {
+                    month: this.selectedMonth,
+                    year: this.selectedYear,
+                    totalTournaments: 0,
+                    totalLeagues: 0,
+                    totalCompetitions: 0,
+                    totalMatches: 0,
+                    topPlayers: [],
+                    topPairs: [],
+                };
                 this.loading = false;
                 this.cdr.markForCheck();
             }
@@ -104,15 +164,42 @@ export class EstadisticasComponent implements OnInit, OnDestroy {
                 next: (matches) => {
                     this.freePlayMatches = matches.filter(m => m.status === 'completed');
                     this.buildFreePlayTopPlayers();
+                    this.buildFreePlayTopPairs();
                     this.cdr.markForCheck();
                 },
                 error: () => {
                     this.freePlayMatches = [];
                     this.freePlayTopPlayers = [];
+                    this.freePlayTopPairs = [];
                     this.cdr.markForCheck();
                 }
             });
         }
+    }
+    private buildFreePlayTopPairs() {
+        const pairMap = new Map<string, { player1Name: string; player2Name: string; matchesWon: number; matchesPlayed: number }>();
+        for (const match of this.freePlayMatches) {
+            const t1 = match.team1Names || [];
+            const t2 = match.team2Names || [];
+            if (t1.length === 2) {
+                const key = [t1[0], t1[1]].sort().join('|');
+                if (!pairMap.has(key)) pairMap.set(key, { player1Name: t1[0], player2Name: t1[1], matchesWon: 0, matchesPlayed: 0 });
+                const pair = pairMap.get(key)!;
+                pair.matchesPlayed++;
+                if (match.winner === 1) pair.matchesWon++;
+            }
+            if (t2.length === 2) {
+                const key = [t2[0], t2[1]].sort().join('|');
+                if (!pairMap.has(key)) pairMap.set(key, { player1Name: t2[0], player2Name: t2[1], matchesWon: 0, matchesPlayed: 0 });
+                const pair = pairMap.get(key)!;
+                pair.matchesPlayed++;
+                if (match.winner === 2) pair.matchesWon++;
+            }
+        }
+        this.freePlayTopPairs = Array.from(pairMap.values())
+            .map(p => ({ ...p, tournamentsPlayed: 0 }))
+            .sort((a, b) => b.matchesWon - a.matchesWon || b.matchesPlayed - a.matchesPlayed)
+            .slice(0, 20);
     }
 
     private buildFreePlayTopPlayers() {
