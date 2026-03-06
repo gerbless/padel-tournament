@@ -49,6 +49,13 @@
                         class="time-cell"
                         (click)="openCreateModal(day.date, slot.startTime)">
                     </div>
+                    <!-- Block overlays -->
+                    <div *ngFor="let blk of getBlocksForDay(day.date)"
+                        class="block-overlay"
+                        [style.top]="blk.top"
+                        [style.height]="blk.height">
+                        <span class="block-label">🚫 {{ blk.reason }}</span>
+                    </div>
                     <!-- Reservation blocks -->
                     <div *ngFor="let res of getReservationsForDay(day.date)"
                         class="reservation-block"

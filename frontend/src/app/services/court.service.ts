@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Court, CourtPriceBlock, Reservation, RevenueReport, MonthlyRevenue, BillingDashboard } from '../models/court.model';
+import { Court, CourtPriceBlock, Reservation, RevenueReport, MonthlyRevenue, BillingDashboard, CourtBlock } from '../models/court.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -121,5 +121,18 @@ export class CourtService {
         const params: any = { year };
         if (month) params.month = month;
         return this.http.get<{ players: any[] }>(`${this.apiUrl}/club/${clubId}/billing/players`, { params });
+    }
+
+    // Court Blocks
+    getCourtBlocks(clubId: string): Observable<CourtBlock[]> {
+        return this.http.get<CourtBlock[]>(`${this.apiUrl}/club/${clubId}/blocks`);
+    }
+
+    createCourtBlock(clubId: string, data: Partial<CourtBlock>): Observable<CourtBlock> {
+        return this.http.post<CourtBlock>(`${this.apiUrl}/club/${clubId}/blocks`, data);
+    }
+
+    deleteCourtBlock(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.apiUrl}/blocks/${id}`);
     }
 }

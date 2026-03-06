@@ -16,6 +16,8 @@ interface CourtSlot {
     priceFullCourt: number;
     pricePerPlayer: number;
     available: boolean;
+    blocked?: boolean;
+    blockReason?: string;
 }
 
 interface CourtAvailability {

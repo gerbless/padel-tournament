@@ -131,6 +131,39 @@
     background: rgba(99,102,241,0.08);
 }
 
+/* ── Block overlays ──────────────────────────────── */
+.block-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(239, 68, 68, 0.08),
+        rgba(239, 68, 68, 0.08) 8px,
+        rgba(239, 68, 68, 0.15) 8px,
+        rgba(239, 68, 68, 0.15) 16px
+    );
+    border: 1px dashed rgba(239, 68, 68, 0.4);
+    border-radius: 4px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    overflow: hidden;
+}
+.block-label {
+    font-size: 0.65rem;
+    color: #ef4444;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
 /* ── Reservation blocks ──────────────────────────────── */
 .reservation-block {
     position: absolute;

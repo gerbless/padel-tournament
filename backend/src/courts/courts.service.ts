@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { Court } from './entities/court.entity';
 import { CourtPriceBlock } from './entities/court-price-block.entity';
 import { Reservation, ReservationStatus, PriceType, PaymentStatus } from './entities/reservation.entity';
+import { CourtBlock, BlockType } from './entities/court-block.entity';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { CreatePriceBlockDto } from './dto/create-price-block.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { CreateCourtBlockDto } from './dto/create-court-block.dto';
 import { MercadoPagoPayment } from '../payments/entities/mercadopago-payment.entity';
 
 @Injectable()
@@ -20,6 +22,8 @@ export class CourtsService {
         private reservationRepository: Repository<Reservation>,
         @InjectRepository(MercadoPagoPayment)
         private mpPaymentRepository: Repository<MercadoPagoPayment>,
+        @InjectRepository(CourtBlock)
+        private courtBlockRepository: Repository<CourtBlock>,
     ) { }
 
     // ==========================================
@@ -621,6 +625,8 @@ export class CourtsService {
             where: { clubId, date, status: ReservationStatus.CONFIRMED },
         });
 
+        const activeBlocks = await this.getActiveBlocksForDate(clubId, date);
+
         return courts.map(court => {
             const blocks = (court.priceBlocks || [])
                 .filter(b => b.daysOfWeek.includes(dayOfWeek))
@@ -634,12 +640,16 @@ export class CourtsService {
                      (block.startTime <= r.startTime && block.endTime >= r.endTime))
                 );
 
+                const blockCheck = this.isSlotBlocked(block.startTime, block.endTime, court.id, activeBlocks);
+
                 return {
                     startTime: block.startTime,
                     endTime: block.endTime,
                     priceFullCourt: Number(block.priceFullCourt),
                     pricePerPlayer: Number(block.pricePerPlayer),
-                    available: !isReserved,
+                    available: !isReserved && !blockCheck.blocked,
+                    blocked: blockCheck.blocked,
+                    blockReason: blockCheck.reason || null,
                 };
             });
 
@@ -742,5 +752,65 @@ export class CourtsService {
 
         // Return the deleted entity (id will be gone but data is still in memory)
         return reservation;
+    }
+
+    // ==========================================
+    // COURT BLOCKS
+    // ==========================================
+
+    private getBlockTimeRange(block: CourtBlock): { start: string; end: string } {
+        switch (block.blockType) {
+            case BlockType.MORNING: return { start: '07:00', end: '12:00' };
+            case BlockType.AFTERNOON: return { start: '12:00', end: '18:00' };
+            case BlockType.NIGHT: return { start: '18:00', end: '23:30' };
+            case BlockType.FULL_DAY: return { start: '00:00', end: '23:59' };
+            case BlockType.CUSTOM: return { start: block.customStartTime || '00:00', end: block.customEndTime || '23:59' };
+            default: return { start: '00:00', end: '23:59' };
+        }
+    }
+
+    async createCourtBlock(dto: CreateCourtBlockDto): Promise<CourtBlock> {
+        const block = this.courtBlockRepository.create({
+            ...dto,
+            courtIds: dto.courtIds && dto.courtIds.length > 0 ? dto.courtIds : null,
+        });
+        return this.courtBlockRepository.save(block);
+    }
+
+    async getCourtBlocks(clubId: string): Promise<CourtBlock[]> {
+        return this.courtBlockRepository.find({
+            where: { clubId, isActive: true },
+            order: { startDate: 'ASC' },
+        });
+    }
+
+    async deleteCourtBlock(id: string): Promise<void> {
+        await this.courtBlockRepository.delete(id);
+    }
+
+    async getActiveBlocksForDate(clubId: string, date: string): Promise<CourtBlock[]> {
+        return this.courtBlockRepository.find({
+            where: {
+                clubId,
+                isActive: true,
+                startDate: LessThanOrEqual(date),
+                endDate: MoreThanOrEqual(date),
+            },
+        });
+    }
+
+    isSlotBlocked(slotStart: string, slotEnd: string, courtId: string, blocks: CourtBlock[]): { blocked: boolean; reason?: string } {
+        for (const block of blocks) {
+            // Check if this block applies to this court
+            if (block.courtIds && !block.courtIds.includes(courtId)) continue;
+
+            const { start, end } = this.getBlockTimeRange(block);
+
+            // Check time overlap
+            if (slotStart < end && slotEnd > start) {
+                return { blocked: true, reason: block.reason || 'Bloqueado' };
+            }
+        }
+        return { blocked: false };
     }
 }

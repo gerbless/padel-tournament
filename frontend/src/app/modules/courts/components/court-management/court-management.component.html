@@ -35,6 +35,9 @@
                 <button *ngIf="enablePricing && courts.length > 0" (click)="openBilling()" class="btn btn-secondary btn-sm">
                     📊 Facturación
                 </button>
+                <button *ngIf="canAdmin && courts.length > 0" (click)="openBlocks()" class="btn btn-secondary btn-sm">
+                    🚫 Bloqueos
+                </button>
                 <button *ngIf="enablePricing && canAdmin && courts.length > 0" (click)="openAddPriceGlobal()" class="btn btn-secondary btn-sm">
                     💰 Precio para Todas
                 </button>

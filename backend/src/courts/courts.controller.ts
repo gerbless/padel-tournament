@@ -3,6 +3,7 @@ import { CourtsService } from './courts.service';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { CreatePriceBlockDto } from './dto/create-price-block.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { CreateCourtBlockDto } from './dto/create-court-block.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClubRoleGuard } from '../auth/club-role.guard';
 import { ClubRoles } from '../auth/club-roles.decorator';
@@ -215,6 +216,31 @@ export class CourtsController {
         @Query('date') date: string
     ) {
         return this.courtsService.getAvailableSlots(clubId, date);
+    }
+
+    // ==========================================
+    // COURT BLOCKS
+    // ==========================================
+
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin')
+    @Post('club/:clubId/blocks')
+    createCourtBlock(@Param('clubId') clubId: string, @Body() dto: CreateCourtBlockDto) {
+        dto.clubId = clubId;
+        return this.courtsService.createCourtBlock(dto);
+    }
+
+    @Get('club/:clubId/blocks')
+    getCourtBlocks(@Param('clubId') clubId: string) {
+        return this.courtsService.getCourtBlocks(clubId);
+    }
+
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin')
+    @Delete('blocks/:id')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    deleteCourtBlock(@Param('id') id: string) {
+        return this.courtsService.deleteCourtBlock(id);
     }
 
     // ==========================================

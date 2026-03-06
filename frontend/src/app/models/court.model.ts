@@ -116,3 +116,17 @@ export interface BillingDashboard {
     monthlyTrend: MonthlyTrend[];
     paymentMethodStats: PaymentMethodStat[];
 }
+
+export interface CourtBlock {
+    id: string;
+    clubId: string;
+    startDate: string;
+    endDate: string;
+    blockType: 'full_day' | 'morning' | 'afternoon' | 'night' | 'custom';
+    customStartTime?: string;
+    customEndTime?: string;
+    courtIds: string[] | null;
+    reason: string;
+    isActive: boolean;
+    createdAt: Date;
+}

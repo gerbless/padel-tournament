@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { CourtService } from '../../../../services/court.service';
-import { Court, Reservation } from '../../../../models/court.model';
+import { Court, Reservation, CourtBlock } from '../../../../models/court.model';
 import { ToastService } from '../../../../services/toast.service';
 import { ConfirmService } from '../../../../services/confirm.service';
 import { AuthService } from '../../../../services/auth.service';
@@ -26,6 +26,7 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
     court: Court | null = null;
     courts: Court[] = [];
     reservations: Reservation[] = [];
+    courtBlocks: CourtBlock[] = [];
     loading = true;
     isLoggedIn = false;
     canEdit = false;
@@ -351,6 +352,14 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
                 this.cdr.markForCheck();
             }
         });
+        // Load blocks
+        this.courtService.getCourtBlocks(this.court.clubId).subscribe({
+            next: (blocks) => {
+                this.courtBlocks = blocks.filter(b => b.isActive);
+                this.cdr.markForCheck();
+            },
+            error: () => {}
+        });
     }
 
     switchCourt(courtId: string) {
@@ -382,10 +391,62 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
         return '#ef4444';
     }
 
+    // ── Block overlay helpers ────────────────────────────────
+
+    private blockTimeRange(block: CourtBlock): { start: string; end: string } {
+        switch (block.blockType) {
+            case 'morning': return { start: '07:00', end: '12:00' };
+            case 'afternoon': return { start: '12:00', end: '18:00' };
+            case 'night': return { start: '18:00', end: '23:30' };
+            case 'full_day': return { start: '07:00', end: '23:30' };
+            case 'custom': return { start: block.customStartTime || '07:00', end: block.customEndTime || '23:30' };
+            default: return { start: '07:00', end: '23:30' };
+        }
+    }
+
+    getBlocksForDay(date: string): { top: string; height: string; reason: string }[] {
+        if (!this.court) return [];
+        const result: { top: string; height: string; reason: string }[] = [];
+        for (const block of this.courtBlocks) {
+            if (block.startDate > date || block.endDate < date) continue;
+            if (block.courtIds && !block.courtIds.includes(this.court.id)) continue;
+            const { start, end } = this.blockTimeRange(block);
+            const [sh, sm] = start.split(':').map(Number);
+            const [eh, em] = end.split(':').map(Number);
+            const topPx = Math.max(0, (sh - this.startHour) * 60 + sm);
+            const heightPx = Math.max(20, (eh * 60 + em) - (sh * 60 + sm));
+            result.push({ top: topPx + 'px', height: heightPx + 'px', reason: block.reason || 'Bloqueado' });
+        }
+        return result;
+    }
+
+    isSlotBlocked(date: string, startTime: string): boolean {
+        if (!this.court) return false;
+        const sMin = this.parseTimeMin(startTime);
+        const endMin = sMin + 30;
+        const endTime = `${Math.floor(endMin / 60).toString().padStart(2, '0')}:${(endMin % 60).toString().padStart(2, '0')}`;
+        for (const block of this.courtBlocks) {
+            if (block.startDate > date || block.endDate < date) continue;
+            if (block.courtIds && !block.courtIds.includes(this.court.id)) continue;
+            const { start, end } = this.blockTimeRange(block);
+            if (startTime < end && endTime > start) return true;
+        }
+        return false;
+    }
+
+    private parseTimeMin(time: string): number {
+        const [h, m] = time.split(':').map(Number);
+        return h * 60 + m;
+    }
+
     // ── Reservation CRUD ─────────────────────────────────────
 
     openCreateModal(date: string, slotStartTime: string) {
         if (!this.isLoggedIn || !this.court) return;
+        if (this.isSlotBlocked(date, slotStartTime)) {
+            this.toast.error('Este horario está bloqueado');
+            return;
+        }
         this.editingReservation = null;
 
         const startTime = slotStartTime;

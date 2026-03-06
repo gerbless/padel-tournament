@@ -38,6 +38,13 @@
                         class="time-cell"
                         (click)="openCreateModal(court.id, slot.startTime)">
                     </div>
+                    <!-- Block overlays -->
+                    <div *ngFor="let blk of getBlocksForCourt(court.id)"
+                        class="block-overlay"
+                        [style.top]="blk.top"
+                        [style.height]="blk.height">
+                        <span class="block-label">🚫 {{ blk.reason }}</span>
+                    </div>
                     <!-- Reservation overlays -->
                     <div *ngFor="let res of getReservationsForCourt(court.id)"
                         class="reservation-block"

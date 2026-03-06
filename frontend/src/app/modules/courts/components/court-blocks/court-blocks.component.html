@@ -1,0 +1,161 @@
+<div class="blocks-page">
+    <div class="page-header">
+        <div class="header-left">
+            <button (click)="goBack()" class="btn-back">← Volver</button>
+            <h1>🚫 Bloqueos de Canchas</h1>
+        </div>
+        <div *ngIf="selectedClubName" class="club-name">{{ selectedClubName }}</div>
+    </div>
+
+    <div *ngIf="loading" class="loading-container">
+        <div class="spinner"></div>
+    </div>
+
+    <div *ngIf="!loading">
+        <!-- Header actions -->
+        <div class="section-header">
+            <h2>Bloqueos Activos y Futuros ({{ activeBlocks.length }})</h2>
+            <button *ngIf="canAdmin" (click)="openAddBlock()" class="btn btn-primary">
+                + Nuevo Bloqueo
+            </button>
+        </div>
+
+        <!-- Active / Future blocks -->
+        <div *ngIf="activeBlocks.length === 0" class="empty-state">
+            <div class="empty-icon">🔓</div>
+            <h3>No hay bloqueos activos</h3>
+            <p>Crea un bloqueo para reservar slots para eventos, feriados o mantenimiento.</p>
+        </div>
+
+        <div class="blocks-list">
+            <div *ngFor="let block of activeBlocks" class="block-card" [class.active-now]="isActive(block)" [class.future]="isFuture(block)">
+                <div class="block-status">
+                    <span *ngIf="isActive(block)" class="status-badge status-active">Activo ahora</span>
+                    <span *ngIf="isFuture(block)" class="status-badge status-future">Programado</span>
+                </div>
+                <div class="block-body">
+                    <div class="block-main">
+                        <div class="block-reason">{{ block.reason || 'Sin motivo' }}</div>
+                        <div class="block-dates">📅 {{ dateRange(block) }}</div>
+                        <div class="block-time">⏰ {{ blockTypeLabel(block.blockType) }} — {{ blockTimeRange(block) }}</div>
+                        <div class="block-courts">🏟️ {{ courtNames(block) }}</div>
+                    </div>
+                    <div class="block-actions">
+                        <button *ngIf="canAdmin" (click)="deleteBlock(block)" class="btn btn-danger btn-sm">
+                            🗑️ Eliminar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expired blocks -->
+        <div *ngIf="expiredBlocks.length > 0" class="expired-section">
+            <h2 class="section-title">Bloqueos Expirados ({{ expiredBlocks.length }})</h2>
+            <div class="blocks-list">
+                <div *ngFor="let block of expiredBlocks" class="block-card expired">
+                    <div class="block-status">
+                        <span class="status-badge status-expired">Expirado</span>
+                    </div>
+                    <div class="block-body">
+                        <div class="block-main">
+                            <div class="block-reason">{{ block.reason || 'Sin motivo' }}</div>
+                            <div class="block-dates">📅 {{ dateRange(block) }}</div>
+                            <div class="block-time">⏰ {{ blockTypeLabel(block.blockType) }} — {{ blockTimeRange(block) }}</div>
+                            <div class="block-courts">🏟️ {{ courtNames(block) }}</div>
+                        </div>
+                        <div class="block-actions">
+                            <button *ngIf="canAdmin" (click)="deleteBlock(block)" class="btn btn-danger btn-sm">
+                                🗑️ Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Block Modal -->
+<div *ngIf="showModal" class="modal-overlay" (click)="closeModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>🚫 Nuevo Bloqueo</h2>
+            <button (click)="closeModal()" class="modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+            <!-- Reason -->
+            <div class="form-group">
+                <label>Motivo</label>
+                <input type="text" [(ngModel)]="blockForm.reason" class="form-control" placeholder="Ej: Feriado, Evento especial, Mantenimiento...">
+            </div>
+
+            <!-- Dates -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Fecha inicio</label>
+                    <input type="date" [(ngModel)]="blockForm.startDate" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Fecha fin</label>
+                    <input type="date" [(ngModel)]="blockForm.endDate" class="form-control">
+                </div>
+            </div>
+
+            <!-- Block Type -->
+            <div class="form-group">
+                <label>Tipo de Bloqueo</label>
+                <div class="block-type-grid">
+                    <div *ngFor="let opt of blockTypeOptions"
+                         class="block-type-option"
+                         [class.selected]="blockForm.blockType === opt.value"
+                         (click)="blockForm.blockType = opt.value">
+                        <span class="bto-icon">{{ opt.icon }}</span>
+                        <span class="bto-label">{{ opt.label }}</span>
+                        <span class="bto-desc">{{ opt.desc }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom Time -->
+            <div *ngIf="blockForm.blockType === 'custom'" class="form-row">
+                <div class="form-group">
+                    <label>Hora inicio</label>
+                    <input type="time" [(ngModel)]="blockForm.customStartTime" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Hora fin</label>
+                    <input type="time" [(ngModel)]="blockForm.customEndTime" class="form-control">
+                </div>
+            </div>
+
+            <!-- Court scope -->
+            <div class="form-group">
+                <label>Canchas afectadas</label>
+                <div class="scope-toggle">
+                    <button class="scope-btn" [class.active]="blockForm.courtScope === 'all'" (click)="blockForm.courtScope = 'all'">
+                        Todas las canchas
+                    </button>
+                    <button class="scope-btn" [class.active]="blockForm.courtScope === 'specific'" (click)="blockForm.courtScope = 'specific'">
+                        Canchas específicas
+                    </button>
+                </div>
+            </div>
+
+            <!-- Court selection -->
+            <div *ngIf="blockForm.courtScope === 'specific'" class="form-group">
+                <label>Selecciona canchas</label>
+                <div class="court-checkboxes">
+                    <label *ngFor="let court of courts" class="court-check-label" [class.checked]="isCourtSelected(court.id)">
+                        <input type="checkbox" [checked]="isCourtSelected(court.id)" (change)="toggleCourt(court.id)">
+                        <span class="court-check-name">{{ court.name }}</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button (click)="closeModal()" class="btn btn-secondary">Cancelar</button>
+            <button (click)="saveBlock()" class="btn btn-primary">Crear Bloqueo</button>
+        </div>
+    </div>
+</div>

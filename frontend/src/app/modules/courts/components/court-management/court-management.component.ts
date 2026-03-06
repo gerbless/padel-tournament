@@ -359,6 +359,10 @@ export class CourtManagementComponent implements OnInit {
         this.router.navigate(['/courts', 'billing']);
     }
 
+    openBlocks() {
+        this.router.navigate(['/courts', 'blocks']);
+    }
+
     formatDays(days: number[]): string {
         return days.map(d => this.dayLabels[d]).join(', ');
     }
