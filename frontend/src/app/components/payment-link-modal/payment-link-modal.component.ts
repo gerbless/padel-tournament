@@ -1,6 +1,7 @@
 import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ToastService } from '../../services/toast.service';
+import { PaymentService } from '../../services/payment.service';
 
 export interface PaymentLinkData {
     playerName?: string;
@@ -8,6 +9,20 @@ export interface PaymentLinkData {
     paymentUrl: string;
     shortUrl: string;
     status: string;
+    /** Player index in the reservation (0-based). Used to correlate with contact status. */
+    playerIndex?: number;
+    email?: string | null;
+    phone?: string | null;
+    isEmailVerified?: boolean;
+    isPhoneVerified?: boolean;
+}
+
+export interface ReservationContext {
+    clubName: string;
+    date: string;       // YYYY-MM-DD
+    courtName: string;
+    startTime: string;  // HH:mm
+    endTime: string;    // HH:mm
 }
 
 @Component({
@@ -42,6 +57,26 @@ export interface PaymentLinkData {
                                     📋 Copiar
                                 </button>
                             </div>
+                            <div class="send-actions" *ngIf="reservationContext">
+                                <button *ngIf="links[0].email"
+                                    class="btn-send btn-send-email"
+                                    [disabled]="sendingState[0] === 'sending'"
+                                    (click)="sendLink(links[0], 0, 'email')">
+                                    <span *ngIf="sendingState[0] === 'sending'">⏳</span>
+                                    <span *ngIf="sendingState[0] !== 'sending'">📧</span>
+                                    Email
+                                    <span *ngIf="links[0].isEmailVerified" class="verified-badge" title="Email verificado">✅</span>
+                                </button>
+                                <button *ngIf="links[0].phone"
+                                    class="btn-send btn-send-whatsapp"
+                                    [disabled]="sendingState[0] === 'sending'"
+                                    (click)="sendLink(links[0], 0, 'whatsapp')">
+                                    <span *ngIf="sendingState[0] === 'sending'">⏳</span>
+                                    <span *ngIf="sendingState[0] !== 'sending'">💬</span>
+                                    WhatsApp
+                                    <span *ngIf="links[0].isPhoneVerified" class="verified-badge" title="Teléfono verificado">✅</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -64,6 +99,27 @@ export interface PaymentLinkData {
                                     class="link-input" readonly>
                                 <button class="btn-copy" (click)="copyLink(link.shortUrl || link.paymentUrl)">
                                     📋 Copiar
+                                </button>
+                            </div>
+                            <!-- Send via email / WhatsApp -->
+                            <div class="send-actions" *ngIf="link.status !== 'paid' && reservationContext && (link.email || link.phone)">
+                                <button *ngIf="link.email"
+                                    class="btn-send btn-send-email"
+                                    [disabled]="sendingState[i] === 'sending'"
+                                    (click)="sendLink(link, i, 'email')">
+                                    <span *ngIf="sendingState[i] === 'sending'">⏳</span>
+                                    <span *ngIf="sendingState[i] !== 'sending'">📧</span>
+                                    Email
+                                    <span *ngIf="link.isEmailVerified" class="verified-badge">✅</span>
+                                </button>
+                                <button *ngIf="link.phone"
+                                    class="btn-send btn-send-whatsapp"
+                                    [disabled]="sendingState[i] === 'sending'"
+                                    (click)="sendLink(link, i, 'whatsapp')">
+                                    <span *ngIf="sendingState[i] === 'sending'">⏳</span>
+                                    <span *ngIf="sendingState[i] !== 'sending'">💬</span>
+                                    WhatsApp
+                                    <span *ngIf="link.isPhoneVerified" class="verified-badge">✅</span>
                                 </button>
                             </div>
                         </div>
@@ -165,6 +221,23 @@ export interface PaymentLinkData {
         }
         .btn-copy-all:hover { background: #0d47a1; }
 
+        .send-actions {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px;
+            border-top: 1px solid #e9ecef;
+        }
+        .btn-send {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 14px; border: none; border-radius: 6px;
+            font-size: 0.82rem; font-weight: 600; cursor: pointer;
+            transition: background 0.15s; white-space: nowrap;
+        }
+        .btn-send:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-send-email { background: #0ea5e9; color: white; }
+        .btn-send-email:hover:not(:disabled) { background: #0284c7; }
+        .btn-send-whatsapp { background: #25d366; color: white; }
+        .btn-send-whatsapp:hover:not(:disabled) { background: #16a34a; }
+        .verified-badge { font-size: 0.75rem; }
+
         .error-state { text-align: center; padding: 20px; color: #c62828; }
     `],
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -173,9 +246,52 @@ export class PaymentLinkModalComponent {
     @Input() links: PaymentLinkData[] = [];
     @Input() loading = false;
     @Input() error = '';
+    @Input() reservationContext: ReservationContext | null = null;
     @Output() close = new EventEmitter<void>();
 
-    constructor(private toast: ToastService, private cdr: ChangeDetectorRef) {}
+    sendingState: Record<number, 'idle' | 'sending' | 'sent' | 'error'> = {};
+
+    constructor(
+        private toast: ToastService,
+        private paymentService: PaymentService,
+        private cdr: ChangeDetectorRef,
+    ) {}
+
+    sendLink(link: PaymentLinkData, playerIndex: number, channel: 'email' | 'whatsapp') {
+        if (!this.reservationContext) return;
+        const contact = channel === 'email' ? link.email : link.phone;
+        if (!contact) return;
+
+        this.sendingState[playerIndex] = 'sending';
+        this.cdr.markForCheck();
+
+        const ctx = this.reservationContext;
+        const timeStr = `${ctx.startTime} - ${ctx.endTime}`;
+
+        this.paymentService.sendPlayerLink({
+            channel,
+            contact,
+            playerName: link.playerName || 'Jugador',
+            link: link.shortUrl || link.paymentUrl,
+            clubName: ctx.clubName,
+            date: ctx.date,
+            time: timeStr,
+            courtName: ctx.courtName,
+            amount: link.amount || 0,
+        }).subscribe({
+            next: () => {
+                this.sendingState[playerIndex] = 'sent';
+                const channelLabel = channel === 'email' ? 'email' : 'WhatsApp';
+                this.toast.success(`Link enviado por ${channelLabel} a ${link.playerName}`);
+                this.cdr.markForCheck();
+            },
+            error: (err) => {
+                this.sendingState[playerIndex] = 'error';
+                this.toast.error(err?.error?.message || `Error al enviar el link`);
+                this.cdr.markForCheck();
+            },
+        });
+    }
 
     copyLink(url: string) {
         navigator.clipboard.writeText(url).then(() => {

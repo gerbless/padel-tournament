@@ -106,4 +106,26 @@ export class PaymentsController {
     ) {
         return this.paymentsService.getClubPayments(clubId, limit ? +limit : 50);
     }
+
+    /**
+     * POST /payments/send-player-link
+     * Send a payment link to a player via WhatsApp or email.
+     * The admin provides the link URL, player contact, and reservation context.
+     */
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('admin', 'editor')
+    @Post('send-player-link')
+    async sendPlayerLink(@Body() body: {
+        channel: 'whatsapp' | 'email';
+        contact: string;
+        playerName: string;
+        link: string;
+        clubName: string;
+        date: string;
+        time: string;
+        courtName: string;
+        amount: number;
+    }) {
+        return this.paymentsService.sendPlayerPaymentLink(body);
+    }
 }

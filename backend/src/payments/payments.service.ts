@@ -7,6 +7,7 @@ import { Reservation, PaymentStatus, PaymentMethod, ReservationStatus } from '..
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { randomUUID } from 'crypto';
 import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
@@ -24,6 +25,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         @InjectRepository(Reservation)
         private reservationRepo: Repository<Reservation>,
         private emailService: EmailService,
+        private notificationsService: NotificationsService,
     ) {
         const accessToken = this.configService.get<string>('MP_ACCESS_TOKEN', '');
         const expirySeconds = this.configService.get<number>('PAYMENT_EXPIRY_SECONDS', 60);
@@ -855,5 +857,89 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             case 'refunded': return MercadoPagoPaymentStatus.REFUNDED;
             default: return MercadoPagoPaymentStatus.PENDING;
         }
+    }
+
+    /**
+     * Send a payment link to a player via WhatsApp or email.
+     * The admin passes: the payment link URL, player info, channel, and reservation context.
+     */
+    async sendPlayerPaymentLink(dto: {
+        channel: 'whatsapp' | 'email';
+        contact: string;        // phone (E.164) for whatsapp, email address for email
+        playerName: string;
+        link: string;
+        clubName: string;
+        date: string;           // YYYY-MM-DD
+        time: string;           // e.g. "15:00 - 16:30"
+        courtName: string;
+        amount: number;
+    }): Promise<{ sent: boolean; channel: string }> {
+        const [year, month, day] = dto.date.split('-');
+        const formattedDate = `${day}/${month}/${year}`;
+        const concept = `Reserva de cancha en ${dto.clubName}`;
+
+        if (dto.channel === 'whatsapp') {
+            await this.notificationsService.sendPaymentLink(dto.contact, {
+                playerName: dto.playerName,
+                amount: String(dto.amount),
+                concept,
+                link: dto.link,
+                clubName: dto.clubName,
+                date: formattedDate,
+                time: dto.time,
+                courtName: dto.courtName,
+            });
+            return { sent: true, channel: 'whatsapp' };
+        }
+
+        // Email channel
+        const from = this.configService.get<string>('SMTP_FROM', this.configService.get<string>('SMTP_USER', 'noreply@padelmgr.com'));
+        const subject = `🎾 ${dto.clubName} — Link de pago para tu reserva`;
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px;">
+                <h2 style="text-align: center; color: #333;">🎾 ${dto.clubName}</h2>
+                <div style="background: #f0f6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 24px; margin: 20px 0;">
+                    <p style="margin: 0 0 16px 0; color: #1e3a8a; font-size: 15px;">
+                        Hola <strong>${dto.playerName}</strong>,<br><br>
+                        Tienes un pago pendiente para la siguiente reserva de cancha:
+                    </p>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #555; font-weight: bold; width: 130px;">📅 Fecha:</td>
+                            <td style="padding: 8px 0; color: #111;">${formattedDate}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #555; font-weight: bold;">⏰ Horario:</td>
+                            <td style="padding: 8px 0; color: #111;">${dto.time}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #555; font-weight: bold;">🎾 Cancha:</td>
+                            <td style="padding: 8px 0; color: #111;">${dto.courtName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #555; font-weight: bold;">💰 Monto:</td>
+                            <td style="padding: 8px 0; color: #111; font-weight: bold;">$${Number(dto.amount).toLocaleString('es-CL')}</td>
+                        </tr>
+                    </table>
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="${dto.link}"
+                           style="background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white;
+                                  padding: 14px 32px; border-radius: 10px; text-decoration: none;
+                                  font-weight: bold; font-size: 16px; display: inline-block;">
+                            💳 Pagar ahora
+                        </a>
+                    </div>
+                    <p style="font-size: 12px; color: #888; text-align: center; margin: 0;">
+                        O copia este enlace en tu navegador:<br>
+                        <a href="${dto.link}" style="color: #2563eb; word-break: break-all;">${dto.link}</a>
+                    </p>
+                </div>
+                <p style="color: #999; font-size: 12px; text-align: center;">© ${dto.clubName} — Padel MGR</p>
+            </div>
+        `;
+
+        await this.emailService.sendEmail(dto.contact, subject, html).catch(() => {});
+
+        return { sent: true, channel: 'email' };
     }
 }

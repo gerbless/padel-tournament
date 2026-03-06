@@ -26,4 +26,8 @@ export class CreatePlayerDto {
     @IsArray()
     @IsUUID('4', { each: true })
     clubIds?: string[];
+
+    @IsOptional()
+    @IsString()
+    phone?: string;
 }

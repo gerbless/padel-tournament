@@ -71,4 +71,27 @@ export class PaymentService {
     getClubPayments(clubId: string, limit = 50): Observable<any[]> {
         return this.http.get<any[]>(`${this.apiUrl}/club/${clubId}`, { params: { limit: limit.toString() } });
     }
+
+    getPlayerContactStatus(playerId: string): Observable<{
+        email: string | null;
+        phone: string | null;
+        isEmailVerified: boolean;
+        isPhoneVerified: boolean;
+    }> {
+        return this.http.get<any>(`${environment.apiUrl}/players/${playerId}/contact-status`);
+    }
+
+    sendPlayerLink(payload: {
+        channel: 'whatsapp' | 'email';
+        contact: string;
+        playerName: string;
+        link: string;
+        clubName: string;
+        date: string;
+        time: string;
+        courtName: string;
+        amount: number;
+    }): Observable<{ sent: boolean; channel: string }> {
+        return this.http.post<{ sent: boolean; channel: string }>(`${this.apiUrl}/send-player-link`, payload);
+    }
 }

@@ -19,6 +19,9 @@ export class Player {
     @Column({ nullable: true, unique: true })
     email: string;
 
+    @Column({ nullable: true })
+    phone: string;
+
     @Column({ default: 0 })
     totalPoints: number;
 

@@ -2,8 +2,10 @@
     <div class="register-card">
         <div class="logo">🎾 PADEL MGR</div>
 
-        <!-- Success state: show verification message -->
-        <div *ngIf="registrationSuccess" class="verification-sent">
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <!-- STEP: done — email verification sent                         -->
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <div *ngIf="step === 'done'" class="verification-sent">
             <div class="icon">📧</div>
             <h2>¡Revisa tu email!</h2>
             <p class="success-msg">{{ successMessage }}</p>
@@ -16,18 +18,94 @@
             </div>
         </div>
 
-        <!-- Registration form -->
-        <ng-container *ngIf="!registrationSuccess">
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <!-- STEP: otp — enter WhatsApp verification code                 -->
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <ng-container *ngIf="step === 'otp'">
+            <h2>Verificar Teléfono</h2>
+            <p class="subtitle" *ngIf="!phoneVerified">
+                Enviamos un código de 6 dígitos via WhatsApp a<br>
+                <strong>{{ otpSentTo }}</strong>
+            </p>
+
+            <!-- Dev-mode helper -->
+            <div *ngIf="devOtpCode" class="dev-code-hint">
+                🛠 Modo desarrollo — código: <strong>{{ devOtpCode }}</strong>
+            </div>
+
+            <!-- Phone verified success banner -->
+            <div *ngIf="phoneVerified" class="phone-verified-banner">
+                ✅ Teléfono verificado correctamente
+            </div>
+
+            <form *ngIf="!phoneVerified" (ngSubmit)="verifyOtp()">
+                <div class="form-group">
+                    <label for="otpCode">Código de verificación</label>
+                    <input type="text" id="otpCode" [(ngModel)]="otpCode" name="otpCode" class="form-control otp-input"
+                        placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" required>
+                </div>
+
+                <div *ngIf="error" class="error-message">{{ error }}</div>
+
+                <button type="submit" class="btn btn-primary btn-block" [disabled]="verifyingOtp">
+                    <span *ngIf="verifyingOtp">Verificando...</span>
+                    <span *ngIf="!verifyingOtp">Confirmar Código</span>
+                </button>
+            </form>
+
+            <!-- Resend & back controls -->
+            <div class="otp-actions" *ngIf="!phoneVerified">
+                <button type="button" class="btn btn-link" (click)="resendOtp()"
+                    [disabled]="sendingOtp || otpCountdown > 0">
+                    <span *ngIf="sendingOtp">Reenviando...</span>
+                    <span *ngIf="!sendingOtp && otpCountdown > 0">Reenviar en {{ otpCountdown }}s</span>
+                    <span *ngIf="!sendingOtp && otpCountdown === 0">📲 Reenviar código</span>
+                </button>
+                <button type="button" class="btn btn-link secondary" (click)="backToForm()">
+                    ← Cambiar número
+                </button>
+            </div>
+
+            <!-- Once phone is verified, show the final register button -->
+            <div *ngIf="phoneVerified">
+                <div *ngIf="error" class="error-message">{{ error }}</div>
+                <button type="button" class="btn btn-primary btn-block" (click)="register()" [disabled]="loading">
+                    <span *ngIf="loading">Creando cuenta...</span>
+                    <span *ngIf="!loading">🎾 Crear Cuenta</span>
+                </button>
+            </div>
+        </ng-container>
+
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <!-- STEP: form — registration form                               -->
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <ng-container *ngIf="step === 'form'">
             <h2>Crear Cuenta</h2>
             <p class="subtitle" *ngIf="clubName">Registrarse en <strong>{{ clubName }}</strong></p>
 
-            <form (ngSubmit)="register()">
+            <!-- Pre-registration notice -->
+            <div *ngIf="preregisteredFound" class="preregistered-notice">
+                <div class="prereg-icon">✅</div>
+                <div class="prereg-text">
+                    <strong>Encontramos tu perfil registrado</strong>
+                    <span *ngIf="maskedPlayerData" class="prereg-details">
+                        <span *ngIf="maskedPlayerData.name">👤 {{ maskedPlayerData.name }}</span>
+                        <span *ngIf="maskedPlayerData.email">📧 {{ maskedPlayerData.email }}</span>
+                        <span *ngIf="maskedPlayerData.phone">📱 {{ maskedPlayerData.phone }}</span>
+                    </span>
+                    <small>Confirma o edita tus datos y verifica tu teléfono.</small>
+                </div>
+            </div>
+
+            <form (ngSubmit)="sendOtp()">
+                <!-- Name -->
                 <div class="form-group">
                     <label for="name">Nombre Completo *</label>
                     <input type="text" id="name" [(ngModel)]="name" name="name" class="form-control"
                         placeholder="Tu nombre completo" required>
                 </div>
 
+                <!-- Identification -->
                 <div class="form-group">
                     <label>Identificación</label>
                     <div class="id-row">
@@ -43,22 +121,37 @@
                         </div>
                         <input type="text" [(ngModel)]="identification" name="identification" class="form-control"
                             [placeholder]="identificationType === 'RUT' ? '12.345.678-9' : 'Número de pasaporte'"
-                            (input)="onIdentificationInput($event)">
+                            (input)="onIdentificationInput($event)"
+                            (blur)="checkPreregistered()">
                     </div>
                 </div>
 
+                <!-- Email -->
                 <div class="form-group">
                     <label for="email">Email *</label>
                     <input type="email" id="email" [(ngModel)]="email" name="email" class="form-control"
-                        placeholder="tu@email.com" required>
+                        placeholder="tu@email.com" required (blur)="checkPreregistered()">
                 </div>
 
+                <!-- Phone -->
+                <div class="form-group">
+                    <label for="phone">
+                        Teléfono (WhatsApp) *
+                        <span class="help-icon" title="Usaremos WhatsApp para verificar tu número. Incluye el código de país. Ejemplo: +56912345678">❔</span>
+                    </label>
+                    <input type="tel" id="phone" [(ngModel)]="phone" name="phone" class="form-control"
+                        placeholder="+56912345678" required (input)="onPhoneInput($event)">
+                    <div class="field-hint">Formato internacional, ej: +56912345678</div>
+                </div>
+
+                <!-- Password -->
                 <div class="form-group">
                     <label for="password">Contraseña *</label>
                     <input type="password" id="password" [(ngModel)]="password" name="password" class="form-control"
                         placeholder="Mínimo 6 caracteres" required>
                 </div>
 
+                <!-- Confirm password -->
                 <div class="form-group">
                     <label for="passwordConfirm">Confirmar Contraseña *</label>
                     <input type="password" id="passwordConfirm" [(ngModel)]="passwordConfirm" name="passwordConfirm"
@@ -67,9 +160,9 @@
 
                 <div *ngIf="error" class="error-message">{{ error }}</div>
 
-                <button type="submit" class="btn btn-primary btn-block" [disabled]="loading">
-                    <span *ngIf="loading">Registrando...</span>
-                    <span *ngIf="!loading">Crear Cuenta</span>
+                <button type="submit" class="btn btn-primary btn-block" [disabled]="sendingOtp">
+                    <span *ngIf="sendingOtp">Enviando código...</span>
+                    <span *ngIf="!sendingOtp">📲 Verificar Teléfono</span>
                 </button>
             </form>
 
@@ -77,5 +170,6 @@
                 ¿Ya tienes cuenta? <a routerLink="/login">Iniciar Sesión</a>
             </div>
         </ng-container>
+
     </div>
 </div>

@@ -103,6 +103,17 @@ export class PlayersController {
         return this.playersService.update(req.user.playerId, dto);
     }
 
+    /**
+     * GET /players/:id/contact-status
+     * Returns verified contact info for a player (admin/editor use).
+     */
+    @UseGuards(JwtAuthGuard, ClubRoleGuard)
+    @ClubRoles('editor')
+    @Get(':id/contact-status')
+    getContactStatus(@Param('id') id: string) {
+        return this.playersService.getContactStatus(id);
+    }
+
     @Get(':id')
     findOne(@Param('id') id: string) {
         return this.playersService.findOne(id);

@@ -8,11 +8,13 @@ import { JwtStrategy } from './jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { UsersModule } from '../users/users.module';
 import { PlayersModule } from '../players/players.module';
+import { PhoneVerificationModule } from '../phone-verification/phone-verification.module';
 
 @Module({
     imports: [
         UsersModule,
         PlayersModule,
+        PhoneVerificationModule,
         PassportModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],

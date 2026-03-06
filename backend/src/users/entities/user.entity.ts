@@ -23,6 +23,12 @@ export class User {
     @Column({ nullable: true })
     emailVerificationToken: string;
 
+    @Column({ nullable: true })
+    phone: string;
+
+    @Column({ default: false })
+    isPhoneVerified: boolean;
+
     @OneToOne(() => Player, { nullable: true })
     @JoinColumn()
     player: Player;

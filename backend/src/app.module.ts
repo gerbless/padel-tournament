@@ -14,6 +14,8 @@ import { UsersModule } from './users/users.module';
 import { PersonalTrackerModule } from './personal-tracker/personal-tracker.module';
 import { EmailModule } from './email/email.module';
 import { PaymentsModule } from './payments/payments.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { PhoneVerificationModule } from './phone-verification/phone-verification.module';
 
 @Module({
     imports: [
@@ -47,6 +49,8 @@ import { PaymentsModule } from './payments/payments.module';
         PersonalTrackerModule,
         EmailModule,
         PaymentsModule,
+        NotificationsModule,
+        PhoneVerificationModule,
     ],
 })
 export class AppModule { }

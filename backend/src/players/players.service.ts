@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Player } from './entities/player.entity';
 import { PlayerClubStats } from './entities/player-club-stats.entity';
 import { FreePlayMatch } from '../courts/entities/free-play-match.entity';
+import { User } from '../users/entities/user.entity';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
 import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
@@ -19,6 +20,8 @@ export class PlayersService {
         private playerClubStatsRepository: Repository<PlayerClubStats>,
         @InjectRepository(FreePlayMatch)
         private freePlayMatchRepository: Repository<FreePlayMatch>,
+        @InjectRepository(User)
+        private userRepository: Repository<User>,
         private rankingService: PlayerRankingService,
         private recommendationService: PlayerRecommendationService,
     ) { }
@@ -45,7 +48,8 @@ export class PlayersService {
             name: createPlayerDto.name,
             identification: createPlayerDto.identification,
             email: createPlayerDto.email,
-            category: createPlayerDto.categoryId ? { id: createPlayerDto.categoryId } : undefined,
+            phone: (createPlayerDto as any).phone,
+            category: createPlayerDto.categoryId ? { id: createPlayerDto.categoryId } as any : undefined,
             position: createPlayerDto.position
         });
 
@@ -139,6 +143,39 @@ export class PlayersService {
             throw new NotFoundException(`Player with ID ${id} not found`);
         }
         return player;
+    }
+
+    /**
+     * Find a player that was pre-registered by an admin (has no associated User account yet).
+     * Used during self-registration to auto-fill the form.
+     */
+    async findPreregisteredByEmailOrIdentification(
+        email?: string,
+        identification?: string,
+    ): Promise<Player | null> {
+        const conditions: any[] = [];
+        if (email) conditions.push({ email });
+        if (identification) conditions.push({ identification });
+        if (conditions.length === 0) return null;
+
+        const player = await this.playerRepository.findOne({ where: conditions });
+        if (!player) return null;
+
+        // Check that this player does NOT already have a user account
+        // We rely on UsersService not being available here — use a raw query
+        const hasUser = await this.playerRepository.query(
+            `SELECT id FROM users WHERE "playerId" = $1 LIMIT 1`,
+            [player.id],
+        );
+
+        return hasUser.length === 0 ? player : null;
+    }
+
+    /**
+     * Update phone for an existing player.
+     */
+    async updatePhone(id: string, phone: string): Promise<void> {
+        await this.playerRepository.update(id, { phone } as any);
     }
 
     async update(id: string, updatePlayerDto: UpdatePlayerDto): Promise<Player> {
@@ -569,6 +606,33 @@ export class PlayersService {
         });
 
         return this.playerRepository.save(player);
+    }
+
+    /**
+     * Returns contact information (email, phone) for a player, along with
+     * verification status from the linked user account (if any).
+     * Only available to editors/admins.
+     */
+    async getContactStatus(playerId: string): Promise<{
+        email: string | null;
+        phone: string | null;
+        isEmailVerified: boolean;
+        isPhoneVerified: boolean;
+    }> {
+        const player = await this.playerRepository.findOne({ where: { id: playerId } });
+        if (!player) {
+            return { email: null, phone: null, isEmailVerified: false, isPhoneVerified: false };
+        }
+
+        // Find linked user account
+        const user = await this.userRepository.findOne({ where: { playerId } });
+
+        return {
+            email: player.email ?? null,
+            phone: (player as any).phone ?? null,
+            isEmailVerified: user ? user.isEmailVerified : false,
+            isPhoneVerified: user ? user.isPhoneVerified : false,
+        };
     }
 }
 

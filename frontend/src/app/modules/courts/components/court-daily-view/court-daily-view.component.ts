@@ -12,7 +12,7 @@ import { PaymentService } from '../../../../services/payment.service';
 import { environment } from '../../../../../environments/environment';
 import { PlayerSelectComponent } from '../../../../components/player-select/player-select.component';
 import { PlayerCreateModalComponent } from '../../../../components/player-create-modal/player-create-modal.component';
-import { PaymentLinkModalComponent, PaymentLinkData } from '../../../../components/payment-link-modal/payment-link-modal.component';
+import { PaymentLinkModalComponent, PaymentLinkData, ReservationContext } from '../../../../components/payment-link-modal/payment-link-modal.component';
 import { ScoreModalComponent } from '../../../../components/score-modal/score-modal.component';
 
 @Component({
@@ -89,6 +89,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
     paymentLinks: PaymentLinkData[] = [];
     paymentLinkLoading = false;
     paymentLinkError = '';
+    reservationContext: ReservationContext | null = null;
 
     // Accordion sections
     accordionInfo = true;
@@ -754,11 +755,51 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
 
     // ── Mercado Pago ──────────────────────────────────────
 
+    /** Build reservation context for the payment link modal. */
+    private buildReservationContext(): ReservationContext | null {
+        const court = this.courts.find(c => c.id === this.selectedCourtId);
+        if (!court) return null;
+        return {
+            clubName: this.clubName,
+            date: this.reservationForm.date,
+            courtName: court.name,
+            startTime: this.reservationForm.startTime,
+            endTime: this.reservationForm.endTime,
+        };
+    }
+
+    /**
+     * Enrich paymentLinks with player contact info (email/phone/verified status).
+     * Called after links are generated with per-player data.
+     */
+    private enrichLinksWithContactInfo(links: PaymentLinkData[]): void {
+        const selects = this.playerSelects?.toArray() || [];
+        links.forEach((link, i) => {
+            // Prefer explicit playerIndex (set for single-player links), fall back to loop index
+            const slot = link.playerIndex !== undefined ? link.playerIndex : i;
+            const playerId = selects[slot]?.selectedPlayerId;
+            if (!playerId) return;
+            this.paymentService.getPlayerContactStatus(playerId).subscribe({
+                next: (status) => {
+                    link.email = status.email;
+                    link.phone = status.phone;
+                    link.isEmailVerified = status.isEmailVerified;
+                    link.isPhoneVerified = status.isPhoneVerified;
+                    // Trigger update by replacing the array reference
+                    this.paymentLinks = [...this.paymentLinks];
+                    this.cdr.markForCheck();
+                },
+                error: () => {} // silent
+            });
+        });
+    }
+
     generatePaymentLink() {
         this.showPaymentLinkModal = true;
         this.paymentLinks = [];
         this.paymentLinkLoading = true;
         this.paymentLinkError = '';
+        this.reservationContext = this.buildReservationContext();
         this.cdr.markForCheck();
 
         const players = this.reservationForm.players.filter(p => p.trim());
@@ -821,14 +862,16 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
         if (this.reservationForm.priceType === 'per_player' && this.reservationForm.playerPayments.length > 0) {
             this.paymentService.createPerPlayerLinks(reservationId).subscribe({
                 next: (result) => {
-                    this.paymentLinks = result.links.map(l => ({
+                    this.paymentLinks = result.links.map((l, idx) => ({
                         playerName: l.playerName,
                         amount: l.amount,
                         paymentUrl: l.paymentUrl,
                         shortUrl: l.shortUrl,
                         status: l.status,
+                        playerIndex: idx,
                     }));
                     this.paymentLinkLoading = false;
+                    this.enrichLinksWithContactInfo(this.paymentLinks);
                     this.cdr.markForCheck();
                 },
                 error: (err) => {
@@ -845,8 +888,10 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
                         shortUrl: result.shortUrl,
                         amount: this.reservationForm.finalPrice,
                         status: 'pending',
+                        playerIndex: 0,
                     }];
                     this.paymentLinkLoading = false;
+                    this.enrichLinksWithContactInfo(this.paymentLinks);
                     this.cdr.markForCheck();
                 },
                 error: (err) => {
@@ -870,6 +915,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
         this.paymentLinks = [];
         this.paymentLinkLoading = true;
         this.paymentLinkError = '';
+        this.reservationContext = this.buildReservationContext();
         this.cdr.markForCheck();
 
         const players = this.reservationForm.players.filter(p => p.trim());
@@ -931,8 +977,10 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
                     paymentUrl: result.paymentUrl,
                     shortUrl: result.shortUrl,
                     status: result.status,
+                    playerIndex,
                 }];
                 this.paymentLinkLoading = false;
+                this.enrichLinksWithContactInfo(this.paymentLinks);
                 this.cdr.markForCheck();
             },
             error: (err) => {

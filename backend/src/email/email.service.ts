@@ -117,6 +117,23 @@ export class EmailService implements OnModuleInit {
     }
 
     /**
+     * Generic email sender — use for any transactional email besides verification.
+     */
+    async sendEmail(to: string, subject: string, html: string): Promise<void> {
+        const from = this.configService.get<string>('SMTP_FROM', this.configService.get<string>('SMTP_USER', 'noreply@padelmgr.com'));
+        if (this.transporter) {
+            try {
+                const info = await this.transporter.sendMail({ from, to, subject, html });
+                this.logger.log(`✅ Email enviado a ${to} (ID: ${info.messageId})`);
+            } catch (err) {
+                this.logger.error(`❌ Error enviando email a ${to}: ${(err as any).message}`);
+            }
+        } else {
+            this.logger.warn(`⚠️  [SIN SMTP] Email no enviado a ${to} — Asunto: ${subject}`);
+        }
+    }
+
+    /**
      * Send payment confirmation email with reservation details
      */
     async sendPaymentConfirmationEmail(

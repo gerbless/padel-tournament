@@ -69,6 +69,19 @@ import { ToastService } from '../../services/toast.service';
                   </div>
                 </div>
 
+                <!-- Phone -->
+                <div class="form-group col-span-full">
+                  <label>Teléfono / WhatsApp <span class="optional">(Op)</span></label>
+                  <input type="tel" formControlName="phone" class="form-control" placeholder="+56912345678"
+                    title="Número de WhatsApp en formato internacional. Ej: +56912345678">
+                  <div class="field-hint" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.2rem;">
+                    Formato: +56912345678 — el jugador recibirá notificaciones aquí
+                  </div>
+                  <div *ngIf="playerForm.get('phone')?.invalid && playerForm.get('phone')?.touched" class="error-msg">
+                    Formato inválido. Usa: +56912345678
+                  </div>
+                </div>
+
                 <!-- Position -->
                 <div class="form-group">
                   <label>Posición</label>
@@ -353,6 +366,7 @@ export class PlayerCreateModalComponent implements OnInit {
       name: ['', [Validators.required, Validators.minLength(2)]],
       identification: [''],
       email: ['', [Validators.email]],
+      phone: ['', [Validators.pattern(/^\+[1-9]\d{6,14}$/)]],
       categoryId: [''],
       position: [''],
       clubIds: [[]]
@@ -537,7 +551,7 @@ export class PlayerCreateModalComponent implements OnInit {
     if (this.playerForm.invalid) return;
 
     this.creating = true;
-    const { name, categoryId, position, clubIds, identification, email } = this.playerForm.value;
+    const { name, categoryId, position, clubIds, identification, email, phone } = this.playerForm.value;
 
     this.playerService.createPlayer(
       name,
@@ -545,7 +559,8 @@ export class PlayerCreateModalComponent implements OnInit {
       position || undefined,
       clubIds,
       identification || undefined,
-      email || undefined
+      email || undefined,
+      phone || undefined
     ).subscribe({
       next: (player) => {
         this.creating = false;

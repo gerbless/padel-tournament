@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, MinLength, Matches } from 'class-validator';
 
 export class RegisterDto {
     @IsString()
@@ -12,6 +12,15 @@ export class RegisterDto {
     @MinLength(6)
     password: string;
 
+    @IsString()
+    @IsNotEmpty()
+    @Matches(/^\+[1-9]\d{6,14}$/, { message: 'El teléfono debe estar en formato internacional. Ejemplo: +56912345678' })
+    phone: string;
+
+    @IsString()
+    @IsNotEmpty()
+    phoneVerificationToken: string;
+
     @IsOptional()
     @IsString()
     identification?: string;
@@ -19,4 +28,9 @@ export class RegisterDto {
     @IsOptional()
     @IsString()
     clubId?: string;
+
+    /** Optional cache key from a previous check-preregistered call. */
+    @IsOptional()
+    @IsString()
+    preregisteredCacheKey?: string;
 }

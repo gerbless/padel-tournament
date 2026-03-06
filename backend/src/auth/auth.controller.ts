@@ -35,6 +35,16 @@ export class AuthController {
         return this.authService.resendVerification(body.email);
     }
 
+    /**
+     * POST /auth/check-preregistered
+     * Returns player data if an admin pre-registered this email/identification,
+     * allowing the frontend to auto-fill the registration form.
+     */
+    @Post('check-preregistered')
+    async checkPreregistered(@Body() body: { email?: string; identification?: string }) {
+        return this.authService.checkPreregistered(body.email, body.identification);
+    }
+
     @Get('email-status')
     async emailStatus() {
         return this.emailService.getStatus();
