@@ -1,4 +1,3 @@
-
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
@@ -9,12 +8,14 @@ import { PassportModule } from '@nestjs/passport';
 import { UsersModule } from '../users/users.module';
 import { PlayersModule } from '../players/players.module';
 import { PhoneVerificationModule } from '../phone-verification/phone-verification.module';
+import { ClubsModule } from '../clubs/clubs.module';
 
 @Module({
     imports: [
         UsersModule,
         PlayersModule,
         PhoneVerificationModule,
+        ClubsModule,
         PassportModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],

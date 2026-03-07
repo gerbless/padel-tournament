@@ -240,16 +240,15 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
                 this.canEdit = this.authService.hasClubRole(this.clubId, 'editor');
                 this.loadClub();
                 this.loadCourts();
+                // Check MP config with clubId to respect club-level enablePayments flag
+                this.paymentService.getConfig(this.clubId).subscribe({
+                    next: (config) => {
+                        this.mpConfigured = config.configured;
+                        this.cdr.markForCheck();
+                    },
+                    error: () => {}
+                });
             }
-        });
-
-        // Check if MP is configured
-        this.paymentService.getConfig().subscribe({
-            next: (config) => {
-                this.mpConfigured = config.configured;
-                this.cdr.markForCheck();
-            },
-            error: () => {}
         });
 
         // Start auto-refresh

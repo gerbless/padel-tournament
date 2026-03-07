@@ -31,9 +31,25 @@ export class Club {
     @Column({ default: false })
     enablePaymentLinkSending: boolean;
 
+    /** Master switch: when false, ALL Mercado Pago payment UI is hidden across the entire app */
+    @Column({ default: true })
+    enablePayments: boolean;
+
     /** Require WhatsApp OTP verification during player registration */
     @Column({ default: false })
     enablePhoneVerification: boolean;
+
+    /**
+     * Per-club integration credentials (SMTP, Twilio, MercadoPago).
+     * Stored as encrypted-at-rest JSONB. Only returnable via the super_admin credentials endpoint.
+     * Secrets are NEVER included in the standard GET /clubs/:id response.
+     */
+    @Column({ type: 'jsonb', nullable: true, default: null, select: false })
+    credentials: {
+        smtp?: { host: string; port: number; user: string; pass: string; from: string; };
+        twilio?: { accountSid: string; authToken: string; whatsappFrom: string; };
+        mercadopago?: { accessToken: string; publicKey: string; notificationUrl?: string; };
+    } | null;
 
     /** Points awarded per free-play match win (configurable per club) */
     @Column({ type: 'int', default: 3 })

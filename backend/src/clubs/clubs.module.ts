@@ -6,6 +6,7 @@ import { Club } from './entities/club.entity';
 import { Player } from '../players/entities/player.entity';
 import { UsersModule } from '../users/users.module';
 import { ClubRoleGuard } from '../auth/club-role.guard';
+import { ClubCredentialsService } from './club-credentials.service';
 
 @Module({
     imports: [
@@ -13,7 +14,8 @@ import { ClubRoleGuard } from '../auth/club-role.guard';
         UsersModule,
     ],
     controllers: [ClubsController],
-    providers: [ClubsService, ClubRoleGuard],
-    exports: [ClubsService]
+    providers: [ClubsService, ClubRoleGuard, ClubCredentialsService],
+    exports: [ClubsService, ClubCredentialsService]
 })
 export class ClubsModule { }
+

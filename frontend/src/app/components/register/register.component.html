@@ -160,9 +160,15 @@
 
                 <div *ngIf="error" class="error-message">{{ error }}</div>
 
-                <button type="submit" class="btn btn-primary btn-block" [disabled]="sendingOtp">
+                <!-- Mostrar botón de verificación solo si la verificación está activa -->
+                <button *ngIf="clubEnablePhoneVerification" type="submit" class="btn btn-primary btn-block" [disabled]="sendingOtp">
                     <span *ngIf="sendingOtp">Enviando código...</span>
                     <span *ngIf="!sendingOtp">📲 Verificar Teléfono</span>
+                </button>
+                <!-- Si la verificación está desactivada, mostrar botón de registro directo -->
+                <button *ngIf="!clubEnablePhoneVerification" type="button" class="btn btn-primary btn-block" (click)="register()" [disabled]="loading">
+                    <span *ngIf="loading">Creando cuenta...</span>
+                    <span *ngIf="!loading">🎾 Registrar</span>
                 </button>
             </form>
 

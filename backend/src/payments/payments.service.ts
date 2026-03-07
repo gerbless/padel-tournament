@@ -8,6 +8,8 @@ import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { randomUUID } from 'crypto';
 import { EmailService } from '../email/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ClubCredentialsService } from '../clubs/club-credentials.service';
+import { Club } from '../clubs/entities/club.entity';
 
 @Injectable()
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
@@ -24,8 +26,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         private mpPaymentRepo: Repository<MercadoPagoPayment>,
         @InjectRepository(Reservation)
         private reservationRepo: Repository<Reservation>,
+        @InjectRepository(Club)
+        private clubRepo: Repository<Club>,
         private emailService: EmailService,
         private notificationsService: NotificationsService,
+        private credentialsService: ClubCredentialsService,
     ) {
         const accessToken = this.configService.get<string>('MP_ACCESS_TOKEN', '');
         const expirySeconds = this.configService.get<number>('PAYMENT_EXPIRY_SECONDS', 60);
@@ -56,6 +61,29 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         if (this.expirationInterval) {
             clearInterval(this.expirationInterval);
         }
+    }
+
+    /**
+     * Return Mercado Pago clients for a specific club.
+     * Falls back to the globally configured client if no per-club credentials exist.
+     */
+    private async getMpClientsForClub(clubId?: string): Promise<{
+        preferenceClient: Preference | null;
+        paymentClient: Payment | null;
+    }> {
+        const creds = await this.credentialsService.getEffectiveMpCreds(clubId);
+        if (creds?.accessToken) {
+            const client = new MercadoPagoConfig({ accessToken: creds.accessToken });
+            return {
+                preferenceClient: new Preference(client),
+                paymentClient: new Payment(client),
+            };
+        }
+        // Fall back to global env-var client
+        return {
+            preferenceClient: this.preferenceClient,
+            paymentClient: this.paymentClient,
+        };
     }
 
     /**
@@ -114,13 +142,26 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Get MP public key for frontend
+     * Get MP public key for frontend.
+     * If clubId is provided and the club has enablePayments=false, returns configured:false
+     * even when global MP credentials are set.
      */
-    getPublicKey(): { publicKey: string; configured: boolean; paymentExpirySeconds: number } {
+    async getPublicKey(clubId?: string): Promise<{ publicKey: string; configured: boolean; paymentExpirySeconds: number }> {
         const publicKey = this.configService.get<string>('MP_PUBLIC_KEY', '');
+        let configured = !!this.mpClient;
+
+        if (configured && clubId) {
+            try {
+                const club = await this.clubRepo.findOne({ where: { id: clubId } });
+                if (club && club.enablePayments === false) {
+                    configured = false;
+                }
+            } catch { /* ignore — default to global configured state */ }
+        }
+
         return {
             publicKey,
-            configured: !!this.mpClient,
+            configured,
             paymentExpirySeconds: this.paymentExpiryMs / 1000,
         };
     }
@@ -133,10 +174,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         initPoint: string;
         externalReference: string;
     }> {
-        if (!this.preferenceClient) {
-            throw new BadRequestException('Mercado Pago no está configurado. Contacte al administrador.');
-        }
-
         const reservation = await this.reservationRepo.findOne({
             where: { id: reservationId },
             relations: ['court'],
@@ -195,8 +232,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
         this.logger.log(`Creating NEW preference for reservation ${reservationId}, amount: ${amount}, ref: ${externalReference}`);
 
+        // Resolve per-club MP client (falls back to global)
+        const { preferenceClient: clubPreferenceClient } = await this.getMpClientsForClub(reservation.clubId);
+        if (!clubPreferenceClient) {
+            throw new BadRequestException('Mercado Pago no está configurado. Contacte al administrador.');
+        }
+
         try {
-            const preferenceResponse = await this.preferenceClient.create({
+            const preferenceResponse = await clubPreferenceClient.create({
                 body: {
                     items: [
                         {
@@ -215,7 +258,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                         pending: `${appUrl}/player/my-bookings?payment=pending&rid=${reservationId}`,
                     },
                     auto_return: 'approved',
-                    notification_url: `${backendUrl}/api/payments/webhook`,
+                    notification_url: `${backendUrl}/api/payments/webhook${reservation.clubId ? `?clubId=${reservation.clubId}` : ''}`,
                     statement_descriptor: 'PADEL MGR',
                 },
             });
@@ -284,10 +327,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         reservationId: string,
         playerIndex: number,
     ): Promise<{ playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string }> {
-        if (!this.preferenceClient) {
-            throw new BadRequestException('Mercado Pago no está configurado. Contacte al administrador.');
-        }
-
         const reservation = await this.reservationRepo.findOne({
             where: { id: reservationId },
             relations: ['court'],
@@ -350,8 +389,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         const externalReference = `res_${reservationId}_p${playerIndex}_${randomUUID().substring(0, 8)}`;
         const description = `${playerName} - ${courtName} - ${reservation.date} ${reservation.startTime}-${reservation.endTime}`;
 
+        // Resolve per-club MP client (falls back to global)
+        const { preferenceClient: clubPreferenceClient } = await this.getMpClientsForClub(reservation.clubId);
+        if (!clubPreferenceClient) {
+            throw new BadRequestException('Mercado Pago no está configurado. Contacte al administrador.');
+        }
+
         try {
-            const preferenceResponse = await this.preferenceClient.create({
+            const preferenceResponse = await clubPreferenceClient.create({
                 body: {
                     items: [{
                         id: `${reservationId}_p${playerIndex}`,
@@ -367,7 +412,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                         pending: `${appUrl}/player/my-bookings?payment=pending&rid=${reservationId}`,
                     },
                     auto_return: 'approved',
-                    notification_url: `${backendUrl}/api/payments/webhook`,
+                    notification_url: `${backendUrl}/api/payments/webhook${reservation.clubId ? `?clubId=${reservation.clubId}` : ''}`,
                     statement_descriptor: 'PADEL MGR',
                 },
             });
@@ -422,10 +467,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     async createPerPlayerPaymentLinks(reservationId: string): Promise<{
         links: { playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string }[];
     }> {
-        if (!this.preferenceClient) {
-            throw new BadRequestException('Mercado Pago no está configurado. Contacte al administrador.');
-        }
-
         const reservation = await this.reservationRepo.findOne({
             where: { id: reservationId },
             relations: ['court'],
@@ -441,6 +482,12 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         const appUrl = this.configService.get<string>('APP_URL', 'http://localhost');
         const backendUrl = this.configService.get<string>('BACKEND_URL', 'http://localhost:3000');
         const courtName = reservation.court?.name || 'Cancha';
+
+        // Resolve per-club MP client once for the whole loop
+        const { preferenceClient: clubPreferenceClient } = await this.getMpClientsForClub(reservation.clubId);
+        if (!clubPreferenceClient) {
+            throw new BadRequestException('Mercado Pago no está configurado. Contacte al administrador.');
+        }
 
         const links: { playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string }[] = [];
 
@@ -487,7 +534,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             const description = `${pp.playerName} - ${courtName} - ${reservation.date} ${reservation.startTime}-${reservation.endTime}`;
 
             try {
-                const preferenceResponse = await this.preferenceClient.create({
+                const preferenceResponse = await clubPreferenceClient.create({
                     body: {
                         items: [
                             {
@@ -505,7 +552,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                             pending: `${appUrl}/player/my-bookings?payment=pending&rid=${reservationId}`,
                         },
                         auto_return: 'approved',
-                        notification_url: `${backendUrl}/api/payments/webhook`,
+                        notification_url: `${backendUrl}/api/payments/webhook${reservation.clubId ? `?clubId=${reservation.clubId}` : ''}`,
                         statement_descriptor: 'PADEL MGR',
                     },
                 });
@@ -633,14 +680,18 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             return;
         }
 
-        if (!this.paymentClient) {
+        // clubId is appended to the notification_url as ?clubId=... so MP passes it back in query
+        const clubId = query.clubId as string | undefined;
+        const { paymentClient: clubPaymentClient } = await this.getMpClientsForClub(clubId);
+
+        if (!clubPaymentClient) {
             this.logger.error('Payment client not configured – cannot process webhook');
             return;
         }
 
         try {
             // Fetch payment details from MP
-            const mpPayment = await this.paymentClient.get({ id: Number(paymentId) });
+            const mpPayment = await clubPaymentClient.get({ id: Number(paymentId) });
             const externalReference = mpPayment.external_reference;
             const status = mpPayment.status; // approved, pending, rejected, etc.
             const statusDetail = mpPayment.status_detail;

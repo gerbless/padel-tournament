@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { ResolvedSmtpCreds } from '../clubs/dto/club-credentials.dto';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
@@ -62,17 +63,31 @@ export class EmailService implements OnModuleInit {
         };
     }
 
-    async sendVerificationEmail(to: string, token: string): Promise<void> {
-        const appUrl = this.configService.get<string>('APP_URL', 'http://localhost');
+    /** Build a transporter from explicit creds (per-club) or return the global one. */
+    private getTransporter(smtpCreds?: ResolvedSmtpCreds): { transporter: nodemailer.Transporter | null; from: string } {
+        if (smtpCreds) {
+            const t = nodemailer.createTransport({
+                host: smtpCreds.host,
+                port: smtpCreds.port,
+                secure: smtpCreds.port === 465,
+                auth: { user: smtpCreds.user, pass: smtpCreds.pass },
+            });
+            return { transporter: t, from: smtpCreds.from || smtpCreds.user };
+        }
         const from = this.configService.get<string>('SMTP_FROM', this.configService.get<string>('SMTP_USER', 'noreply@padelmgr.com'));
+        return { transporter: this.transporter || null, from };
+    }
+
+    async sendVerificationEmail(to: string, token: string, smtpCreds?: ResolvedSmtpCreds): Promise<void> {
+        const appUrl = this.configService.get<string>('APP_URL', 'http://localhost');
+        const { transporter, from } = this.getTransporter(smtpCreds);
         const verifyLink = `${appUrl}/verify-email?token=${token}`;
 
         this.logger.log(`--- Enviando email de verificación ---`);
         this.logger.log(`  To: ${to}`);
         this.logger.log(`  From: ${from}`);
         this.logger.log(`  Link: ${verifyLink}`);
-        this.logger.log(`  Transporter: ${this.transporter ? 'SÍ' : 'NO'}`);
-        this.logger.log(`  SMTP Ready: ${this.smtpReady}`);
+        this.logger.log(`  Transporter: ${transporter ? 'SÍ' : 'NO'}`);
 
         const subject = 'Verifica tu cuenta – Padel MGR';
         const html = `
@@ -97,17 +112,13 @@ export class EmailService implements OnModuleInit {
             </div>
         `;
 
-        if (this.transporter) {
+        if (transporter) {
             try {
-                const info = await this.transporter.sendMail({ from, to, subject, html });
+                const info = await transporter.sendMail({ from, to, subject, html });
                 this.logger.log(`✅ Email enviado exitosamente a ${to}`);
                 this.logger.log(`   Message ID: ${info.messageId}`);
-                this.logger.log(`   Response: ${info.response}`);
             } catch (error) {
-                this.logger.error(`❌ Error enviando email a ${to}:`);
-                this.logger.error(`   Error: ${error.message}`);
-                this.logger.error(`   Code: ${error.code || 'N/A'}`);
-                this.logger.error(`   Stack: ${error.stack}`);
+                this.logger.error(`❌ Error enviando email a ${to}: ${error.message}`);
             }
         } else {
             this.logger.warn(`⚠️  [SIN SMTP] Email NO enviado a ${to}`);

@@ -9,6 +9,7 @@ import { PlayersService } from '../players/players.service';
 import { RegisterDto } from './dto/register.dto';
 import { EmailService } from '../email/email.service';
 import { PhoneVerificationService } from '../phone-verification/phone-verification.service';
+import { ClubCredentialsService } from '../clubs/club-credentials.service';
 
 /** Shape of data stored in the preregistered cache. */
 interface PreregCacheEntry {
@@ -29,6 +30,7 @@ export class AuthService {
         private playersService: PlayersService,
         private emailService: EmailService,
         private phoneVerificationService: PhoneVerificationService,
+        private credentialsService: ClubCredentialsService,
     ) { }
 
     async validateUser(username: string, pass: string): Promise<any> {
@@ -157,8 +159,9 @@ export class AuthService {
             this.phoneVerificationService.consumeVerificationToken(dto.phoneVerificationToken);
         }
 
-        // 9. Send verification email
-        await this.emailService.sendVerificationEmail(dto.email, verificationToken);
+        // 9. Send verification email using per-club SMTP if available
+        const smtpCreds = await this.credentialsService.getEffectiveSmtpCreds(dto.clubId);
+        await this.emailService.sendVerificationEmail(dto.email, verificationToken, smtpCreds ?? undefined);
 
         return {
             message: 'Registro exitoso. Te enviamos un email de verificación. Revisa tu bandeja de entrada para activar tu cuenta.',

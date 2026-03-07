@@ -6,7 +6,7 @@ import { Subscription } from 'rxjs';
 import { ClubService } from '../../../services/club.service';
 import { AuthService } from '../../../services/auth.service';
 import { PermissionsService, SIDEBAR_ITEMS, NavItem } from '../../../services/permissions.service';
-import { Club, EnabledModules, DEFAULT_ENABLED_MODULES } from '../../../models/club.model';
+import { Club, EnabledModules, DEFAULT_ENABLED_MODULES, ClubSmtpCredentials, ClubTwilioCredentials, ClubMercadoPagoCredentials } from '../../../models/club.model';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { ConfirmService } from '../../../services/confirm.service';
@@ -41,13 +41,28 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
 
     saving = false;
     loadingUsers = false;
-    activeTab: 'modules' | 'users' | 'features' = 'modules';
+    activeTab: 'modules' | 'users' | 'features' | 'credentials' = 'modules';
     freePlayPointsPerWin = 3;
 
     // Feature flags
     enablePhoneVerification = false;
     enablePaymentLinkSending = false;
+    enablePayments = true;
     savingFeatures = false;
+
+    // Credentials (super_admin only)
+    smtpCreds: ClubSmtpCredentials = {};
+    twilioCreds: ClubTwilioCredentials = {};
+    mpCreds: ClubMercadoPagoCredentials = {};
+    // Snapshots of masked values returned by the API — used to detect changes
+    private _maskedSmtp: ClubSmtpCredentials = {};
+    private _maskedTwilio: ClubTwilioCredentials = {};
+    private _maskedMp: ClubMercadoPagoCredentials = {};
+    loadingCredentials = false;
+    savingSmtp = false;
+    savingTwilio = false;
+    savingMp = false;
+    credentialsLoaded = false;
 
     // Role assignment form
     selectedUserId = '';
@@ -88,9 +103,13 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
                     this.freePlayPointsPerWin = club.freePlayPointsPerWin || 3;
                     this.enablePhoneVerification = club.enablePhoneVerification ?? false;
                     this.enablePaymentLinkSending = club.enablePaymentLinkSending ?? false;
+                    this.enablePayments = club.enablePayments ?? true;
                     this.loadClubUsers();
                     this.loadAllUsers();
                     this.loadPlayers();
+                    if (this.authService.isSuperAdmin()) {
+                        this.loadCredentials(club.id);
+                    }
                 }
                 this.cdr.markForCheck();
             })
@@ -176,6 +195,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
                 {
                     enablePhoneVerification: this.enablePhoneVerification,
                     enablePaymentLinkSending: this.enablePaymentLinkSending,
+                    enablePayments: this.enablePayments,
                 }
             ).toPromise();
 
@@ -184,6 +204,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
                     ...this.club,
                     enablePhoneVerification: this.enablePhoneVerification,
                     enablePaymentLinkSending: this.enablePaymentLinkSending,
+                    enablePayments: this.enablePayments,
                 };
                 this.clubService.selectClub(updatedClub);
             }
@@ -193,6 +214,95 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
             this.savingFeatures = false;
             this.cdr.markForCheck();
         }
+    }
+
+    // ─── Credentials (super_admin only) ──────────────
+
+    get isSuperAdmin(): boolean {
+        return this.authService.isSuperAdmin();
+    }
+
+    loadCredentials(clubId: string) {
+        this.loadingCredentials = true;
+        this.cdr.markForCheck();
+        this.clubService.getCredentials(clubId).subscribe({
+            next: (creds) => {
+                // Store masked values — the form shows them so the user can see what’s saved.
+                // Snapshots are kept separately to detect when the user actually changes a field.
+                this.smtpCreds   = { ...(creds.smtp ?? {}) };
+                this.twilioCreds = { ...(creds.twilio ?? {}) };
+                this.mpCreds     = { ...(creds.mercadopago ?? {}) };
+                this._maskedSmtp   = { ...(creds.smtp ?? {}) };
+                this._maskedTwilio = { ...(creds.twilio ?? {}) };
+                this._maskedMp     = { ...(creds.mercadopago ?? {}) };
+                this.credentialsLoaded = true;
+                this.loadingCredentials = false;
+                this.cdr.markForCheck();
+            },
+            error: () => {
+                this.loadingCredentials = false;
+                this.cdr.markForCheck();
+            },
+        });
+    }
+
+    /** Returns true if the user changed at least one SMTP field from the masked snapshot. */
+    hasSmtpChanges(): boolean {
+        return this.hasObjectChanges(this.smtpCreds, this._maskedSmtp);
+    }
+
+    /** Returns true if the user changed at least one Twilio field from the masked snapshot. */
+    hasTwilioChanges(): boolean {
+        return this.hasObjectChanges(this.twilioCreds, this._maskedTwilio);
+    }
+
+    /** Returns true if the user changed at least one Mercado Pago field from the masked snapshot. */
+    hasMpChanges(): boolean {
+        return this.hasObjectChanges(this.mpCreds, this._maskedMp);
+    }
+
+    private hasObjectChanges(current: Record<string, any>, original: Record<string, any>): boolean {
+        const keys = new Set([...Object.keys(current), ...Object.keys(original)]);
+        for (const k of keys) {
+            const val = current[k];
+            // A field is “changed” if it has a real value AND it differs from the snapshot.
+            if (val !== undefined && val !== '' && val !== original[k]) return true;
+        }
+        return false;
+    }
+
+    async saveSmtp() {
+        if (!this.club || this.savingSmtp || !this.hasSmtpChanges()) return;
+        this.savingSmtp = true;
+        this.cdr.markForCheck();
+        try {
+            await this.clubService.updateCredentials(this.club.id, { smtp: this.smtpCreds }).toPromise();
+            // Refresh snapshot so the button disables again until the next edit
+            this._maskedSmtp = { ...this.smtpCreds };
+        } catch (e) { console.error('Error saving SMTP', e); }
+        finally { this.savingSmtp = false; this.cdr.markForCheck(); }
+    }
+
+    async saveTwilio() {
+        if (!this.club || this.savingTwilio || !this.hasTwilioChanges()) return;
+        this.savingTwilio = true;
+        this.cdr.markForCheck();
+        try {
+            await this.clubService.updateCredentials(this.club.id, { twilio: this.twilioCreds }).toPromise();
+            this._maskedTwilio = { ...this.twilioCreds };
+        } catch (e) { console.error('Error saving Twilio', e); }
+        finally { this.savingTwilio = false; this.cdr.markForCheck(); }
+    }
+
+    async saveMp() {
+        if (!this.club || this.savingMp || !this.hasMpChanges()) return;
+        this.savingMp = true;
+        this.cdr.markForCheck();
+        try {
+            await this.clubService.updateCredentials(this.club.id, { mercadopago: this.mpCreds }).toPromise();
+            this._maskedMp = { ...this.mpCreds };
+        } catch (e) { console.error('Error saving Mercado Pago', e); }
+        finally { this.savingMp = false; this.cdr.markForCheck(); }
     }
 
     // ─── User Management ──────────────────────────────

@@ -2,13 +2,19 @@ import { Controller, Get, Post, Delete, Patch, Body, Param, HttpCode, HttpStatus
 import { ClubsService } from './clubs.service';
 import { CreateClubDto } from './dto/create-club.dto';
 import { UpdateClubDto } from './dto/update-club.dto';
+import { UpdateClubCredentialsDto } from './dto/club-credentials.dto';
+import { ClubCredentialsService } from './club-credentials.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClubRoleGuard } from '../auth/club-role.guard';
+import { SuperAdminGuard } from '../auth/super-admin.guard';
 import { ClubRoles } from '../auth/club-roles.decorator';
 
 @Controller('clubs')
 export class ClubsController {
-    constructor(private readonly clubsService: ClubsService) { }
+    constructor(
+        private readonly clubsService: ClubsService,
+        private readonly credentialsService: ClubCredentialsService,
+    ) { }
 
     @UseGuards(JwtAuthGuard)
     @Post()
@@ -65,5 +71,20 @@ export class ClubsController {
     @Get(':id/top-players')
     getTopPlayers(@Param('id') id: string) {
         return this.clubsService.getTopPlayers(id, 10);
+    }
+
+    // ─── Credentials (super_admin only) ─────────────────────────────────────
+
+    @UseGuards(JwtAuthGuard, SuperAdminGuard)
+    @Get(':id/credentials')
+    getCredentials(@Param('id') id: string) {
+        return this.credentialsService.getMaskedCredentials(id);
+    }
+
+    @UseGuards(JwtAuthGuard, SuperAdminGuard)
+    @Patch(':id/credentials')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async updateCredentials(@Param('id') id: string, @Body() dto: UpdateClubCredentialsDto) {
+        await this.credentialsService.updateCredentials(id, dto);
     }
 }

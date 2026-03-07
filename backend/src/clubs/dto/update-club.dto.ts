@@ -37,6 +37,10 @@ export class UpdateClubDto {
     enablePhoneVerification?: boolean;
 
     @IsOptional()
+    @IsBoolean()
+    enablePayments?: boolean;
+
+    @IsOptional()
     @IsObject()
     @ValidateNested()
     @Type(() => EnabledModulesDto)

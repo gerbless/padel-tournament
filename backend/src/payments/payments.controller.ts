@@ -11,11 +11,12 @@ export class PaymentsController {
     constructor(private paymentsService: PaymentsService) {}
 
     /**
-     * Get MP public key for frontend Bricks
+     * Get MP public key for frontend Bricks.
+     * Pass ?clubId= to also check the club-level enablePayments flag.
      */
     @Get('config')
-    getConfig() {
-        return this.paymentsService.getPublicKey();
+    getConfig(@Query('clubId') clubId?: string) {
+        return this.paymentsService.getPublicKey(clubId);
     }
 
     /**

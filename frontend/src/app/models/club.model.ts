@@ -27,9 +27,42 @@ export interface Club {
     freePlayPointsPerWin?: number;
     enablePaymentLinkSending?: boolean;
     enablePhoneVerification?: boolean;
+    enablePayments?: boolean;
     enabledModules?: EnabledModules;
     createdAt: Date;
     updatedAt: Date;
+}
+
+export interface ClubSmtpCredentials {
+    host?: string;
+    port?: number;
+    user?: string;
+    pass?: string;
+    from?: string;
+}
+
+export interface ClubTwilioCredentials {
+    accountSid?: string;
+    authToken?: string;
+    whatsappFrom?: string;
+}
+
+export interface ClubMercadoPagoCredentials {
+    accessToken?: string;
+    publicKey?: string;
+    notificationUrl?: string;
+}
+
+export interface ClubCredentials {
+    smtp?: ClubSmtpCredentials;
+    twilio?: ClubTwilioCredentials;
+    mercadopago?: ClubMercadoPagoCredentials;
+}
+
+export interface UpdateClubCredentialsDto {
+    smtp?: ClubSmtpCredentials;
+    twilio?: ClubTwilioCredentials;
+    mercadopago?: ClubMercadoPagoCredentials;
 }
 
 export interface CreateClubDto {
@@ -46,5 +79,6 @@ export interface UpdateClubDto {
     freePlayPointsPerWin?: number;
     enablePaymentLinkSending?: boolean;
     enablePhoneVerification?: boolean;
+    enablePayments?: boolean;
     enabledModules?: Partial<EnabledModules>;
 }

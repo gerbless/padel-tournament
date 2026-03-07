@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ClubCredentialsService } from '../clubs/club-credentials.service';
 import { randomUUID } from 'crypto';
 
 interface OtpRecord {
@@ -40,7 +41,10 @@ export class PhoneVerificationService {
     private readonly verifiedStore = new Map<string, string>(); // token → phone
     private readonly verifiedPhones = new Map<string, VerifiedRecord>(); // phone → VerifiedRecord
 
-    constructor(private readonly notifications: NotificationsService) {
+    constructor(
+        private readonly notifications: NotificationsService,
+        private readonly credentialsService: ClubCredentialsService,
+    ) {
         // Periodic cleanup every 10 minutes
         setInterval(() => this.cleanup(), 10 * 60 * 1000);
     }
@@ -49,7 +53,7 @@ export class PhoneVerificationService {
      * Send a verification OTP to the given phone number via WhatsApp.
      * Returns { sent: true } or throws.
      */
-    async sendOtp(phone: string, clubName?: string): Promise<{ sent: boolean; devCode?: string }> {
+    async sendOtp(phone: string, clubName?: string, clubId?: string): Promise<{ sent: boolean; devCode?: string }> {
         const now = Date.now();
 
         // Cooldown check
@@ -71,7 +75,8 @@ export class PhoneVerificationService {
             attempts: 0,
         });
 
-        const result = await this.notifications.sendPhoneOtp(phone, code, clubName);
+        const twilioCreds = await this.credentialsService.getEffectiveTwilioCreds(clubId);
+        const result = await this.notifications.sendPhoneOtp(phone, code, clubName, twilioCreds ?? undefined);
 
         if (!result.success) {
             this.otpStore.delete(phone);

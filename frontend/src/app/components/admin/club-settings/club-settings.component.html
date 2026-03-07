@@ -13,6 +13,9 @@
         <button class="tab" [class.active]="activeTab === 'features'" (click)="activeTab = 'features'">
             🔧 Funcionalidades
         </button>
+        <button *ngIf="isSuperAdmin" class="tab" [class.active]="activeTab === 'credentials'" (click)="activeTab = 'credentials'">
+            🔑 Credenciales
+        </button>
         <button class="tab" [class.active]="activeTab === 'users'" (click)="activeTab = 'users'">
             👥 Usuarios y Roles
         </button>
@@ -106,12 +109,105 @@
                 </div>
             </div>
 
+            <!-- Master payments toggle -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-icon">🏧</div>
+                    <div class="feature-info">
+                        <span class="feature-name">Pagos con Mercado Pago</span>
+                        <span class="feature-desc">Control maestro del sistema de pagos. Cuando está desactivado, todos los botones de pago, generación de links y redirecciones a Mercado Pago desaparecen de toda la aplicación (portal del jugador y módulo de canchas).</span>
+                        <span class="feature-note">Al desactivar, las reservas se crean sin cobro. Los pagos ya registrados no se eliminan.</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" [(ngModel)]="enablePayments">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
         </div>
 
         <div class="actions-bar">
             <button class="btn btn-primary" (click)="saveFeatures()" [disabled]="savingFeatures">
                 {{ savingFeatures ? 'Guardando...' : '💾 Guardar Funcionalidades' }}
             </button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!--          CREDENTIALS TAB (super_admin)         -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <div *ngIf="activeTab === 'credentials' && isSuperAdmin" class="tab-content">
+        <div class="section-info">
+            <h2>🔑 Credenciales de Integración</h2>
+            <p>Configura las credenciales específicas de este club para SMTP, Twilio y Mercado Pago. Si dejas un campo vacío, se utilizará la configuración global del servidor como fallback.</p>
+            <p><strong>⚠️ Solo visible para super administradores.</strong></p>
+        </div>
+
+        <div *ngIf="loadingCredentials" class="loading-state">Cargando credenciales...</div>
+
+        <div *ngIf="!loadingCredentials" class="credentials-sections">
+
+            <!-- SMTP -->
+            <div class="cred-section">
+                <h3>📧 SMTP (Email)</h3>
+                <div class="cred-grid">
+                    <label>Servidor (host)
+                        <input type="text" [(ngModel)]="smtpCreds.host" placeholder="smtp.gmail.com">
+                    </label>
+                    <label>Puerto
+                        <input type="number" [(ngModel)]="smtpCreds.port" placeholder="587">
+                    </label>
+                    <label>Usuario
+                        <input type="text" [(ngModel)]="smtpCreds.user" placeholder="user@example.com">
+                    </label>
+                    <label>Contraseña
+                        <input type="password" [(ngModel)]="smtpCreds.pass" placeholder="••••••••">
+                    </label>
+                    <label>Remitente (from)
+                        <input type="text" [(ngModel)]="smtpCreds.from" placeholder="noreply@miclub.com">
+                    </label>
+                </div>
+                <button class="btn btn-primary" (click)="saveSmtp()" [disabled]="savingSmtp || !hasSmtpChanges()">
+                    {{ savingSmtp ? 'Guardando...' : '💾 Guardar SMTP' }}
+                </button>
+            </div>
+
+            <!-- Twilio -->
+            <div class="cred-section">
+                <h3>💬 Twilio (WhatsApp)</h3>
+                <div class="cred-grid">
+                    <label>Account SID
+                        <input type="text" [(ngModel)]="twilioCreds.accountSid" placeholder="ACxxxxxxxxxxxxxxxx">
+                    </label>
+                    <label>Auth Token
+                        <input type="password" [(ngModel)]="twilioCreds.authToken" placeholder="••••••••">
+                    </label>
+                    <label>WhatsApp From
+                        <input type="text" [(ngModel)]="twilioCreds.whatsappFrom" placeholder="whatsapp:+14155238886">
+                    </label>
+                </div>
+                <button class="btn btn-primary" (click)="saveTwilio()" [disabled]="savingTwilio || !hasTwilioChanges()">
+                    {{ savingTwilio ? 'Guardando...' : '💾 Guardar Twilio' }}
+                </button>
+            </div>
+
+            <!-- Mercado Pago -->
+            <div class="cred-section">
+                <h3>💳 Mercado Pago</h3>
+                <div class="cred-grid">
+                    <label>Access Token
+                        <input type="password" [(ngModel)]="mpCreds.accessToken" placeholder="APP_USR-xxxxx">
+                    </label>
+                    <label>Public Key
+                        <input type="text" [(ngModel)]="mpCreds.publicKey" placeholder="APP_USR-xxxxx-public">
+                    </label>
+                </div>
+                <button class="btn btn-primary" (click)="saveMp()" [disabled]="savingMp || !hasMpChanges()">
+                    {{ savingMp ? 'Guardando...' : '💾 Guardar Mercado Pago' }}
+                </button>
+            </div>
+
         </div>
     </div>
 

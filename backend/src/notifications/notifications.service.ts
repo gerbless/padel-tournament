@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TwilioService } from './providers/twilio.service';
 import { SendMessageDto, SendMessageResult, NotificationChannel, NotificationTemplate } from './dto/send-message.dto';
+import { ResolvedTwilioCreds } from '../clubs/dto/club-credentials.dto';
 
 /**
  * NotificationsService — Generic messaging layer.
@@ -31,20 +32,21 @@ export class NotificationsService {
 
         switch (channel) {
             case NotificationChannel.WHATSAPP:
-                return this.twilio.sendWhatsApp(dto.to, body);
+                return this.twilio.sendWhatsApp(dto.to, body, dto.twilioCreds);
             default:
                 this.logger.warn(`Channel ${channel} not implemented. Falling back to WhatsApp.`);
-                return this.twilio.sendWhatsApp(dto.to, body);
+                return this.twilio.sendWhatsApp(dto.to, body, dto.twilioCreds);
         }
     }
 
     // ─── Convenience shortcuts ────────────────────────────────────────────────
 
-    async sendPhoneOtp(to: string, code: string, clubName = 'Padel MGR'): Promise<SendMessageResult> {
+    async sendPhoneOtp(to: string, code: string, clubName = 'Padel MGR', twilioCreds?: ResolvedTwilioCreds): Promise<SendMessageResult> {
         return this.send({
             to,
             template: NotificationTemplate.PHONE_OTP,
             params: { code, clubName },
+            twilioCreds,
         });
     }
 
@@ -76,8 +78,8 @@ export class NotificationsService {
         date?: string;
         time?: string;
         courtName?: string;
-    }): Promise<SendMessageResult> {
-        return this.send({ to, template: NotificationTemplate.PAYMENT_LINK, params });
+    }, twilioCreds?: ResolvedTwilioCreds): Promise<SendMessageResult> {
+        return this.send({ to, template: NotificationTemplate.PAYMENT_LINK, params, twilioCreds });
     }
 
     async sendMatchSuggestion(to: string, params: {

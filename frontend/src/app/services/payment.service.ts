@@ -26,14 +26,19 @@ export interface PaymentStatus {
 @Injectable({ providedIn: 'root' })
 export class PaymentService {
     private apiUrl = `${environment.apiUrl}/payments`;
-    private _config: PaymentConfig | null = null;
+    // Cache per club (key = clubId or '_global' for calls without a clubId)
+    private _configs = new Map<string, PaymentConfig>();
 
     constructor(private http: HttpClient) {}
 
-    getConfig(): Observable<PaymentConfig> {
-        if (this._config) return of(this._config);
-        return this.http.get<PaymentConfig>(`${this.apiUrl}/config`).pipe(
-            tap(c => this._config = c)
+    getConfig(clubId?: string): Observable<PaymentConfig> {
+        const key = clubId || '_global';
+        if (this._configs.has(key)) return of(this._configs.get(key)!);
+        const url = clubId
+            ? `${this.apiUrl}/config?clubId=${clubId}`
+            : `${this.apiUrl}/config`;
+        return this.http.get<PaymentConfig>(url).pipe(
+            tap(c => this._configs.set(key, c))
         );
     }
 

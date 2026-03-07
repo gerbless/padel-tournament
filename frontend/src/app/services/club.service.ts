@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { Club, CreateClubDto, UpdateClubDto } from '../models/club.model';
+import { Club, CreateClubDto, UpdateClubDto, ClubCredentials, UpdateClubCredentialsDto } from '../models/club.model';
 import { Player } from './player.service';
 import { environment } from '../../environments/environment';
 
@@ -49,6 +49,14 @@ export class ClubService {
 
     deleteClub(id: string): Observable<void> {
         return this.http.delete<void>(`${this.apiUrl}/${id}`);
+    }
+
+    getCredentials(clubId: string): Observable<ClubCredentials> {
+        return this.http.get<ClubCredentials>(`${this.apiUrl}/${clubId}/credentials`);
+    }
+
+    updateCredentials(clubId: string, dto: UpdateClubCredentialsDto): Observable<void> {
+        return this.http.patch<void>(`${this.apiUrl}/${clubId}/credentials`, dto);
     }
 
     getClubPlayers(clubId: string): Observable<Player[]> {

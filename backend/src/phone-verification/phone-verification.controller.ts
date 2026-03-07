@@ -14,7 +14,7 @@ export class PhoneVerificationController {
     @Post('send')
     @HttpCode(HttpStatus.OK)
     async sendOtp(@Body() dto: SendOtpDto & { clubName?: string }) {
-        return this.phoneVerificationService.sendOtp(dto.phone, dto.clubName);
+        return this.phoneVerificationService.sendOtp(dto.phone, dto.clubName, dto.clubId);
     }
 
     /**

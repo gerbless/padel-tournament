@@ -1,3 +1,5 @@
+import { ResolvedTwilioCreds } from '../../clubs/dto/club-credentials.dto';
+
 export enum NotificationChannel {
     WHATSAPP = 'whatsapp',
     SMS = 'sms',
@@ -19,6 +21,8 @@ export interface SendMessageDto {
     channel?: NotificationChannel;
     params?: Record<string, string | number>;
     customBody?: string; // used when template = CUSTOM
+    /** Optional per-club Twilio credential override */
+    twilioCreds?: ResolvedTwilioCreds;
 }
 
 export interface SendMessageResult {

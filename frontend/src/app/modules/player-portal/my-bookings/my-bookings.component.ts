@@ -89,19 +89,18 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
             }
         });
 
-        // Check if MP is configured
-        this.paymentService.getConfig().subscribe({
-            next: (config) => {
-                this.mpConfigured = config.configured;
-                this.cdr.markForCheck();
-            },
-            error: () => {}
-        });
-
+        // Check if MP is configured — done inside selectedClub$ so clubId is available
         this.clubService.selectedClub$.subscribe(club => {
             if (club) {
                 this.clubId = club.id;
                 this.clubName = club.name;
+                this.paymentService.getConfig(club.id).subscribe({
+                    next: (config) => {
+                        this.mpConfigured = config.configured;
+                        this.cdr.markForCheck();
+                    },
+                    error: () => {}
+                });
                 this.loadBookings();
             }
         });

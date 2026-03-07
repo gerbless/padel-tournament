@@ -67,17 +67,16 @@ export class PlayerBookingComponent implements OnInit {
             if (club) {
                 this.clubId = club.id;
                 this.clubName = club.name;
+                // Check MP config with clubId so the club-level enablePayments flag is respected
+                this.paymentService.getConfig(club.id).subscribe({
+                    next: (config) => {
+                        this.mpConfigured = config.configured;
+                        this.cdr.markForCheck();
+                    },
+                    error: () => { this.mpConfigured = false; this.cdr.markForCheck(); }
+                });
                 this.loadSlots();
             }
-        });
-
-        // Check if MP is configured
-        this.paymentService.getConfig().subscribe({
-            next: (config) => {
-                this.mpConfigured = config.configured;
-                this.cdr.markForCheck();
-            },
-            error: () => { /* MP not available */ }
         });
     }
 

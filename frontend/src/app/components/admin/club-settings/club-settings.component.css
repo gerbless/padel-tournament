@@ -530,3 +530,55 @@
     font-style: italic;
 }
 
+/* ─── Credentials Section ──────────────────────────── */
+.credentials-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.cred-section {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 1.5rem;
+}
+
+.cred-section h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: var(--text-primary, #fff);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding-bottom: 0.75rem;
+}
+
+.cred-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.cred-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-muted, #aaa);
+}
+
+.cred-grid input {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    color: var(--text-primary, #fff);
+    font-size: 0.875rem;
+}
+
+.cred-grid input:focus {
+    outline: none;
+    border-color: rgba(99, 102, 241, 0.6);
+    background: rgba(255,255,255,0.1);
+}
+

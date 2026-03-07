@@ -411,8 +411,8 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
                 // Check role
                 this.canEdit = this.authService.hasClubRole(court.clubId, 'editor');
 
-                // Check MP config
-                this.paymentService.getConfig().subscribe({
+                // Check MP config with clubId to respect club-level enablePayments flag
+                this.paymentService.getConfig(court.clubId).subscribe({
                     next: (cfg) => {
                         this.mpConfigured = cfg.configured;
                         this.cdr.markForCheck();

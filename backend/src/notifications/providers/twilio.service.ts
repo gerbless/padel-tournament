@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SendMessageDto, SendMessageResult, NotificationChannel, NotificationTemplate } from '../dto/send-message.dto';
+import { SendMessageResult } from '../dto/send-message.dto';
+import { ResolvedTwilioCreds } from '../../clubs/dto/club-credentials.dto';
 
 /**
  * TwilioService - raw Twilio API wrapper.
@@ -26,10 +27,16 @@ export class TwilioService {
         }
     }
 
-    async sendWhatsApp(to: string, body: string): Promise<SendMessageResult> {
+    async sendWhatsApp(to: string, body: string, creds?: ResolvedTwilioCreds): Promise<SendMessageResult> {
         const toFormatted = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
 
-        if (!this.enabled) {
+        // Resolve credentials: per-club override takes priority, fall back to env
+        const accountSid = creds?.accountSid || this.accountSid;
+        const authToken = creds?.authToken || this.authToken;
+        const whatsappFrom = creds?.whatsappFrom || this.whatsappFromNumber;
+        const isEnabled = !!(accountSid && authToken);
+
+        if (!isEnabled) {
             this.logger.log(`[TWILIO MOCK] WhatsApp → ${toFormatted}: ${body}`);
             return { success: true, messageId: `mock_${Date.now()}` };
         }
@@ -37,11 +44,11 @@ export class TwilioService {
         try {
             // Dynamic import to avoid build issues when twilio is not installed
             const twilio = require('twilio');
-            const client = twilio(this.accountSid, this.authToken);
+            const client = twilio(accountSid, authToken);
 
             const message = await client.messages.create({
                 body,
-                from: this.whatsappFromNumber,
+                from: whatsappFrom,
                 to: toFormatted,
             });
 
