@@ -53,6 +53,8 @@ export class RegisterComponent {
     // ── Club context ─────────────────────────────────────────────────────────
     clubId: string | null = null;
     clubName: string | null = null;
+    /** Controlled from club settings — when false the OTP step is skipped entirely */
+    clubEnablePhoneVerification = false;
 
     constructor(
         private http: HttpClient,
@@ -67,6 +69,7 @@ export class RegisterComponent {
         if (club) {
             this.clubId = club.id;
             this.clubName = club.name;
+            this.clubEnablePhoneVerification = club.enablePhoneVerification ?? false;
         }
     }
 
@@ -120,7 +123,7 @@ export class RegisterComponent {
         this.phone = val;
     }
 
-    // ── Step 1: Validate form fields, then send OTP ───────────────────────────
+    // ── Step 1: Validate form fields, then send OTP (or skip if disabled) ────
     sendOtp() {
         this.error = '';
         if (!this.name.trim()) { this.error = 'El nombre es obligatorio'; return; }
@@ -132,6 +135,14 @@ export class RegisterComponent {
         }
         if (this.password.length < 6) { this.error = 'La contraseña debe tener al menos 6 caracteres'; return; }
         if (this.password !== this.passwordConfirm) { this.error = 'Las contraseñas no coinciden'; return; }
+
+        // If phone verification is disabled for this club, skip directly to registration
+        if (!this.clubEnablePhoneVerification) {
+            this.phoneVerified = true;
+            this.phoneVerificationToken = '';
+            this.register();
+            return;
+        }
 
         this.sendingOtp = true;
         this.cdr.markForCheck();
@@ -204,7 +215,8 @@ export class RegisterComponent {
 
     // ── Step 3: Final registration ────────────────────────────────────────────
     register() {
-        if (!this.phoneVerified) {
+        // Only enforce phone verification check when it's enabled for this club
+        if (this.clubEnablePhoneVerification && !this.phoneVerified) {
             this.error = 'Debes verificar tu número de teléfono antes de continuar';
             return;
         }

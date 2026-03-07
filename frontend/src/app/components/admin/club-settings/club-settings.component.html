@@ -10,6 +10,9 @@
         <button class="tab" [class.active]="activeTab === 'modules'" (click)="activeTab = 'modules'">
             📦 Módulos
         </button>
+        <button class="tab" [class.active]="activeTab === 'features'" (click)="activeTab = 'features'">
+            🔧 Funcionalidades
+        </button>
         <button class="tab" [class.active]="activeTab === 'users'" (click)="activeTab = 'users'">
             👥 Usuarios y Roles
         </button>
@@ -56,6 +59,58 @@
         <div class="actions-bar">
             <button class="btn btn-primary" (click)="saveModules()" [disabled]="saving">
                 {{ saving ? 'Guardando...' : '💾 Guardar Configuración' }}
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!--             FEATURES TAB                       -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <div *ngIf="activeTab === 'features'" class="tab-content">
+        <div class="section-info">
+            <h2>🔧 Funcionalidades del Club</h2>
+            <p>Activa o desactiva características avanzadas para este club. Estas opciones controlan comportamientos del sistema que requieren configuración adicional (Twilio, email, etc.).</p>
+        </div>
+
+        <div class="features-list">
+
+            <!-- Phone verification -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-icon">📲</div>
+                    <div class="feature-info">
+                        <span class="feature-name">Verificación de teléfono al registrarse</span>
+                        <span class="feature-desc">Cuando está activo, los jugadores deben confirmar su número de WhatsApp mediante un código OTP antes de completar el registro. Requiere Twilio configurado.</span>
+                        <span class="feature-note">⚠️ La verificación de email al crear la cuenta siempre está activa y no puede desactivarse.</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" [(ngModel)]="enablePhoneVerification">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Payment link sending -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <div class="feature-icon">💳</div>
+                    <div class="feature-info">
+                        <span class="feature-name">Envío de links de pago por Email / WhatsApp</span>
+                        <span class="feature-desc">Cuando está activo, los administradores pueden enviar los links de Mercado Pago directamente a los jugadores que tengan email o teléfono verificado. El mensaje incluye club, fecha, cancha, horario y monto.</span>
+                        <span class="feature-note">Requiere email (SMTP) y/o Twilio configurados según el canal a usar.</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" [(ngModel)]="enablePaymentLinkSending">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="actions-bar">
+            <button class="btn btn-primary" (click)="saveFeatures()" [disabled]="savingFeatures">
+                {{ savingFeatures ? 'Guardando...' : '💾 Guardar Funcionalidades' }}
             </button>
         </div>
     </div>

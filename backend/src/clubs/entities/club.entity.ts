@@ -27,6 +27,14 @@ export class Club {
     @Column({ default: false })
     enableCourtPricing: boolean;
 
+    /** Allow admins to send Mercado Pago payment links via Email/WhatsApp */
+    @Column({ default: false })
+    enablePaymentLinkSending: boolean;
+
+    /** Require WhatsApp OTP verification during player registration */
+    @Column({ default: false })
+    enablePhoneVerification: boolean;
+
     /** Points awarded per free-play match win (configurable per club) */
     @Column({ type: 'int', default: 3 })
     freePlayPointsPerWin: number;

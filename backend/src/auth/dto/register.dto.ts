@@ -17,9 +17,13 @@ export class RegisterDto {
     @Matches(/^\+[1-9]\d{6,14}$/, { message: 'El teléfono debe estar en formato internacional. Ejemplo: +56912345678' })
     phone: string;
 
+    /**
+     * OTP token from WhatsApp verification.
+     * Optional — only required when the club has enablePhoneVerification = true.
+     */
+    @IsOptional()
     @IsString()
-    @IsNotEmpty()
-    phoneVerificationToken: string;
+    phoneVerificationToken?: string;
 
     @IsOptional()
     @IsString()

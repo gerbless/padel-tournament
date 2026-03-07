@@ -41,8 +41,13 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
 
     saving = false;
     loadingUsers = false;
-    activeTab: 'modules' | 'users' = 'modules';
+    activeTab: 'modules' | 'users' | 'features' = 'modules';
     freePlayPointsPerWin = 3;
+
+    // Feature flags
+    enablePhoneVerification = false;
+    enablePaymentLinkSending = false;
+    savingFeatures = false;
 
     // Role assignment form
     selectedUserId = '';
@@ -81,6 +86,8 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
                 if (club) {
                     this.modules = { ...DEFAULT_ENABLED_MODULES, ...(club.enabledModules || {}) };
                     this.freePlayPointsPerWin = club.freePlayPointsPerWin || 3;
+                    this.enablePhoneVerification = club.enablePhoneVerification ?? false;
+                    this.enablePaymentLinkSending = club.enablePaymentLinkSending ?? false;
                     this.loadClubUsers();
                     this.loadAllUsers();
                     this.loadPlayers();
@@ -152,6 +159,38 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
             console.error('Error saving modules', e);
         } finally {
             this.saving = false;
+            this.cdr.markForCheck();
+        }
+    }
+
+    // ─── Feature Flags ────────────────────────────────
+
+    async saveFeatures() {
+        if (!this.club || this.savingFeatures) return;
+        this.savingFeatures = true;
+        this.cdr.markForCheck();
+
+        try {
+            const updated = await this.http.patch<Club>(
+                `${environment.apiUrl}/clubs/${this.club.id}`,
+                {
+                    enablePhoneVerification: this.enablePhoneVerification,
+                    enablePaymentLinkSending: this.enablePaymentLinkSending,
+                }
+            ).toPromise();
+
+            if (updated) {
+                const updatedClub = {
+                    ...this.club,
+                    enablePhoneVerification: this.enablePhoneVerification,
+                    enablePaymentLinkSending: this.enablePaymentLinkSending,
+                };
+                this.clubService.selectClub(updatedClub);
+            }
+        } catch (e) {
+            console.error('Error saving features', e);
+        } finally {
+            this.savingFeatures = false;
             this.cdr.markForCheck();
         }
     }

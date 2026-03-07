@@ -85,12 +85,14 @@ export class AuthService {
     }
 
     async register(dto: RegisterDto) {
-        // 1. Validate phone verification token
-        const verifiedPhone = this.phoneVerificationService.validateVerificationToken(dto.phoneVerificationToken);
+        // 1. Validate phone verification token (only when provided — club may have disabled phone verification)
+        if (dto.phoneVerificationToken) {
+            const verifiedPhone = this.phoneVerificationService.validateVerificationToken(dto.phoneVerificationToken);
 
-        // 2. Ensure the verified phone matches the submitted phone
-        if (verifiedPhone !== dto.phone) {
-            throw new UnauthorizedException('El teléfono verificado no coincide con el registrado.');
+            // 2. Ensure the verified phone matches the submitted phone
+            if (verifiedPhone !== dto.phone) {
+                throw new UnauthorizedException('El teléfono verificado no coincide con el registrado.');
+            }
         }
 
         // 3. If a preregisteredCacheKey is provided, retrieve the original (real) data from cache
@@ -142,7 +144,7 @@ export class AuthService {
             email: dto.email,
             password: dto.password,
             phone: dto.phone,
-            isPhoneVerified: true,
+            isPhoneVerified: !!dto.phoneVerificationToken,
             emailVerificationToken: verificationToken,
             isEmailVerified: false,
         } as any);
@@ -150,8 +152,10 @@ export class AuthService {
         // 7. Link user to player
         await this.usersService.linkUserToPlayer(user.id, player.id);
 
-        // 8. Consume verification token (one-time use)
-        this.phoneVerificationService.consumeVerificationToken(dto.phoneVerificationToken);
+        // 8. Consume verification token (one-time use, only if provided)
+        if (dto.phoneVerificationToken) {
+            this.phoneVerificationService.consumeVerificationToken(dto.phoneVerificationToken);
+        }
 
         // 9. Send verification email
         await this.emailService.sendVerificationEmail(dto.email, verificationToken);

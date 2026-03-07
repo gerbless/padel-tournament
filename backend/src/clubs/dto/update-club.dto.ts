@@ -29,6 +29,14 @@ export class UpdateClubDto {
     enableCourtPricing?: boolean;
 
     @IsOptional()
+    @IsBoolean()
+    enablePaymentLinkSending?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    enablePhoneVerification?: boolean;
+
+    @IsOptional()
     @IsObject()
     @ValidateNested()
     @Type(() => EnabledModulesDto)

@@ -23,6 +23,8 @@ export interface ReservationContext {
     courtName: string;
     startTime: string;  // HH:mm
     endTime: string;    // HH:mm
+    /** Controlled from club settings — when false the Email/WhatsApp send buttons are hidden */
+    enablePaymentLinkSending: boolean;
 }
 
 @Component({
@@ -57,7 +59,7 @@ export interface ReservationContext {
                                     📋 Copiar
                                 </button>
                             </div>
-                            <div class="send-actions" *ngIf="reservationContext">
+                            <div class="send-actions" *ngIf="reservationContext?.enablePaymentLinkSending">
                                 <button *ngIf="links[0].email"
                                     class="btn-send btn-send-email"
                                     [disabled]="sendingState[0] === 'sending'"
@@ -102,7 +104,7 @@ export interface ReservationContext {
                                 </button>
                             </div>
                             <!-- Send via email / WhatsApp -->
-                            <div class="send-actions" *ngIf="link.status !== 'paid' && reservationContext && (link.email || link.phone)">
+                            <div class="send-actions" *ngIf="link.status !== 'paid' && reservationContext?.enablePaymentLinkSending && (link.email || link.phone)">
                                 <button *ngIf="link.email"
                                     class="btn-send btn-send-email"
                                     [disabled]="sendingState[i] === 'sending'"

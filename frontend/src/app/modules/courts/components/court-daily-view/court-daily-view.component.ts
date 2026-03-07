@@ -34,6 +34,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
     canEdit = false;
     enablePricing = false;
     freePlayPointsPerWin = 3;
+    enablePaymentLinkSending = false;
 
     // Auto-refresh
     private refreshInterval: any = null;
@@ -405,6 +406,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
                 this.clubName = club.name;
                 this.enablePricing = club.enableCourtPricing || false;
                 this.freePlayPointsPerWin = club.freePlayPointsPerWin || 3;
+                this.enablePaymentLinkSending = club.enablePaymentLinkSending ?? false;
                 this.cdr.markForCheck();
             }
         });
@@ -765,6 +767,7 @@ export class CourtDailyViewComponent implements OnInit, OnDestroy {
             courtName: court.name,
             startTime: this.reservationForm.startTime,
             endTime: this.reservationForm.endTime,
+            enablePaymentLinkSending: this.enablePaymentLinkSending,
         };
     }
 
