@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { Court } from './entities/court.entity';
@@ -11,9 +11,16 @@ import { CreatePriceBlockDto } from './dto/create-price-block.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateCourtBlockDto } from './dto/create-court-block.dto';
 import { MercadoPagoPayment } from '../payments/entities/mercadopago-payment.entity';
+import { ClubsService } from '../clubs/clubs.service';
+import { ClubCredentialsService } from '../clubs/club-credentials.service';
+import { UsersService } from '../users/users.service';
+import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CourtsService {
+    private readonly logger = new Logger(CourtsService.name);
+
     constructor(
         @InjectRepository(Court)
         private courtRepository: Repository<Court>,
@@ -27,6 +34,11 @@ export class CourtsService {
         private courtBlockRepository: Repository<CourtBlock>,
         @InjectRepository(FreePlayMatch)
         private freePlayMatchRepository: Repository<FreePlayMatch>,
+        private clubsService: ClubsService,
+        private credentialsService: ClubCredentialsService,
+        private usersService: UsersService,
+        private emailService: EmailService,
+        private notificationsService: NotificationsService,
     ) { }
 
     // ==========================================
@@ -681,7 +693,7 @@ export class CourtsService {
         const priceBlock = await this.getPrice(dto.courtId, dto.date, dto.startTime);
         const price = priceBlock ? Number(priceBlock.priceFullCourt) : 0;
 
-        return this.createReservation({
+        const reservation = await this.createReservation({
             courtId: dto.courtId,
             clubId: dto.clubId,
             date: dto.date,
@@ -694,6 +706,69 @@ export class CourtsService {
             finalPrice: price,
             paymentStatus: 'pending',
         } as CreateReservationDto);
+
+        // ── Send booking confirmation when Mercado Pago is disabled ────────────
+        this.sendBookingNotifications(userId, reservation, dto.clubId, playerName).catch(err =>
+            this.logger.warn(`Could not send booking notification: ${err?.message}`)
+        );
+
+        return reservation;
+    }
+
+    /** Fire-and-forget: sends email and/or WhatsApp booking confirmation. */
+    private async sendBookingNotifications(userId: string, reservation: Reservation, clubId: string, playerName: string): Promise<void> {
+        // Load club and user in parallel
+        const [club, user, court] = await Promise.all([
+            this.clubsService.findOne(clubId).catch(() => null),
+            this.usersService.findById(userId).catch(() => null),
+            this.courtRepository.findOne({ where: { id: reservation.courtId } }).catch(() => null),
+        ]);
+
+        if (!club || club.enablePayments !== false) return; // MP is active — no manual notification needed
+
+        const courtName = court?.name ?? 'Cancha';
+        const clubName  = club.name;
+        const [year, month, day] = reservation.date.split('-');
+        const formattedDate  = `${day}/${month}/${year}`;
+        const formattedTime  = `${reservation.startTime} - ${reservation.endTime}`;
+        const formattedPrice = Number(reservation.finalPrice).toLocaleString('es-CL');
+        const transferInfo   = club.transferInfo ?? null;
+
+        // ── Email ──────────────────────────────────────────────────────────────
+        if (user?.email && user.isEmailVerified) {
+            const smtpCreds = await this.credentialsService.getEffectiveSmtpCreds(clubId).catch(() => undefined);
+            await this.emailService.sendReservationBookingEmail(
+                user.email,
+                { date: reservation.date, startTime: reservation.startTime, endTime: reservation.endTime, courtName, finalPrice: reservation.finalPrice, clubName },
+                transferInfo,
+                smtpCreds,
+            );
+        }
+
+        // ── WhatsApp ───────────────────────────────────────────────────────────
+        if (user?.phone && user.isPhoneVerified && club.enablePaymentLinkSending) {
+            const twilioCreds = await this.credentialsService.getEffectiveTwilioCreds(clubId).catch(() => undefined);
+
+            // Build plain-text transfer block for WhatsApp
+            let transferBlock = '';
+            if (transferInfo) {
+                const lines: string[] = [];
+                if (transferInfo.bankName)      lines.push(`Banco: ${transferInfo.bankName}`);
+                if (transferInfo.accountHolder) lines.push(`Titular: ${transferInfo.accountHolder}`);
+                if (transferInfo.accountType)   lines.push(`Tipo: ${transferInfo.accountType}`);
+                if (transferInfo.accountNumber) lines.push(`N° cuenta: ${transferInfo.accountNumber}`);
+                if (transferInfo.rut)           lines.push(`RUT: ${transferInfo.rut}`);
+                if (transferInfo.email)         lines.push(`Email: ${transferInfo.email}`);
+                if (transferInfo.notes)         lines.push(`📝 ${transferInfo.notes}`);
+                transferBlock = lines.join('\n');
+            }
+
+            await this.notificationsService.sendBookingConfirmWithTransfer(
+                user.phone,
+                { playerName, courtName, date: formattedDate, time: formattedTime, clubName, amount: formattedPrice, transferInfo: transferBlock || undefined },
+                twilioCreds,
+            );
+        }
     }
 
     async getPlayerBookings(playerId: string, playerName: string, clubId?: string): Promise<any[]> {

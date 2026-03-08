@@ -51,6 +51,21 @@ export class Club {
         mercadopago?: { accessToken: string; publicKey: string; notificationUrl?: string; };
     } | null;
 
+    /**
+     * Bank transfer details shown to players when Mercado Pago is disabled.
+     * Contains bank name, account holder, account number, etc.
+     */
+    @Column({ type: 'jsonb', nullable: true, default: null })
+    transferInfo: {
+        bankName?: string;
+        accountHolder?: string;
+        accountType?: string;
+        accountNumber?: string;
+        rut?: string;
+        email?: string;
+        notes?: string;
+    } | null;
+
     /** Points awarded per free-play match win (configurable per club) */
     @Column({ type: 'int', default: 3 })
     freePlayPointsPerWin: number;

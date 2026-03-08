@@ -42,6 +42,18 @@ export class UpdateClubDto {
 
     @IsOptional()
     @IsObject()
+    transferInfo?: {
+        bankName?: string;
+        accountHolder?: string;
+        accountType?: string;
+        accountNumber?: string;
+        rut?: string;
+        email?: string;
+        notes?: string;
+    } | null;
+
+    @IsOptional()
+    @IsObject()
     @ValidateNested()
     @Type(() => EnabledModulesDto)
     enabledModules?: EnabledModulesDto;

@@ -6,10 +6,11 @@ import { Subscription } from 'rxjs';
 import { ClubService } from '../../../services/club.service';
 import { AuthService } from '../../../services/auth.service';
 import { PermissionsService, SIDEBAR_ITEMS, NavItem } from '../../../services/permissions.service';
-import { Club, EnabledModules, DEFAULT_ENABLED_MODULES, ClubSmtpCredentials, ClubTwilioCredentials, ClubMercadoPagoCredentials } from '../../../models/club.model';
+import { Club, EnabledModules, DEFAULT_ENABLED_MODULES, ClubSmtpCredentials, ClubTwilioCredentials, ClubMercadoPagoCredentials, ClubTransferInfo } from '../../../models/club.model';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { ConfirmService } from '../../../services/confirm.service';
+import { PaymentService } from '../../../services/payment.service';
 
 interface ClubUser {
     id: string;
@@ -64,6 +65,10 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
     savingMp = false;
     credentialsLoaded = false;
 
+    // Transfer info (super_admin, stored directly on club)
+    transferInfo: ClubTransferInfo = {};
+    savingTransfer = false;
+
     // Role assignment form
     selectedUserId = '';
     selectedRole = 'viewer';
@@ -92,6 +97,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
         private http: HttpClient,
         private router: Router,
         private confirmService: ConfirmService,
+        private paymentService: PaymentService,
     ) { }
 
     ngOnInit() {
@@ -104,6 +110,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
                     this.enablePhoneVerification = club.enablePhoneVerification ?? false;
                     this.enablePaymentLinkSending = club.enablePaymentLinkSending ?? false;
                     this.enablePayments = club.enablePayments ?? true;
+                    this.transferInfo = { ...(club.transferInfo ?? {}) };
                     this.loadClubUsers();
                     this.loadAllUsers();
                     this.loadPlayers();
@@ -207,6 +214,8 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
                     enablePayments: this.enablePayments,
                 };
                 this.clubService.selectClub(updatedClub);
+                // Invalidate cached payment config so all views pick up the new enablePayments value
+                this.paymentService.clearCache(this.club.id);
             }
         } catch (e) {
             console.error('Error saving features', e);
@@ -303,6 +312,20 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
             this._maskedMp = { ...this.mpCreds };
         } catch (e) { console.error('Error saving Mercado Pago', e); }
         finally { this.savingMp = false; this.cdr.markForCheck(); }
+    }
+
+    async saveTransferInfo() {
+        if (!this.club || this.savingTransfer) return;
+        this.savingTransfer = true;
+        this.cdr.markForCheck();
+        try {
+            await this.http.patch<Club>(
+                `${environment.apiUrl}/clubs/${this.club.id}`,
+                { transferInfo: this.transferInfo }
+            ).toPromise();
+            this.clubService.selectClub({ ...this.club, transferInfo: { ...this.transferInfo } });
+        } catch (e) { console.error('Error saving transfer info', e); }
+        finally { this.savingTransfer = false; this.cdr.markForCheck(); }
     }
 
     // ─── User Management ──────────────────────────────

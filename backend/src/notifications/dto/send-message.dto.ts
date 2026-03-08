@@ -9,6 +9,7 @@ export enum NotificationTemplate {
     PHONE_OTP = 'phone_otp',
     RESERVATION_CONFIRM = 'reservation_confirm',
     RESERVATION_REMINDER = 'reservation_reminder',
+    RESERVATION_BOOKING_TRANSFER = 'reservation_booking_transfer',
     PAYMENT_LINK = 'payment_link',
     MATCH_SUGGESTION = 'match_suggestion',
     ADMIN_COURT_BOOKED = 'admin_court_booked',

@@ -31,6 +31,15 @@ export class PaymentService {
 
     constructor(private http: HttpClient) {}
 
+    /** Clear cached config so the next getConfig() fetches fresh data from the server. */
+    clearCache(clubId?: string): void {
+        if (clubId) {
+            this._configs.delete(clubId);
+        } else {
+            this._configs.clear();
+        }
+    }
+
     getConfig(clubId?: string): Observable<PaymentConfig> {
         const key = clubId || '_global';
         if (this._configs.has(key)) return of(this._configs.get(key)!);

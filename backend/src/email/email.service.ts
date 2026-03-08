@@ -209,4 +209,77 @@ export class EmailService implements OnModuleInit {
             this.logger.warn(`⚠️  [SIN SMTP] Email de confirmación NO enviado a ${to}`);
         }
     }
+
+    /**
+     * Email de confirmación de reserva sin pago (cuando MP está desactivado).
+     * Incluye los datos de transferencia bancaria del club si están configurados.
+     */
+    async sendReservationBookingEmail(
+        to: string,
+        reservation: { date: string; startTime: string; endTime: string; courtName: string; finalPrice: number; clubName: string },
+        transferInfo?: {
+            bankName?: string;
+            accountHolder?: string;
+            accountType?: string;
+            accountNumber?: string;
+            rut?: string;
+            email?: string;
+            notes?: string;
+        } | null,
+        smtpCreds?: ResolvedSmtpCreds,
+    ): Promise<void> {
+        const { transporter, from } = this.getTransporter(smtpCreds);
+
+        const [year, month, day] = reservation.date.split('-');
+        const formattedDate = `${day}/${month}/${year}`;
+        const formattedPrice = `$${Number(reservation.finalPrice).toLocaleString('es-CL')}`;
+
+        const subject = `✅ Reserva Confirmada – ${reservation.courtName} ${formattedDate}`;
+
+        const transferSection = transferInfo && Object.values(transferInfo).some(v => v) ? `
+            <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 20px; margin: 20px 0;">
+                <h3 style="color: #92400e; margin-top: 0;">🏦 Datos para Transferencia</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    ${transferInfo.bankName ? `<tr><td style="padding: 6px 0; color: #666; font-weight: bold;">Banco:</td><td style="padding: 6px 0; color: #333;">${transferInfo.bankName}</td></tr>` : ''}
+                    ${transferInfo.accountHolder ? `<tr><td style="padding: 6px 0; color: #666; font-weight: bold;">Titular:</td><td style="padding: 6px 0; color: #333;">${transferInfo.accountHolder}</td></tr>` : ''}
+                    ${transferInfo.accountType ? `<tr><td style="padding: 6px 0; color: #666; font-weight: bold;">Tipo:</td><td style="padding: 6px 0; color: #333;">${transferInfo.accountType}</td></tr>` : ''}
+                    ${transferInfo.accountNumber ? `<tr><td style="padding: 6px 0; color: #666; font-weight: bold;">N° Cuenta:</td><td style="padding: 6px 0; color: #333; font-weight: bold;">${transferInfo.accountNumber}</td></tr>` : ''}
+                    ${transferInfo.rut ? `<tr><td style="padding: 6px 0; color: #666; font-weight: bold;">RUT:</td><td style="padding: 6px 0; color: #333;">${transferInfo.rut}</td></tr>` : ''}
+                    ${transferInfo.email ? `<tr><td style="padding: 6px 0; color: #666; font-weight: bold;">Email:</td><td style="padding: 6px 0; color: #333;">${transferInfo.email}</td></tr>` : ''}
+                    ${transferInfo.notes ? `<tr><td colspan="2" style="padding: 10px 0; color: #555; font-style: italic;">📝 ${transferInfo.notes}</td></tr>` : ''}
+                </table>
+                <p style="color: #92400e; font-size: 13px; margin-bottom: 0;">Envía el comprobante de pago al club para confirmar tu reserva.</p>
+            </div>` : '';
+
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 20px;">
+                <h2 style="text-align: center; color: #333;">🎾 ${reservation.clubName}</h2>
+                <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 24px; margin: 20px 0;">
+                    <h3 style="color: #16a34a; margin-top: 0;">✅ ¡Reserva confirmada!</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin: 12px 0;">
+                        <tr><td style="padding: 8px 0; color: #666; font-weight: bold;">📅 Fecha:</td><td style="padding: 8px 0; color: #333;">${formattedDate}</td></tr>
+                        <tr><td style="padding: 8px 0; color: #666; font-weight: bold;">🕐 Horario:</td><td style="padding: 8px 0; color: #333;">${reservation.startTime} – ${reservation.endTime}</td></tr>
+                        <tr><td style="padding: 8px 0; color: #666; font-weight: bold;">🏟️ Cancha:</td><td style="padding: 8px 0; color: #333;">${reservation.courtName}</td></tr>
+                        <tr><td style="padding: 8px 0; color: #666; font-weight: bold;">💰 Monto:</td><td style="padding: 8px 0; color: #333; font-weight: bold;">${formattedPrice}</td></tr>
+                    </table>
+                </div>
+                ${transferSection}
+                <p style="color: #666; font-size: 13px;">¡Nos vemos en la cancha! 🎾</p>
+                <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">© ${reservation.clubName} · Padel MGR</p>
+            </div>`;
+
+        this.logger.log(`--- Enviando email de reserva (sin MP) a ${to} ---`);
+
+        if (transporter) {
+            try {
+                const info = await transporter.sendMail({ from, to, subject, html });
+                this.logger.log(`✅ Email de reserva enviado a ${to} (ID: ${info.messageId})`);
+            } catch (error) {
+                this.logger.error(`❌ Error enviando email de reserva a ${to}: ${error.message}`);
+            }
+        } else {
+            this.logger.warn(`⚠️  [SIN SMTP] Email de reserva NO enviado a ${to}`);
+        }
+    }
 }
+

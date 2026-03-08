@@ -28,9 +28,20 @@ export interface Club {
     enablePaymentLinkSending?: boolean;
     enablePhoneVerification?: boolean;
     enablePayments?: boolean;
+    transferInfo?: ClubTransferInfo | null;
     enabledModules?: EnabledModules;
     createdAt: Date;
     updatedAt: Date;
+}
+
+export interface ClubTransferInfo {
+    bankName?: string;
+    accountHolder?: string;
+    accountType?: string;
+    accountNumber?: string;
+    rut?: string;
+    email?: string;
+    notes?: string;
 }
 
 export interface ClubSmtpCredentials {
@@ -80,5 +91,6 @@ export interface UpdateClubDto {
     enablePaymentLinkSending?: boolean;
     enablePhoneVerification?: boolean;
     enablePayments?: boolean;
+    transferInfo?: ClubTransferInfo | null;
     enabledModules?: Partial<EnabledModules>;
 }

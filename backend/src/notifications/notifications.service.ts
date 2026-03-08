@@ -69,6 +69,18 @@ export class NotificationsService {
         return this.send({ to, template: NotificationTemplate.ADMIN_COURT_BOOKED, params });
     }
 
+    async sendBookingConfirmWithTransfer(to: string, params: {
+        playerName: string;
+        courtName: string;
+        date: string;
+        time: string;
+        clubName: string;
+        amount: string;
+        transferInfo?: string; // pre-formatted transfer info block
+    }, twilioCreds?: ResolvedTwilioCreds): Promise<SendMessageResult> {
+        return this.send({ to, template: NotificationTemplate.RESERVATION_BOOKING_TRANSFER, params, twilioCreds });
+    }
+
     async sendPaymentLink(to: string, params: {
         playerName: string;
         amount: string;
@@ -145,6 +157,19 @@ export class NotificationsService {
                     (p['courtName'] ? `Cancha: ${p['courtName']}\n` : '') +
                     (p['date'] ? `Fecha sugerida: ${p['date']}` : '')
                 );
+
+            case NotificationTemplate.RESERVATION_BOOKING_TRANSFER: {
+                const tf = p['transferInfo'] ? `\n\n🏦 *Datos para Transferencia:*\n${p['transferInfo']}` : '';
+                return (
+                    `✅ *Reserva Confirmada — ${p['clubName']}*\n\n` +
+                    `Hola ${p['playerName']}, tu reserva está confirmada:\n` +
+                    `📅 ${p['date']} a las ${p['time']}\n` +
+                    `🎾 Cancha: ${p['courtName']}\n` +
+                    `💰 Monto: $${p['amount']}` +
+                    `${tf}\n\n` +
+                    `¡Nos vemos en la cancha!`
+                );
+            }
 
             case NotificationTemplate.ADMIN_COURT_BOOKED:
                 return (

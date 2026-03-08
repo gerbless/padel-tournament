@@ -10,6 +10,7 @@ import { FreePlayMatch } from './entities/free-play-match.entity';
 import { MercadoPagoPayment } from '../payments/entities/mercadopago-payment.entity';
 import { UsersModule } from '../users/users.module';
 import { PlayersModule } from '../players/players.module';
+import { ClubsModule } from '../clubs/clubs.module';
 import { ClubRoleGuard } from '../auth/club-role.guard';
 
 @Module({
@@ -17,6 +18,7 @@ import { ClubRoleGuard } from '../auth/club-role.guard';
         TypeOrmModule.forFeature([Court, CourtPriceBlock, Reservation, CourtBlock, FreePlayMatch, MercadoPagoPayment]),
         UsersModule,
         PlayersModule,
+        ClubsModule,
     ],
     controllers: [CourtsController],
     providers: [CourtsService, ClubRoleGuard],

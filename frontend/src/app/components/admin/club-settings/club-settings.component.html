@@ -208,6 +208,41 @@
                 </button>
             </div>
 
+            <!-- ══════════ Datos de Transferencia ══════════ -->
+            <div class="cred-section">
+                <h3>🏦 Transferencia Bancaria</h3>
+                <p style="font-size:0.85rem;color:var(--text-muted,#888);margin:0 0 1rem;">
+                    Cuando los pagos con Mercado Pago están desactivados, estos datos se envían automáticamente al
+                    jugador por email y/o WhatsApp al hacer una reserva.
+                </p>
+                <div class="cred-grid">
+                    <label>Banco
+                        <input type="text" [(ngModel)]="transferInfo.bankName" placeholder="Ej: Banco Santander">
+                    </label>
+                    <label>Titular de la cuenta
+                        <input type="text" [(ngModel)]="transferInfo.accountHolder" placeholder="Nombre del titular">
+                    </label>
+                    <label>Tipo de cuenta
+                        <input type="text" [(ngModel)]="transferInfo.accountType" placeholder="Ej: Cuenta Corriente, Vista, RUT">
+                    </label>
+                    <label>Número de cuenta
+                        <input type="text" [(ngModel)]="transferInfo.accountNumber" placeholder="Número de cuenta">
+                    </label>
+                    <label>RUT
+                        <input type="text" [(ngModel)]="transferInfo.rut" placeholder="12.345.678-9">
+                    </label>
+                    <label>Email para comprobantes
+                        <input type="email" [(ngModel)]="transferInfo.email" placeholder="pagos@miclub.cl">
+                    </label>
+                    <label style="grid-column: 1 / -1">Notas adicionales
+                        <textarea [(ngModel)]="transferInfo.notes" placeholder="Ej: Enviar comprobante al WhatsApp del club" rows="2"></textarea>
+                    </label>
+                </div>
+                <button class="btn btn-primary" (click)="saveTransferInfo()" [disabled]="savingTransfer">
+                    {{ savingTransfer ? 'Guardando...' : '💾 Guardar Transferencia' }}
+                </button>
+            </div>
+
         </div>
     </div>
 
