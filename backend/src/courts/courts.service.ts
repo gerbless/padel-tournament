@@ -16,6 +16,7 @@ import { ClubCredentialsService } from '../clubs/club-credentials.service';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
 export class CourtsService {
@@ -39,6 +40,7 @@ export class CourtsService {
         private usersService: UsersService,
         private emailService: EmailService,
         private notificationsService: NotificationsService,
+        private tenant: TenantService,
     ) { }
 
     // ==========================================
@@ -46,55 +48,74 @@ export class CourtsService {
     // ==========================================
 
     async createCourt(dto: CreateCourtDto): Promise<Court> {
-        const court = this.courtRepository.create(dto);
-        return this.courtRepository.save(court);
+        return this.tenant.run(dto.clubId, async (em) => {
+            const repo = em.getRepository(Court);
+            const court = repo.create(dto);
+            return repo.save(court);
+        });
     }
 
     async copyPriceBlocks(targetCourtId: string, sourceCourtId: string): Promise<CourtPriceBlock[]> {
-        const sourceBlocks = await this.priceBlockRepository.find({ where: { courtId: sourceCourtId } });
-        if (sourceBlocks.length === 0) return [];
+        return this.tenant.runInContext(async (em) => {
+            const pbRepo = em.getRepository(CourtPriceBlock);
+            const sourceBlocks = await pbRepo.find({ where: { courtId: sourceCourtId } });
+            if (sourceBlocks.length === 0) return [];
 
-        const newBlocks: CourtPriceBlock[] = [];
-        for (const block of sourceBlocks) {
-            const newBlock = this.priceBlockRepository.create({
-                courtId: targetCourtId,
-                daysOfWeek: [...block.daysOfWeek],
-                startTime: block.startTime,
-                endTime: block.endTime,
-                priceFullCourt: block.priceFullCourt,
-                pricePerPlayer: block.pricePerPlayer,
-            });
-            newBlocks.push(await this.priceBlockRepository.save(newBlock));
-        }
-        return newBlocks;
+            const newBlocks: CourtPriceBlock[] = [];
+            for (const block of sourceBlocks) {
+                const newBlock = pbRepo.create({
+                    courtId: targetCourtId,
+                    daysOfWeek: [...block.daysOfWeek],
+                    startTime: block.startTime,
+                    endTime: block.endTime,
+                    priceFullCourt: block.priceFullCourt,
+                    pricePerPlayer: block.pricePerPlayer,
+                });
+                newBlocks.push(await pbRepo.save(newBlock));
+            }
+            return newBlocks;
+        });
     }
 
     async findCourtsByClub(clubId: string): Promise<Court[]> {
-        return this.courtRepository.find({
-            where: { clubId },
-            relations: ['priceBlocks'],
-            order: { courtNumber: 'ASC' }
-        });
+        return this.tenant.run(clubId, em =>
+            em.getRepository(Court).find({
+                relations: ['priceBlocks'],
+                order: { courtNumber: 'ASC' }
+            })
+        );
     }
 
-    async findCourt(id: string): Promise<Court> {
-        const court = await this.courtRepository.findOne({
-            where: { id },
-            relations: ['priceBlocks']
+    async findCourt(id: string, clubId?: string): Promise<Court> {
+        const cid = clubId || this.tenant.getCurrentClubId();
+        if (!cid) throw new BadRequestException('Club ID required');
+        return this.tenant.run(cid, async (em) => {
+            const court = await em.getRepository(Court).findOne({
+                where: { id },
+                relations: ['priceBlocks']
+            });
+            if (!court) throw new NotFoundException(`Court ${id} not found`);
+            return court;
         });
-        if (!court) throw new NotFoundException(`Court ${id} not found`);
-        return court;
     }
 
     async updateCourt(id: string, dto: Partial<CreateCourtDto>): Promise<Court> {
-        const court = await this.findCourt(id);
-        Object.assign(court, dto);
-        return this.courtRepository.save(court);
+        return this.tenant.runInContext(async (em) => {
+            const repo = em.getRepository(Court);
+            const court = await repo.findOne({ where: { id }, relations: ['priceBlocks'] });
+            if (!court) throw new NotFoundException(`Court ${id} not found`);
+            Object.assign(court, dto);
+            return repo.save(court);
+        });
     }
 
     async removeCourt(id: string): Promise<void> {
-        const court = await this.findCourt(id);
-        await this.courtRepository.remove(court);
+        return this.tenant.runInContext(async (em) => {
+            const repo = em.getRepository(Court);
+            const court = await repo.findOne({ where: { id } });
+            if (!court) throw new NotFoundException(`Court ${id} not found`);
+            await repo.remove(court);
+        });
     }
 
     // ==========================================
@@ -102,35 +123,35 @@ export class CourtsService {
     // ==========================================
 
     async createPriceBlock(dto: CreatePriceBlockDto): Promise<CourtPriceBlock> {
-        const block = this.priceBlockRepository.create(dto);
-        return this.priceBlockRepository.save(block);
+        const block = this.tenant.getRepo(CourtPriceBlock).create(dto);
+        return this.tenant.getRepo(CourtPriceBlock).save(block);
     }
 
     async createPriceBlockForAllCourts(clubId: string, dto: CreatePriceBlockDto): Promise<CourtPriceBlock[]> {
-        const courts = await this.courtRepository.find({ where: { clubId, isActive: true } });
+        const courts = await this.tenant.getRepo(Court).find({ where: { clubId, isActive: true } });
         const blocks: CourtPriceBlock[] = [];
         for (const court of courts) {
-            const block = this.priceBlockRepository.create({
+            const block = this.tenant.getRepo(CourtPriceBlock).create({
                 ...dto,
                 courtId: court.id,
             });
-            blocks.push(await this.priceBlockRepository.save(block));
+            blocks.push(await this.tenant.getRepo(CourtPriceBlock).save(block));
         }
         return blocks;
     }
 
     async getPriceBlocks(courtId: string): Promise<CourtPriceBlock[]> {
-        return this.priceBlockRepository.find({
+        return this.tenant.getRepo(CourtPriceBlock).find({
             where: { courtId },
             order: { startTime: 'ASC' }
         });
     }
 
     async updatePriceBlock(id: string, dto: Partial<CreatePriceBlockDto>): Promise<CourtPriceBlock> {
-        const block = await this.priceBlockRepository.findOne({ where: { id } });
+        const block = await this.tenant.getRepo(CourtPriceBlock).findOne({ where: { id } });
         if (!block) throw new NotFoundException(`Price block ${id} not found`);
         Object.assign(block, dto);
-        return this.priceBlockRepository.save(block);
+        return this.tenant.getRepo(CourtPriceBlock).save(block);
     }
 
     async bulkUpdatePriceBlocks(
@@ -139,12 +160,12 @@ export class CourtsService {
         newValues: Partial<CreatePriceBlockDto>,
     ): Promise<{ updated: number }> {
         // Get all courts for this club
-        const courts = await this.courtRepository.find({ where: { clubId } });
+        const courts = await this.tenant.getRepo(Court).find({ where: { clubId } });
         const courtIds = courts.map(c => c.id);
         if (courtIds.length === 0) return { updated: 0 };
 
         // Find all matching price blocks across these courts
-        const allBlocks = await this.priceBlockRepository.find({
+        const allBlocks = await this.tenant.getRepo(CourtPriceBlock).find({
             where: { courtId: In(courtIds) },
         });
 
@@ -157,16 +178,16 @@ export class CourtsService {
 
         for (const block of matching) {
             Object.assign(block, newValues);
-            await this.priceBlockRepository.save(block);
+            await this.tenant.getRepo(CourtPriceBlock).save(block);
         }
 
         return { updated: matching.length };
     }
 
     async removePriceBlock(id: string): Promise<void> {
-        const block = await this.priceBlockRepository.findOne({ where: { id } });
+        const block = await this.tenant.getRepo(CourtPriceBlock).findOne({ where: { id } });
         if (!block) throw new NotFoundException(`Price block ${id} not found`);
-        await this.priceBlockRepository.remove(block);
+        await this.tenant.getRepo(CourtPriceBlock).remove(block);
     }
 
     /**
@@ -174,7 +195,7 @@ export class CourtsService {
      */
     async getPrice(courtId: string, date: string, startTime: string): Promise<CourtPriceBlock | null> {
         const dayOfWeek = new Date(date + 'T12:00:00').getDay(); // 0=Sunday
-        const blocks = await this.priceBlockRepository.find({ where: { courtId } });
+        const blocks = await this.tenant.getRepo(CourtPriceBlock).find({ where: { courtId } });
 
         return blocks.find(b =>
             b.daysOfWeek.includes(dayOfWeek) &&
@@ -189,7 +210,7 @@ export class CourtsService {
 
     async createReservation(dto: CreateReservationDto): Promise<Reservation> {
         // Check for time conflicts
-        const conflicts = await this.reservationRepository.find({
+        const conflicts = await this.tenant.getRepo(Reservation).find({
             where: {
                 courtId: dto.courtId,
                 date: dto.date,
@@ -219,7 +240,7 @@ export class CourtsService {
             }
         }
 
-        const reservation = this.reservationRepository.create({
+        const reservation = this.tenant.getRepo(Reservation).create({
             courtId: dto.courtId,
             clubId: dto.clubId,
             date: dto.date,
@@ -236,11 +257,11 @@ export class CourtsService {
             paymentNotes: dto.paymentNotes,
             playerPayments: dto.playerPayments || null,
         } as Partial<Reservation>);
-        return this.reservationRepository.save(reservation as Reservation);
+        return this.tenant.getRepo(Reservation).save(reservation as Reservation);
     }
 
     async getReservations(courtId: string, startDate: string, endDate: string): Promise<Reservation[]> {
-        return this.reservationRepository
+        return this.tenant.getRepo(Reservation)
             .createQueryBuilder('r')
             .where('r.courtId = :courtId', { courtId })
             .andWhere('r.date >= :startDate', { startDate })
@@ -252,7 +273,7 @@ export class CourtsService {
     }
 
     async getReservationsByClub(clubId: string, startDate: string, endDate: string): Promise<Reservation[]> {
-        return this.reservationRepository
+        return this.tenant.getRepo(Reservation)
             .createQueryBuilder('r')
             .leftJoinAndSelect('r.court', 'court')
             .where('r.clubId = :clubId', { clubId })
@@ -265,7 +286,7 @@ export class CourtsService {
     }
 
     async updateReservation(id: string, dto: Partial<CreateReservationDto>): Promise<Reservation> {
-        const reservation = await this.reservationRepository.findOne({ where: { id } });
+        const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id } });
         if (!reservation) throw new NotFoundException(`Reservation ${id} not found`);
 
         // If time changed, check conflicts
@@ -275,7 +296,7 @@ export class CourtsService {
             const checkEnd = dto.endTime || reservation.endTime;
             const checkCourtId = dto.courtId || reservation.courtId;
 
-            const conflicts = await this.reservationRepository.find({
+            const conflicts = await this.tenant.getRepo(Reservation).find({
                 where: {
                     courtId: checkCourtId,
                     date: checkDate,
@@ -297,14 +318,14 @@ export class CourtsService {
         }
 
         Object.assign(reservation, dto);
-        return this.reservationRepository.save(reservation);
+        return this.tenant.getRepo(Reservation).save(reservation);
     }
 
     async cancelReservation(id: string): Promise<Reservation> {
-        const reservation = await this.reservationRepository.findOne({ where: { id } });
+        const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id } });
         if (!reservation) throw new NotFoundException(`Reservation ${id} not found`);
         reservation.status = ReservationStatus.CANCELLED;
-        return this.reservationRepository.save(reservation);
+        return this.tenant.getRepo(Reservation).save(reservation);
     }
 
     // ==========================================
@@ -312,7 +333,7 @@ export class CourtsService {
     // ==========================================
 
     async getRevenue(clubId: string, year: number, month?: number): Promise<any> {
-        const qb = this.reservationRepository
+        const qb = this.tenant.getRepo(Reservation)
             .createQueryBuilder('r')
             .select(`COALESCE(SUM(
                 CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
@@ -345,7 +366,7 @@ export class CourtsService {
     }
 
     async getMonthlyRevenue(clubId: string, year: number): Promise<any[]> {
-        return this.reservationRepository
+        return this.tenant.getRepo(Reservation)
             .createQueryBuilder('r')
             .select("EXTRACT(MONTH FROM r.date::date)", 'month')
             .addSelect(`COALESCE(SUM(
@@ -401,7 +422,7 @@ export class CourtsService {
                                                    ELSE CASE WHEN r."paymentStatus" IN ('pending','partial') THEN ${fp} ELSE 0 END END), 0) AS "owedRevenue"`;
 
         // Per-court breakdown
-        const perCourt = await this.reservationRepository.query(`
+        const perCourt = await this.tenant.getRepo(Reservation).query(`
             SELECT
                 c."id" AS "courtId",
                 c."name" AS "courtName",
@@ -421,7 +442,7 @@ export class CourtsService {
         `, [clubId]);
 
         // Totals
-        const totals = await this.reservationRepository.query(`
+        const totals = await this.tenant.getRepo(Reservation).query(`
             SELECT
                 COUNT(r."id") AS "totalReservations",
                 COUNT(CASE WHEN r."paymentStatus" = 'paid' THEN 1 END) AS "paidCount",
@@ -445,7 +466,7 @@ export class CourtsService {
                 COALESCE(SUM(CASE WHEN ${hasPP} THEN CASE WHEN r."paymentStatus" = 'partial' THEN ${ppTotal} ELSE 0 END
                                                    ELSE CASE WHEN r."paymentStatus" = 'partial' THEN ${fp} ELSE 0 END END), 0) AS "partialRevenue"`;
 
-        const monthlyTrend = await this.reservationRepository.query(`
+        const monthlyTrend = await this.tenant.getRepo(Reservation).query(`
             SELECT
                 EXTRACT(MONTH FROM r."date"::date) AS "month",
                 ${monthlyRevenueColumns},
@@ -461,7 +482,7 @@ export class CourtsService {
 
         // Payment method statistics
         // Counts from full-court reservations (non per-player) — only paid/partial
-        const fullCourtMethods = await this.reservationRepository.query(`
+        const fullCourtMethods = await this.tenant.getRepo(Reservation).query(`
             SELECT COALESCE(r."paymentMethod"::text, 'sin_especificar') AS method,
                    COUNT(*) AS count,
                    COALESCE(SUM(${fp}), 0) AS revenue
@@ -476,7 +497,7 @@ export class CourtsService {
         `, [clubId]);
 
         // Counts from per-player payments (only paid individual payments)
-        const perPlayerMethods = await this.reservationRepository.query(`
+        const perPlayerMethods = await this.tenant.getRepo(Reservation).query(`
             SELECT COALESCE(NULLIF(pp->>'paymentMethod', ''), 'sin_especificar') AS method,
                    COUNT(*) AS count,
                    COALESCE(SUM((pp->>'amount')::numeric), 0) AS revenue
@@ -521,7 +542,7 @@ export class CourtsService {
             : `EXTRACT(YEAR FROM r."date"::date) = ${year}`;
 
         // Get all reservations for the period with their player data
-        const reservations = await this.reservationRepository.query(`
+        const reservations = await this.tenant.getRepo(Reservation).query(`
             SELECT
                 r."id",
                 r."players",
@@ -630,13 +651,13 @@ export class CourtsService {
     async getAvailableSlots(clubId: string, date: string) {
         const dayOfWeek = new Date(date + 'T12:00:00').getDay();
 
-        const courts = await this.courtRepository.find({
+        const courts = await this.tenant.getRepo(Court).find({
             where: { clubId, isActive: true },
             relations: ['priceBlocks'],
             order: { courtNumber: 'ASC' },
         });
 
-        const reservations = await this.reservationRepository.find({
+        const reservations = await this.tenant.getRepo(Reservation).find({
             where: { clubId, date, status: ReservationStatus.CONFIRMED },
         });
 
@@ -721,7 +742,7 @@ export class CourtsService {
         const [club, user, court] = await Promise.all([
             this.clubsService.findOne(clubId).catch(() => null),
             this.usersService.findById(userId).catch(() => null),
-            this.courtRepository.findOne({ where: { id: reservation.courtId } }).catch(() => null),
+            this.tenant.getRepo(Court).findOne({ where: { id: reservation.courtId } }).catch(() => null),
         ]);
 
         if (!club || club.enablePayments !== false) return; // MP is active — no manual notification needed
@@ -772,7 +793,7 @@ export class CourtsService {
     }
 
     async getPlayerBookings(playerId: string, playerName: string, clubId?: string): Promise<any[]> {
-        const qb = this.reservationRepository
+        const qb = this.tenant.getRepo(Reservation)
             .createQueryBuilder('r')
             .leftJoinAndSelect('r.court', 'court')
             .where("r.title LIKE :pattern", { pattern: `%${playerName}%` })
@@ -790,7 +811,7 @@ export class CourtsService {
         const reservationIds = reservations.map(r => r.id);
         let mpPaymentMap: Record<string, { status: string; statusDetail: string | null }> = {};
         if (reservationIds.length > 0) {
-            const mpPayments = await this.mpPaymentRepository
+            const mpPayments = await this.tenant.getRepo(MercadoPagoPayment)
                 .createQueryBuilder('mp')
                 .where('mp.reservationId IN (:...ids)', { ids: reservationIds })
                 .orderBy('mp.createdAt', 'DESC')
@@ -812,7 +833,7 @@ export class CourtsService {
     }
 
     async cancelPlayerBooking(playerId: string, playerName: string, reservationId: string): Promise<Reservation> {
-        const reservation = await this.reservationRepository.findOne({ where: { id: reservationId } });
+        const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id: reservationId } });
         if (!reservation) throw new NotFoundException('Reserva no encontrada');
 
         // Verify this reservation belongs to this player
@@ -826,7 +847,7 @@ export class CourtsService {
         }
 
         // Delete the reservation (cascades to mercadopago_payments via FK)
-        await this.reservationRepository.remove(reservation);
+        await this.tenant.getRepo(Reservation).remove(reservation);
 
         // Return the deleted entity (id will be gone but data is still in memory)
         return reservation;
@@ -848,26 +869,26 @@ export class CourtsService {
     }
 
     async createCourtBlock(dto: CreateCourtBlockDto): Promise<CourtBlock> {
-        const block = this.courtBlockRepository.create({
+        const block = this.tenant.getRepo(CourtBlock).create({
             ...dto,
             courtIds: dto.courtIds && dto.courtIds.length > 0 ? dto.courtIds : null,
         });
-        return this.courtBlockRepository.save(block);
+        return this.tenant.getRepo(CourtBlock).save(block);
     }
 
     async getCourtBlocks(clubId: string): Promise<CourtBlock[]> {
-        return this.courtBlockRepository.find({
+        return this.tenant.getRepo(CourtBlock).find({
             where: { clubId, isActive: true },
             order: { startDate: 'ASC' },
         });
     }
 
     async deleteCourtBlock(id: string): Promise<void> {
-        await this.courtBlockRepository.delete(id);
+        await this.tenant.getRepo(CourtBlock).delete(id);
     }
 
     async getActiveBlocksForDate(clubId: string, date: string): Promise<CourtBlock[]> {
-        return this.courtBlockRepository.find({
+        return this.tenant.getRepo(CourtBlock).find({
             where: {
                 clubId,
                 isActive: true,
@@ -897,11 +918,11 @@ export class CourtsService {
     // ==========================================
 
     async getFreePlayMatch(reservationId: string): Promise<FreePlayMatch | null> {
-        return this.freePlayMatchRepository.findOne({ where: { reservationId } });
+        return this.tenant.getRepo(FreePlayMatch).findOne({ where: { reservationId } });
     }
 
     async getFreePlayMatchesByClub(clubId: string, startDate?: string, endDate?: string): Promise<FreePlayMatch[]> {
-        const query = this.freePlayMatchRepository.createQueryBuilder('fpm')
+        const query = this.tenant.getRepo(FreePlayMatch).createQueryBuilder('fpm')
             .where('fpm.clubId = :clubId', { clubId });
 
         if (startDate) query.andWhere('fpm.date >= :startDate', { startDate });
@@ -933,7 +954,7 @@ export class CourtsService {
         const status = data.sets.length > 0 ? 'completed' : 'pending';
 
         // Check if match already exists for this reservation
-        let match = await this.freePlayMatchRepository.findOne({ where: { reservationId: data.reservationId } });
+        let match = await this.tenant.getRepo(FreePlayMatch).findOne({ where: { reservationId: data.reservationId } });
 
         if (match) {
             // Update existing
@@ -948,7 +969,7 @@ export class CourtsService {
             match.pointsPerWin = data.pointsPerWin;
         } else {
             // Create new
-            match = this.freePlayMatchRepository.create({
+            match = this.tenant.getRepo(FreePlayMatch).create({
                 ...data,
                 winner,
                 status,
@@ -956,19 +977,19 @@ export class CourtsService {
         }
 
         // Also update reservation countsForRanking flag
-        await this.reservationRepository.update(data.reservationId, { countsForRanking: data.countsForRanking });
+        await this.tenant.getRepo(Reservation).update(data.reservationId, { countsForRanking: data.countsForRanking });
 
-        return this.freePlayMatchRepository.save(match);
+        return this.tenant.getRepo(FreePlayMatch).save(match);
     }
 
     async deleteFreePlayMatch(reservationId: string): Promise<void> {
-        await this.freePlayMatchRepository.delete({ reservationId });
-        await this.reservationRepository.update(reservationId, { countsForRanking: false });
+        await this.tenant.getRepo(FreePlayMatch).delete({ reservationId });
+        await this.tenant.getRepo(Reservation).update(reservationId, { countsForRanking: false });
     }
 
     /** Get free-play stats for a player across all completed matches */
     async getFreePlayStatsForPlayer(playerId: string, clubId?: string): Promise<{ matchesWon: number; matchesLost: number; matchesPlayed: number; points: number }> {
-        const query = this.freePlayMatchRepository.createQueryBuilder('fpm')
+        const query = this.tenant.getRepo(FreePlayMatch).createQueryBuilder('fpm')
             .where('fpm.status = :status', { status: 'completed' })
             .andWhere('fpm.countsForRanking = true');
 
@@ -1001,7 +1022,7 @@ export class CourtsService {
 
     /** Get all free-play matches for bulk stats computation */
     async getAllFreePlayMatches(clubId?: string): Promise<FreePlayMatch[]> {
-        const query = this.freePlayMatchRepository.createQueryBuilder('fpm')
+        const query = this.tenant.getRepo(FreePlayMatch).createQueryBuilder('fpm')
             .where('fpm.status = :status', { status: 'completed' })
             .andWhere('fpm.countsForRanking = true');
 

@@ -8,7 +8,7 @@ export class Court {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ManyToOne(() => Club, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Club, { onDelete: 'CASCADE', createForeignKeyConstraints: false })
     club: Club;
 
     @Column()

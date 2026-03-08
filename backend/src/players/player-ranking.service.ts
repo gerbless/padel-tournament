@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { Player } from './entities/player.entity';
 import { PlayerClubStats } from './entities/player-club-stats.entity';
+import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
 export class PlayerRankingService {
@@ -11,6 +12,7 @@ export class PlayerRankingService {
         private playerRepository: Repository<Player>,
         @InjectRepository(PlayerClubStats)
         private playerClubStatsRepository: Repository<PlayerClubStats>,
+        private tenant: TenantService,
     ) { }
 
     private mapClubStatsToPlayers(stats: PlayerClubStats[]): Player[] {
@@ -40,7 +42,7 @@ export class PlayerRankingService {
                 .getMany();
         }
 
-        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
+        let statsQuery = this.tenant.getRepo(PlayerClubStats).createQueryBuilder('stats')
             .leftJoinAndSelect('stats.player', 'player')
             .leftJoinAndSelect('player.category', 'category')
             .where('stats.club.id = :clubId', { clubId })
@@ -74,7 +76,7 @@ export class PlayerRankingService {
                 .getMany();
         }
 
-        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
+        let statsQuery = this.tenant.getRepo(PlayerClubStats).createQueryBuilder('stats')
             .leftJoinAndSelect('stats.player', 'player')
             .leftJoinAndSelect('player.category', 'category')
             .where('stats.club.id = :clubId', { clubId })
@@ -109,7 +111,7 @@ export class PlayerRankingService {
                 .getMany();
         }
 
-        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
+        let statsQuery = this.tenant.getRepo(PlayerClubStats).createQueryBuilder('stats')
             .leftJoinAndSelect('stats.player', 'player')
             .leftJoinAndSelect('player.category', 'category')
             .where('stats.club.id = :clubId', { clubId })
@@ -270,7 +272,7 @@ export class PlayerRankingService {
                 .getMany();
         }
 
-        let statsQuery = this.playerClubStatsRepository.createQueryBuilder('stats')
+        let statsQuery = this.tenant.getRepo(PlayerClubStats).createQueryBuilder('stats')
             .leftJoinAndSelect('stats.player', 'player')
             .leftJoinAndSelect('player.category', 'category')
             .where('stats.club.id = :clubId', { clubId })

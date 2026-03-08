@@ -16,6 +16,7 @@ import { EmailModule } from './email/email.module';
 import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PhoneVerificationModule } from './phone-verification/phone-verification.module';
+import { TenantModule } from './tenant/tenant.module';
 
 @Module({
     imports: [
@@ -51,6 +52,7 @@ import { PhoneVerificationModule } from './phone-verification/phone-verification
         PaymentsModule,
         NotificationsModule,
         PhoneVerificationModule,
+        TenantModule,
     ],
 })
 export class AppModule { }

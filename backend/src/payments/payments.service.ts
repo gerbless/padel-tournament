@@ -10,6 +10,7 @@ import { EmailService } from '../email/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ClubCredentialsService } from '../clubs/club-credentials.service';
 import { Club } from '../clubs/entities/club.entity';
+import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
@@ -31,6 +32,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         private emailService: EmailService,
         private notificationsService: NotificationsService,
         private credentialsService: ClubCredentialsService,
+        private tenant: TenantService,
     ) {
         const accessToken = this.configService.get<string>('MP_ACCESS_TOKEN', '');
         const expirySeconds = this.configService.get<number>('PAYMENT_EXPIRY_SECONDS', 60);
@@ -94,7 +96,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     private async cancelExpiredReservations(): Promise<void> {
         try {
             const now = new Date();
-            const expired = await this.reservationRepo.find({
+            const expired = await this.tenant.getRepo(Reservation).find({
                 where: {
                     paymentExpiresAt: LessThanOrEqual(now),
                     status: Not(ReservationStatus.CANCELLED as any),
@@ -105,35 +107,35 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             for (const reservation of expired) {
                 // Check if any player has already paid — if so, never auto-cancel
                 if (reservation.playerPayments?.some(p => p.paid)) {
-                    await this.reservationRepo.update(reservation.id, { paymentExpiresAt: null });
+                    await this.tenant.getRepo(Reservation).update(reservation.id, { paymentExpiresAt: null });
                     this.logger.log(`💰 Reservation ${reservation.id} has partial player payments – skipping auto-cancel`);
                     continue;
                 }
 
                 // Check if there's a pending_contingency MP payment — if so, skip
-                const mpPayment = await this.mpPaymentRepo.findOne({
+                const mpPayment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
                     where: { reservationId: reservation.id },
                     order: { createdAt: 'DESC' },
                 });
                 if (mpPayment?.statusDetail === 'pending_contingency') {
                     // Clear the deadline so we don't keep checking this one
-                    await this.reservationRepo.update(reservation.id, { paymentExpiresAt: null });
+                    await this.tenant.getRepo(Reservation).update(reservation.id, { paymentExpiresAt: null });
                     this.logger.log(`⏳ Reservation ${reservation.id} has pending_contingency – skipping auto-cancel`);
                     continue;
                 }
 
                 // Also check if any MP payment for this reservation is approved
-                const approvedPayment = await this.mpPaymentRepo.findOne({
+                const approvedPayment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
                     where: { reservationId: reservation.id, status: MercadoPagoPaymentStatus.APPROVED },
                 });
                 if (approvedPayment) {
-                    await this.reservationRepo.update(reservation.id, { paymentExpiresAt: null });
+                    await this.tenant.getRepo(Reservation).update(reservation.id, { paymentExpiresAt: null });
                     this.logger.log(`💰 Reservation ${reservation.id} has an approved payment – skipping auto-cancel`);
                     continue;
                 }
 
                 this.logger.log(`⏰ Auto-cancelling reservation ${reservation.id} – payment deadline expired`);
-                await this.reservationRepo.remove(reservation);
+                await this.tenant.getRepo(Reservation).remove(reservation);
                 this.logger.log(`🗑️  Deleted reservation ${reservation.id} and its payment records`);
             }
         } catch (error) {
@@ -174,7 +176,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         initPoint: string;
         externalReference: string;
     }> {
-        const reservation = await this.reservationRepo.findOne({
+        const reservation = await this.tenant.getRepo(Reservation).findOne({
             where: { id: reservationId },
             relations: ['court'],
         });
@@ -187,7 +189,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         }
 
         // Reuse existing pending/rejected payment record for this reservation
-        const existingPayment = await this.mpPaymentRepo.findOne({
+        const existingPayment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
             where: { reservationId },
             order: { createdAt: 'DESC' },
         });
@@ -201,17 +203,17 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             // Update payer email if provided
             if (payerEmail && existingPayment.payerEmail !== payerEmail) {
                 existingPayment.payerEmail = payerEmail;
-                await this.mpPaymentRepo.save(existingPayment);
+                await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
             }
 
             // Reset status back to pending for retry
             if (existingPayment.status !== MercadoPagoPaymentStatus.PENDING) {
                 existingPayment.status = MercadoPagoPaymentStatus.PENDING;
-                await this.mpPaymentRepo.save(existingPayment);
+                await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
             }
 
             // Reset payment deadline
-            await this.reservationRepo.update(reservationId, {
+            await this.tenant.getRepo(Reservation).update(reservationId, {
                 paymentExpiresAt: new Date(Date.now() + this.paymentExpiryMs),
             });
 
@@ -275,11 +277,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                 existingPayment.mpData = null;
                 existingPayment.statusDetail = null;
                 existingPayment.paymentMethod = null;
-                await this.mpPaymentRepo.save(existingPayment);
+                await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
                 this.logger.log(`✅ Updated existing payment record with new preference: ${preferenceResponse.id}`);
             } else {
                 // First time — create new record
-                const mpPayment = this.mpPaymentRepo.create({
+                const mpPayment = this.tenant.getRepo(MercadoPagoPayment).create({
                     reservationId,
                     clubId: reservation.clubId,
                     preferenceId: preferenceResponse.id,
@@ -289,12 +291,12 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     payerEmail: payerEmail || null,
                     status: MercadoPagoPaymentStatus.PENDING,
                 });
-                await this.mpPaymentRepo.save(mpPayment);
+                await this.tenant.getRepo(MercadoPagoPayment).save(mpPayment);
                 this.logger.log(`✅ Created new payment record with preference: ${preferenceResponse.id}`);
             }
 
             // Set payment deadline
-            await this.reservationRepo.update(reservationId, {
+            await this.tenant.getRepo(Reservation).update(reservationId, {
                 paymentExpiresAt: new Date(Date.now() + this.paymentExpiryMs),
             });
 
@@ -327,7 +329,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         reservationId: string,
         playerIndex: number,
     ): Promise<{ playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string }> {
-        const reservation = await this.reservationRepo.findOne({
+        const reservation = await this.tenant.getRepo(Reservation).findOne({
             where: { id: reservationId },
             relations: ['court'],
         });
@@ -369,7 +371,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         }
 
         // Check for existing pending payment for this player
-        const existingPayment = await this.mpPaymentRepo.findOne({
+        const existingPayment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
             where: { reservationId, playerIndex },
             order: { createdAt: 'DESC' },
         });
@@ -424,7 +426,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             const existingPP = reservation.playerPayments[playerIndex];
             if (!existingPP) {
                 reservation.playerPayments.push({ playerName, paid: false, amount });
-                await this.reservationRepo.update(reservationId, {
+                await this.tenant.getRepo(Reservation).update(reservationId, {
                     playerPayments: reservation.playerPayments,
                 });
             }
@@ -440,16 +442,16 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                 existingPayment.mpData = null;
                 existingPayment.statusDetail = null;
                 existingPayment.paymentMethod = null;
-                await this.mpPaymentRepo.save(existingPayment);
+                await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
             } else {
-                const mpPayment = this.mpPaymentRepo.create({
+                const mpPayment = this.tenant.getRepo(MercadoPagoPayment).create({
                     reservationId, clubId: reservation.clubId,
                     preferenceId: preferenceResponse.id, externalReference,
                     amount, description, playerIndex, playerName,
                     playerId: playerIdFromPP,
                     status: MercadoPagoPaymentStatus.PENDING,
                 });
-                await this.mpPaymentRepo.save(mpPayment);
+                await this.tenant.getRepo(MercadoPagoPayment).save(mpPayment);
             }
 
             const paymentUrl = preferenceResponse.init_point;
@@ -467,7 +469,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     async createPerPlayerPaymentLinks(reservationId: string): Promise<{
         links: { playerIndex: number; playerName: string; amount: number; paymentUrl: string; shortUrl: string; status: string }[];
     }> {
-        const reservation = await this.reservationRepo.findOne({
+        const reservation = await this.tenant.getRepo(Reservation).findOne({
             where: { id: reservationId },
             relations: ['court'],
         });
@@ -508,7 +510,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             }
 
             // Check for existing payment record for this player
-            const existingPayment = await this.mpPaymentRepo.findOne({
+            const existingPayment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
                 where: { reservationId, playerIndex: i },
                 order: { createdAt: 'DESC' },
             });
@@ -568,9 +570,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     existingPayment.mpData = null;
                     existingPayment.statusDetail = null;
                     existingPayment.paymentMethod = null;
-                    await this.mpPaymentRepo.save(existingPayment);
+                    await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
                 } else {
-                    const mpPayment = this.mpPaymentRepo.create({
+                    const mpPayment = this.tenant.getRepo(MercadoPagoPayment).create({
                         reservationId,
                         clubId: reservation.clubId,
                         preferenceId: preferenceResponse.id,
@@ -582,7 +584,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                         playerId: pp.playerId || null,
                         status: MercadoPagoPaymentStatus.PENDING,
                     });
-                    await this.mpPaymentRepo.save(mpPayment);
+                    await this.tenant.getRepo(MercadoPagoPayment).save(mpPayment);
                 }
 
                 const paymentUrl = preferenceResponse.init_point;
@@ -634,7 +636,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
      * then check if all players have paid to update overall reservation status.
      */
     private async reconcilePerPlayerPayment(reservationId: string, playerIndex: number, mpPaymentId: string): Promise<void> {
-        const reservation = await this.reservationRepo.findOne({ where: { id: reservationId } });
+        const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id: reservationId } });
         if (!reservation || !reservation.playerPayments) return;
 
         // Mark this player as paid via Mercado Pago
@@ -661,7 +663,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             this.logger.log(`½ Partial payment for reservation ${reservationId}: ${paidNames} – timer cleared`);
         }
 
-        await this.reservationRepo.save(reservation);
+        await this.tenant.getRepo(Reservation).save(reservation);
     }
 
     /**
@@ -699,7 +701,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             this.logger.log(`Payment ${paymentId}: status=${status}, detail=${statusDetail}, ref=${externalReference}`);
 
             // Find our payment record
-            const payment = await this.mpPaymentRepo.findOne({
+            const payment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
                 where: { externalReference },
             });
 
@@ -714,7 +716,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             payment.statusDetail = statusDetail;
             payment.paymentMethod = mpPayment.payment_method_id || null;
             payment.mpData = mpPayment;
-            await this.mpPaymentRepo.save(payment);
+            await this.tenant.getRepo(MercadoPagoPayment).save(payment);
 
             // If approved, update reservation payment status and send confirmation email
             if (status === 'approved') {
@@ -725,7 +727,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     await this.reconcilePerPlayerPayment(payment.reservationId, payment.playerIndex, String(paymentId));
                 } else {
                     // Full-court payment
-                    await this.reservationRepo.update(payment.reservationId, {
+                    await this.tenant.getRepo(Reservation).update(payment.reservationId, {
                         paymentStatus: PaymentStatus.PAID,
                         paymentMethod: PaymentMethod.MERCADO_PAGO,
                         paymentNotes: `Pagado via Mercado Pago (ID: ${paymentId})`,
@@ -735,7 +737,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                 }
             } else if (statusDetail === 'pending_contingency') {
                 this.logger.log(`⏳ Payment pending_contingency for reservation ${payment.reservationId} – clearing deadline`);
-                await this.reservationRepo.update(payment.reservationId, {
+                await this.tenant.getRepo(Reservation).update(payment.reservationId, {
                     paymentExpiresAt: null, // Don't auto-cancel while MP is reviewing
                 });
             } else if (status === 'rejected') {
@@ -743,9 +745,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                 this.logger.log(`❌ Payment rejected for reservation ${payment.reservationId} – waiting for timer to expire`);
             } else if (status === 'cancelled') {
                 this.logger.log(`❌ Payment cancelled for reservation ${payment.reservationId} – deleting reservation`);
-                const reservation = await this.reservationRepo.findOne({ where: { id: payment.reservationId } });
+                const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id: payment.reservationId } });
                 if (reservation) {
-                    await this.reservationRepo.remove(reservation);
+                    await this.tenant.getRepo(Reservation).remove(reservation);
                     this.logger.log(`🗑️ Deleted reservation ${payment.reservationId} and its payment records`);
                 }
             }
@@ -758,7 +760,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
      * Sync payment status from MP API (called when user returns from checkout)
      */
     async syncPaymentStatus(reservationId: string): Promise<{ status: string; synced: boolean }> {
-        const payment = await this.mpPaymentRepo.findOne({
+        const payment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
             where: { reservationId },
             order: { createdAt: 'DESC' },
         });
@@ -801,12 +803,12 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                 payment.statusDetail = mpPayment.status_detail;
                 payment.paymentMethod = mpPayment.payment_method_id || null;
                 payment.mpData = mpPayment;
-                await this.mpPaymentRepo.save(payment);
+                await this.tenant.getRepo(MercadoPagoPayment).save(payment);
 
                 // If approved, update reservation and send confirmation email
                 if (payment.reservationId) {
                     if (mpStatus === 'approved') {
-                        await this.reservationRepo.update(payment.reservationId, {
+                        await this.tenant.getRepo(Reservation).update(payment.reservationId, {
                             paymentStatus: PaymentStatus.PAID,
                             paymentNotes: `Pagado via Mercado Pago (ID: ${mpPayment.id})`,
                             paymentExpiresAt: null, // Clear deadline
@@ -816,7 +818,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                         await this.sendPaymentConfirmationEmail(payment.reservationId, String(mpPayment.id), payment.payerEmail);
                     } else if (mpPayment.status_detail === 'pending_contingency') {
                         this.logger.log(`⏳ Payment pending_contingency for reservation ${payment.reservationId} via sync – clearing deadline`);
-                        await this.reservationRepo.update(payment.reservationId, {
+                        await this.tenant.getRepo(Reservation).update(payment.reservationId, {
                             paymentExpiresAt: null,
                         });
                     } else if (mpStatus === 'rejected') {
@@ -824,9 +826,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                         this.logger.log(`❌ Payment rejected for reservation ${payment.reservationId} via sync – waiting for timer`);
                     } else if (mpStatus === 'cancelled') {
                         this.logger.log(`❌ Payment cancelled for reservation ${payment.reservationId} via sync – deleting reservation`);
-                        const reservation = await this.reservationRepo.findOne({ where: { id: payment.reservationId } });
+                        const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id: payment.reservationId } });
                         if (reservation) {
-                            await this.reservationRepo.remove(reservation);
+                            await this.tenant.getRepo(Reservation).remove(reservation);
                             this.logger.log(`🗑️ Deleted reservation ${payment.reservationId} and its payment records`);
                         }
                     }
@@ -845,7 +847,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
      * Get payment status for a reservation
      */
     async getPaymentStatus(reservationId: string): Promise<MercadoPagoPayment | null> {
-        return this.mpPaymentRepo.findOne({
+        return this.tenant.getRepo(MercadoPagoPayment).findOne({
             where: { reservationId },
             order: { createdAt: 'DESC' },
         });
@@ -855,7 +857,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
      * Get all payments for a club
      */
     async getClubPayments(clubId: string, limit = 50): Promise<MercadoPagoPayment[]> {
-        return this.mpPaymentRepo.find({
+        return this.tenant.getRepo(MercadoPagoPayment).find({
             where: { clubId },
             order: { createdAt: 'DESC' },
             take: limit,
@@ -868,7 +870,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
      */
     private async sendPaymentConfirmationEmail(reservationId: string, mpPaymentId: string, payerEmail?: string): Promise<void> {
         try {
-            const reservation = await this.reservationRepo.findOne({
+            const reservation = await this.tenant.getRepo(Reservation).findOne({
                 where: { id: reservationId },
                 relations: ['court'],
             });

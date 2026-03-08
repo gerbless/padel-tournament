@@ -42,7 +42,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
 
     saving = false;
     loadingUsers = false;
-    activeTab: 'modules' | 'users' | 'features' | 'credentials' = 'modules';
+    activeTab: 'modules' | 'users' | 'features' | 'credentials' | 'clubs' = 'modules';
     freePlayPointsPerWin = 3;
 
     // Feature flags
@@ -87,6 +87,15 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
     linkingPlayerId: string | null = null;
     selectedPlayerId = '';
 
+    // Club management (super_admin)
+    allClubs: Club[] = [];
+    loadingClubs = false;
+    newClubName = '';
+    newClubDescription = '';
+    creatingClub = false;
+    createClubError = '';
+    createClubSuccess = '';
+
     private subs: Subscription[] = [];
     private cdr = inject(ChangeDetectorRef);
 
@@ -116,6 +125,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
                     this.loadPlayers();
                     if (this.authService.isSuperAdmin()) {
                         this.loadCredentials(club.id);
+                        this.loadAllClubs();
                     }
                 }
                 this.cdr.markForCheck();
@@ -525,5 +535,72 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
                 .map(u => u.user?.player?.id || u.player?.id || u.playerId)
         );
         return this.allPlayers.filter(p => !linkedPlayerIds.has(p.id));
+    }
+
+    // ─── Club Management (super_admin) ────────────────
+
+    loadAllClubs() {
+        this.loadingClubs = true;
+        this.cdr.markForCheck();
+        this.clubService.getClubs().subscribe({
+            next: (clubs) => {
+                this.allClubs = clubs;
+                this.loadingClubs = false;
+                this.cdr.markForCheck();
+            },
+            error: () => {
+                this.loadingClubs = false;
+                this.cdr.markForCheck();
+            }
+        });
+    }
+
+    createNewClub() {
+        if (!this.newClubName || this.creatingClub) return;
+        this.creatingClub = true;
+        this.createClubError = '';
+        this.createClubSuccess = '';
+        this.cdr.markForCheck();
+
+        this.clubService.createClub({
+            name: this.newClubName,
+            description: this.newClubDescription || undefined,
+        }).subscribe({
+            next: (club) => {
+                this.createClubSuccess = `Club "${club.name}" creado correctamente con su schema.`;
+                this.newClubName = '';
+                this.newClubDescription = '';
+                this.creatingClub = false;
+                this.loadAllClubs();
+                this.cdr.markForCheck();
+            },
+            error: (err) => {
+                this.createClubError = err.error?.message || 'Error al crear el club';
+                this.creatingClub = false;
+                this.cdr.markForCheck();
+            }
+        });
+    }
+
+    toggleClubActive(club: Club) {
+        const newState = club.isActive === false ? true : false;
+        this.clubService.toggleActive(club.id, newState).subscribe({
+            next: (updated) => {
+                // Update in the list
+                const idx = this.allClubs.findIndex(c => c.id === club.id);
+                if (idx >= 0) this.allClubs[idx] = { ...this.allClubs[idx], isActive: updated.isActive };
+                // If this is the selected club, update it too
+                if (this.club?.id === club.id) {
+                    this.clubService.selectClub({ ...this.club, isActive: updated.isActive });
+                }
+                this.cdr.markForCheck();
+            },
+            error: (err) => console.error('Error toggling club active state', err),
+        });
+    }
+
+    switchToClub(club: Club) {
+        this.clubService.selectClub(club);
+        this.cdr.markForCheck();
     }
 }

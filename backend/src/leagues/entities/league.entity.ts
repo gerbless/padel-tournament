@@ -68,7 +68,7 @@ export class League {
     @OneToMany(() => LeagueMatch, match => match.league, { cascade: true })
     matches: LeagueMatch[];
 
-    @ManyToOne(() => Club, club => club.leagues)
+    @ManyToOne(() => Club, club => club.leagues, { createForeignKeyConstraints: false })
     club: Club;
 
     @Column({ nullable: true })

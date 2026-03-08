@@ -600,3 +600,25 @@
     background: rgba(255,255,255,0.1);
 }
 
+/* Club management */
+.create-club-section {
+    background: var(--bg-secondary, rgba(255,255,255,0.05));
+    border: 1px solid var(--border, rgba(255,255,255,0.1));
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.create-club-section h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.inactive-card {
+    opacity: 0.55;
+    border-style: dashed !important;
+}
+
+.inactive-card:hover {
+    opacity: 0.85;
+}

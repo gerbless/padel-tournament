@@ -68,7 +68,7 @@ export class Tournament {
     @OneToMany(() => Match, match => match.tournament, { cascade: true })
     matches: Match[];
 
-    @ManyToOne(() => Club, club => club.tournaments)
+    @ManyToOne(() => Club, club => club.tournaments, { createForeignKeyConstraints: false })
     club: Club;
 
     @Column({ nullable: true })

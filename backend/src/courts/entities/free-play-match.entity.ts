@@ -14,7 +14,7 @@ export class FreePlayMatch {
     @Column()
     reservationId: string;
 
-    @ManyToOne(() => Club, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Club, { onDelete: 'CASCADE', createForeignKeyConstraints: false })
     club: Club;
 
     @Column()

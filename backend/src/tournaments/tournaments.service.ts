@@ -9,6 +9,7 @@ import { MatchStatus as LeagueMatchStatus } from '../leagues/entities/league-mat
 import { CreateTournamentDto } from './dto/create-tournament.dto';
 import { PlayersService } from '../players/players.service';
 import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
+import { TenantService } from '../tenant/tenant.service';
 
 export interface Standing {
     teamId: string;
@@ -81,6 +82,7 @@ export class TournamentsService {
         private leagueRepository: Repository<League>,
         private playersService: PlayersService,
         private dataSource: DataSource,
+        private tenant: TenantService,
     ) { }
 
     async create(createTournamentDto: CreateTournamentDto): Promise<Tournament> {
@@ -103,7 +105,7 @@ export class TournamentsService {
             }
         }
 
-        const queryRunner = this.dataSource.createQueryRunner();
+        const queryRunner = await this.tenant.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
@@ -286,7 +288,7 @@ export class TournamentsService {
         const limit = pagination?.limit || 20;
         const skip = (page - 1) * limit;
 
-        const qb = this.tournamentRepository.createQueryBuilder('t')
+        const qb = this.tenant.getRepo(Tournament).createQueryBuilder('t')
             .leftJoinAndSelect('t.teams', 'team')
             .leftJoinAndSelect('team.player1', 'p1')
             .leftJoinAndSelect('team.player2', 'p2')
@@ -311,7 +313,7 @@ export class TournamentsService {
     }
 
     async findOne(id: string): Promise<Tournament> {
-        const tournament = await this.tournamentRepository.findOne({
+        const tournament = await this.tenant.getRepo(Tournament).findOne({
             where: { id },
             relations: [
                 'teams',
@@ -481,7 +483,7 @@ export class TournamentsService {
             playerIds.add(t.player2Id);
         });
 
-        const queryRunner = this.dataSource.createQueryRunner();
+        const queryRunner = await this.tenant.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
@@ -511,7 +513,7 @@ export class TournamentsService {
             throw new BadRequestException('Cannot close tournament: All matches must have at least one set played');
         }
 
-        const queryRunner = this.dataSource.createQueryRunner();
+        const queryRunner = await this.tenant.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
@@ -563,7 +565,7 @@ export class TournamentsService {
                 throw new BadRequestException('Ambas semifinales deben estar completadas antes de generar la final');
             }
 
-            const queryRunner = this.dataSource.createQueryRunner();
+            const queryRunner = await this.tenant.createQueryRunner();
             await queryRunner.connect();
             await queryRunner.startTransaction();
 
@@ -633,7 +635,7 @@ export class TournamentsService {
             throw new BadRequestException('Se necesitan al menos 4 parejas para generar eliminación');
         }
 
-        const queryRunner = this.dataSource.createQueryRunner();
+        const queryRunner = await this.tenant.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
@@ -668,7 +670,7 @@ export class TournamentsService {
 
     // ===================== MONTHLY STATS =====================
     async getMonthlyStats(month: number, year: number, clubId?: string) {
-        const tournamentQb = this.tournamentRepository.createQueryBuilder('t')
+        const tournamentQb = this.tenant.getRepo(Tournament).createQueryBuilder('t')
             .leftJoinAndSelect('t.matches', 'match')
             .leftJoinAndSelect('match.team1', 'mt1')
             .leftJoinAndSelect('mt1.player1', 'mt1p1')
@@ -685,7 +687,7 @@ export class TournamentsService {
 
         const tournaments = await tournamentQb.getMany();
 
-        const leagueQb = this.leagueRepository.createQueryBuilder('l')
+        const leagueQb = this.tenant.getRepo(League).createQueryBuilder('l')
             .leftJoinAndSelect('l.matches', 'lm')
             .leftJoinAndSelect('lm.team1', 'lt1')
             .leftJoinAndSelect('lt1.player1', 'lt1p1')

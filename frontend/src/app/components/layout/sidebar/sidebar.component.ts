@@ -50,8 +50,8 @@ import { PermissionsService, NavItem } from '../../../services/permissions.servi
                 <span class="label" *ngIf="!isCollapsed">{{ item.label }}</span>
             </a>
 
-            <!-- Admin Settings (only for super_admin) -->
-            <a *ngIf="isSuperAdmin && selectedClub"
+            <!-- Admin Settings (for club admins and super_admin) -->
+            <a *ngIf="(isSuperAdmin || isAdmin) && selectedClub"
                routerLink="/admin/club-settings"
                routerLinkActive="active"
                class="nav-item admin-item"

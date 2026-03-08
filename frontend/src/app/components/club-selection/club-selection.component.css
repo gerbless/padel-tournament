@@ -185,6 +185,20 @@
     border-color: var(--primary);
 }
 
+.club-card.inactive {
+    opacity: 0.55;
+    border-style: dashed;
+}
+
+.club-card.inactive:hover {
+    opacity: 0.85;
+}
+
+.inactive-badge {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #ef4444 !important;
+}
+
 .club-logo {
     width: 64px;
     height: 64px;

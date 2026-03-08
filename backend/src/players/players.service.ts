@@ -10,6 +10,7 @@ import { UpdatePlayerDto } from './dto/update-player.dto';
 import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
 import { PlayerRankingService } from './player-ranking.service';
 import { PlayerRecommendationService } from './player-recommendation.service';
+import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
 export class PlayersService {
@@ -24,6 +25,7 @@ export class PlayersService {
         private userRepository: Repository<User>,
         private rankingService: PlayerRankingService,
         private recommendationService: PlayerRecommendationService,
+        private tenant: TenantService,
     ) { }
 
     async create(createPlayerDto: CreatePlayerDto): Promise<Player> {
@@ -402,7 +404,7 @@ export class PlayersService {
             let globalFreePlayPoints = 0;
             let globalFreePlayWins = 0;
 
-            const freePlayMatches = await this.freePlayMatchRepository.createQueryBuilder('fpm')
+            const freePlayMatches = await this.tenant.getRepo(FreePlayMatch).createQueryBuilder('fpm')
                 .where('fpm.status = :status', { status: 'completed' })
                 .andWhere('fpm.countsForRanking = true')
                 .getMany();
@@ -463,7 +465,7 @@ export class PlayersService {
                     clubStats.tournamentsPlayed = stats.tournamentsPlayed;
                     clubStats.leaguesPlayed = stats.leaguesPlayed;
 
-                    await this.playerClubStatsRepository.save(clubStats);
+                    await this.tenant.getRepo(PlayerClubStats).save(clubStats);
                 }
             }
         }
@@ -523,7 +525,7 @@ export class PlayersService {
         }
 
         // Try to find existing stats
-        let stats = await this.playerClubStatsRepository.findOne({
+        let stats = await this.tenant.getRepo(PlayerClubStats).findOne({
             where: {
                 player: { id: playerId },
                 club: { id: clubId }
@@ -533,7 +535,7 @@ export class PlayersService {
 
         if (!stats) {
             // Create new stats
-            stats = this.playerClubStatsRepository.create({
+            stats = this.tenant.getRepo(PlayerClubStats).create({
                 player: { id: playerId } as Player,
                 club: { id: clubId } as any,
                 totalPoints: 0,
@@ -546,7 +548,7 @@ export class PlayersService {
                 tournamentsPlayed: 0,
                 leaguesPlayed: 0
             });
-            stats = await this.playerClubStatsRepository.save(stats);
+            stats = await this.tenant.getRepo(PlayerClubStats).save(stats);
         }
 
         return stats;
@@ -580,7 +582,7 @@ export class PlayersService {
             }
         });
 
-        return this.playerClubStatsRepository.save(stats);
+        return this.tenant.getRepo(PlayerClubStats).save(stats);
     }
 
     async updatePlayerGlobalStats(

@@ -60,7 +60,8 @@ export class ClubRoleGuard implements CanActivate {
         let clubId =
             request.params?.clubId ||
             request.body?.clubId ||
-            request.query?.clubId;
+            request.query?.clubId ||
+            request.headers?.['x-club-id'];
 
         // If no clubId found directly, try to resolve from resource ID
         if (!clubId && request.params?.id) {

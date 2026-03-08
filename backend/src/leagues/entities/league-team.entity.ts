@@ -53,11 +53,11 @@ export class LeagueTeam {
     @JoinColumn({ name: 'leagueId' })
     league: League;
 
-    @ManyToOne(() => Player)
+    @ManyToOne(() => Player, { createForeignKeyConstraints: false })
     @JoinColumn({ name: 'player1Id' })
     player1: Player;
 
-    @ManyToOne(() => Player)
+    @ManyToOne(() => Player, { createForeignKeyConstraints: false })
     @JoinColumn({ name: 'player2Id' })
     player2: Player;
 

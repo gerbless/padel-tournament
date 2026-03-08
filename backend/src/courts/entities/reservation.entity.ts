@@ -37,7 +37,7 @@ export class Reservation {
     @Column()
     courtId: string;
 
-    @ManyToOne(() => Club, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Club, { onDelete: 'CASCADE', createForeignKeyConstraints: false })
     club: Club;
 
     @Column()

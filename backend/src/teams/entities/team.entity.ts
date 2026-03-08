@@ -14,11 +14,11 @@ export class Team {
     @Column()
     player2Id: string;
 
-    @ManyToOne(() => Player, player => player.teamsAsPlayer1)
+    @ManyToOne(() => Player, player => player.teamsAsPlayer1, { createForeignKeyConstraints: false })
     @JoinColumn({ name: 'player1Id' })
     player1: Player;
 
-    @ManyToOne(() => Player, player => player.teamsAsPlayer2)
+    @ManyToOne(() => Player, player => player.teamsAsPlayer2, { createForeignKeyConstraints: false })
     @JoinColumn({ name: 'player2Id' })
     player2: Player;
 

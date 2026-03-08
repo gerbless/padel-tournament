@@ -7,6 +7,9 @@
 
     <!-- Tabs -->
     <div class="tabs-bar">
+        <button *ngIf="isSuperAdmin" class="tab" [class.active]="activeTab === 'clubs'" (click)="activeTab = 'clubs'">
+            🏢 Clubs
+        </button>
         <button class="tab" [class.active]="activeTab === 'modules'" (click)="activeTab = 'modules'">
             📦 Módulos
         </button>
@@ -19,6 +22,70 @@
         <button class="tab" [class.active]="activeTab === 'users'" (click)="activeTab = 'users'">
             👥 Usuarios y Roles
         </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!--              CLUBS TAB (super_admin)           -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <div *ngIf="activeTab === 'clubs' && isSuperAdmin" class="tab-content">
+        <div class="section-info">
+            <h2>🏢 Gestión de Clubs</h2>
+            <p>Crea nuevos clubs o activa/desactiva clubs existentes. Los clubs desactivados no serán visibles para los usuarios, pero sus datos se conservan.</p>
+        </div>
+
+        <!-- Create Club Form -->
+        <div class="create-club-section">
+            <h3>➕ Crear Nuevo Club</h3>
+            <div class="form-grid" style="margin-top: 0.75rem;">
+                <div class="form-field">
+                    <label>Nombre del Club *</label>
+                    <input type="text" [(ngModel)]="newClubName" class="form-control" placeholder="Ej: Club de Padel Norte">
+                </div>
+                <div class="form-field">
+                    <label>Descripción</label>
+                    <input type="text" [(ngModel)]="newClubDescription" class="form-control" placeholder="Breve descripción (opcional)">
+                </div>
+            </div>
+            <div class="actions-bar" style="margin-top: 0.75rem;">
+                <div *ngIf="createClubError" class="alert alert-error">⚠️ {{ createClubError }}</div>
+                <div *ngIf="createClubSuccess" class="alert alert-success">✅ {{ createClubSuccess }}</div>
+                <button class="btn btn-primary" (click)="createNewClub()" [disabled]="creatingClub || !newClubName">
+                    {{ creatingClub ? 'Creando...' : '🏢 Crear Club' }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Existing Clubs List -->
+        <div class="section-info" style="margin-top: 2rem;">
+            <h3>Clubs Existentes ({{ allClubs.length }})</h3>
+        </div>
+        <div class="users-list" style="margin-top: 0.5rem;">
+            <div *ngIf="loadingClubs" class="loading-state">
+                <div class="spinner"></div>
+            </div>
+            <div *ngFor="let c of allClubs" class="user-card" [class.inactive-card]="!c.isActive">
+                <div class="user-info">
+                    <div class="user-avatar" [style.background]="c.isActive !== false ? 'var(--primary)' : '#666'">{{ c.name.charAt(0).toUpperCase() }}</div>
+                    <div class="user-details">
+                        <span class="user-email">{{ c.name }}</span>
+                        <span class="user-player" *ngIf="c.description">{{ c.description }}</span>
+                        <span class="user-global-role" *ngIf="c.isActive === false" style="color: #ef4444;">⏸️ Desactivado</span>
+                    </div>
+                </div>
+                <div class="user-actions">
+                    <button class="btn btn-sm"
+                            [class.btn-primary]="c.isActive === false"
+                            [class.btn-outline]="c.isActive !== false"
+                            (click)="toggleClubActive(c)"
+                            style="min-width: 120px;">
+                        {{ c.isActive !== false ? '⏸️ Desactivar' : '▶️ Activar' }}
+                    </button>
+                    <button class="btn btn-sm btn-outline" (click)="switchToClub(c)" title="Ir al club">
+                        🔗 Ir al Club
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- ═══════════════════════════════════════════════ -->

@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Delete, Patch, Body, Param, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Body, Param, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { ClubsService } from './clubs.service';
 import { CreateClubDto } from './dto/create-club.dto';
 import { UpdateClubDto } from './dto/update-club.dto';
 import { UpdateClubCredentialsDto } from './dto/club-credentials.dto';
 import { ClubCredentialsService } from './club-credentials.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { ClubRoleGuard } from '../auth/club-role.guard';
 import { SuperAdminGuard } from '../auth/super-admin.guard';
 import { ClubRoles } from '../auth/club-roles.decorator';
@@ -16,15 +17,18 @@ export class ClubsController {
         private readonly credentialsService: ClubCredentialsService,
     ) { }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, SuperAdminGuard)
     @Post()
     create(@Body() createClubDto: CreateClubDto) {
         return this.clubsService.create(createClubDto);
     }
 
+    @UseGuards(OptionalJwtAuthGuard)
     @Get()
-    findAll() {
-        return this.clubsService.findAll();
+    findAll(@Req() req: any) {
+        // If the request has an authenticated super_admin, include inactive clubs
+        const isSuperAdmin = req.user?.role === 'super_admin';
+        return this.clubsService.findAll(isSuperAdmin);
     }
 
     @Get(':id')
@@ -39,8 +43,13 @@ export class ClubsController {
         return this.clubsService.update(id, updateClubDto);
     }
 
-    @UseGuards(JwtAuthGuard, ClubRoleGuard)
-    @ClubRoles('admin')
+    @UseGuards(JwtAuthGuard, SuperAdminGuard)
+    @Patch(':id/toggle-active')
+    toggleActive(@Param('id') id: string, @Body('isActive') isActive: boolean) {
+        return this.clubsService.setActive(id, isActive);
+    }
+
+    @UseGuards(JwtAuthGuard, SuperAdminGuard)
     @Delete(':id')
     @HttpCode(HttpStatus.NO_CONTENT)
     remove(@Param('id') id: string) {

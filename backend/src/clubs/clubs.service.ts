@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Club } from './entities/club.entity';
 import { CreateClubDto } from './dto/create-club.dto';
 import { UpdateClubDto } from './dto/update-club.dto';
 import { Player } from '../players/entities/player.entity';
+import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
 export class ClubsService {
@@ -13,15 +14,28 @@ export class ClubsService {
         private clubRepository: Repository<Club>,
         @InjectRepository(Player)
         private playerRepository: Repository<Player>,
+        private tenantService: TenantService,
     ) { }
 
     async create(createClubDto: CreateClubDto): Promise<Club> {
         const club = this.clubRepository.create(createClubDto);
-        return this.clubRepository.save(club);
+        const saved = await this.clubRepository.save(club);
+
+        // Auto-generate schema for the new club
+        const schemaName = this.tenantService.generateSchemaName(saved.id);
+        saved.schemaName = schemaName;
+        await this.clubRepository.save(saved);
+
+        // Create the PostgreSQL schema and initialise all club tables
+        await this.tenantService.createSchemaForClub(schemaName);
+
+        return saved;
     }
 
-    async findAll(): Promise<Club[]> {
+    async findAll(includeInactive = false): Promise<Club[]> {
+        const where = includeInactive ? {} : { isActive: true };
         return this.clubRepository.find({
+            where,
             relations: ['players'],
             order: { name: 'ASC' }
         });
@@ -30,7 +44,7 @@ export class ClubsService {
     async findOne(id: string): Promise<Club> {
         const club = await this.clubRepository.findOne({
             where: { id },
-            relations: ['players', 'tournaments', 'leagues']
+            relations: ['players']
         });
 
         if (!club) {
@@ -48,7 +62,19 @@ export class ClubsService {
 
     async remove(id: string): Promise<void> {
         const club = await this.findOne(id);
+        // Prevent deletion of clubs that have a schema (i.e. contain data)
+        if (club.schemaName) {
+            throw new BadRequestException(
+                'No se puede eliminar un club que ya tiene datos. Desactívalo con PATCH /clubs/:id { "isActive": false }.',
+            );
+        }
         await this.clubRepository.remove(club);
+    }
+
+    async setActive(id: string, isActive: boolean): Promise<Club> {
+        const club = await this.findOne(id);
+        club.isActive = isActive;
+        return this.clubRepository.save(club);
     }
 
     async getPlayers(clubId: string): Promise<Player[]> {

@@ -51,6 +51,10 @@ export class ClubService {
         return this.http.delete<void>(`${this.apiUrl}/${id}`);
     }
 
+    toggleActive(id: string, isActive: boolean): Observable<Club> {
+        return this.http.patch<Club>(`${this.apiUrl}/${id}/toggle-active`, { isActive });
+    }
+
     getCredentials(clubId: string): Observable<ClubCredentials> {
         return this.http.get<ClubCredentials>(`${this.apiUrl}/${clubId}/credentials`);
     }

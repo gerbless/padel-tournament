@@ -8,10 +8,10 @@ export class PlayerClubStats {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ManyToOne(() => Player, player => player.clubStats)
+    @ManyToOne(() => Player, player => player.clubStats, { createForeignKeyConstraints: false })
     player: Player;
 
-    @ManyToOne(() => Club)
+    @ManyToOne(() => Club, { createForeignKeyConstraints: false })
     club: Club;
 
     @Column({ default: 0, type: 'int' })

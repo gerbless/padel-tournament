@@ -53,6 +53,10 @@ export class UpdateClubDto {
     } | null;
 
     @IsOptional()
+    @IsBoolean()
+    isActive?: boolean;
+
+    @IsOptional()
     @IsObject()
     @ValidateNested()
     @Type(() => EnabledModulesDto)

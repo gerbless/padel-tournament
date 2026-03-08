@@ -18,6 +18,14 @@ export class Club {
     @Column({ nullable: true })
     logo?: string;
 
+    /** PostgreSQL schema name for this club's tenant data. Auto-generated on creation. */
+    @Column({ nullable: true, unique: true })
+    schemaName: string;
+
+    /** When false, the club is hidden from non-super_admin users. */
+    @Column({ default: true })
+    isActive: boolean;
+
     @CreateDateColumn()
     createdAt: Date;
 

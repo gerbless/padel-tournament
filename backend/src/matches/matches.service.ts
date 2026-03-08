@@ -3,60 +3,64 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Match, MatchStatus, SetResult } from './entities/match.entity';
 import { UpdateMatchScoreDto } from './dto/update-match-score.dto';
+import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
 export class MatchesService {
     constructor(
         @InjectRepository(Match)
         private matchRepository: Repository<Match>,
+        private tenant: TenantService,
     ) { }
 
-    async findOne(id: string): Promise<Match> {
-        const match = await this.matchRepository.findOne({
-            where: { id },
-            relations: ['team1', 'team2', 'winner', 'tournament'],
+    async findOne(id: string, clubId?: string): Promise<Match> {
+        const cid = clubId || this.tenant.getCurrentClubId();
+        if (!cid) throw new BadRequestException('Club ID required');
+
+        return this.tenant.run(cid, async (em) => {
+            const match = await em.getRepository(Match).findOne({
+                where: { id },
+                relations: ['team1', 'team2', 'winner', 'tournament'],
+            });
+            if (!match) {
+                throw new NotFoundException(`Match with ID ${id} not found`);
+            }
+            return match;
         });
-
-        if (!match) {
-            throw new NotFoundException(`Match with ID ${id} not found`);
-        }
-
-        return match;
     }
 
-    async updateScore(id: string, updateMatchScoreDto: UpdateMatchScoreDto): Promise<Match> {
-        const match = await this.matchRepository.findOne({
-            where: { id },
-            relations: ['team1', 'team2', 'winner', 'tournament'],
+    async updateScore(id: string, updateMatchScoreDto: UpdateMatchScoreDto, clubId?: string): Promise<Match> {
+        const cid = clubId || this.tenant.getCurrentClubId();
+        if (!cid) throw new BadRequestException('Club ID required');
+
+        return this.tenant.run(cid, async (em) => {
+            const matchRepo = em.getRepository(Match);
+            const match = await matchRepo.findOne({
+                where: { id },
+                relations: ['team1', 'team2', 'winner', 'tournament'],
+            });
+
+            if (!match) {
+                throw new NotFoundException(`Match with ID ${id} not found`);
+            }
+
+            if (match.tournament && match.tournament.status === 'completed') {
+                throw new BadRequestException('Cannot update match result for a completed tournament');
+            }
+
+            const { sets } = updateMatchScoreDto;
+            const config = match.tournament?.config || { strictScoring: false, allowTies: true };
+            this.validateSets(sets, config.strictScoring ?? false);
+            const winnerId = this.calculateMatchWinner(sets, match.team1Id, match.team2Id, config.allowTies ?? true);
+
+            await matchRepo.update(id, {
+                sets: sets,
+                winnerId: winnerId,
+                status: MatchStatus.COMPLETED
+            });
+
+            return this.findOne(id, cid);
         });
-
-        if (!match) {
-            throw new NotFoundException(`Match with ID ${id} not found`);
-        }
-
-        if (match.tournament && match.tournament.status === 'completed') {
-            throw new BadRequestException('Cannot update match result for a completed tournament');
-        }
-
-        const { sets } = updateMatchScoreDto;
-
-        // Validate sets
-        const config = match.tournament?.config || { strictScoring: false, allowTies: true };
-
-        // Validate sets
-        this.validateSets(sets, config.strictScoring ?? false);
-
-        // Calculate winner
-        const winnerId = this.calculateMatchWinner(sets, match.team1Id, match.team2Id, config.allowTies ?? true);
-
-        // Update match using direct update to avoid relation conflicts with save()
-        await this.matchRepository.update(id, {
-            sets: sets,
-            winnerId: winnerId,
-            status: MatchStatus.COMPLETED
-        });
-
-        return this.findOne(id);
     }
 
     private validateSets(sets: SetResult[], strictMode: boolean): void {

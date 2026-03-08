@@ -21,7 +21,8 @@
             </div>
 
             <div class="clubs-grid" *ngIf="!loading">
-                <div class="club-card" *ngFor="let club of filteredClubs" (click)="selectClub(club)">
+                <div class="club-card" *ngFor="let club of filteredClubs" (click)="selectClub(club)"
+                     [class.inactive]="club.isActive === false">
                     <div class="club-logo">
                         <span *ngIf="!club.logo">{{ club.name.charAt(0) }}</span>
                         <img *ngIf="club.logo" [src]="club.logo" [alt]="club.name" />
@@ -29,6 +30,9 @@
                     <div class="club-info">
                         <h3>{{ club.name }}</h3>
                         <p *ngIf="club.description">{{ club.description }}</p>
+                        <span class="role-badge inactive-badge" *ngIf="club.isActive === false && isSuperAdmin">
+                            ⏸️ Desactivado
+                        </span>
                         <span class="role-badge" *ngIf="getClubRoleBadge(club.id)">
                             {{ getClubRoleBadge(club.id) }}
                         </span>

@@ -23,6 +23,7 @@ export interface Club {
     name: string;
     description?: string;
     logo?: string;
+    isActive?: boolean;
     enableCourtPricing?: boolean;
     freePlayPointsPerWin?: number;
     enablePaymentLinkSending?: boolean;

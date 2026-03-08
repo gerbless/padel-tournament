@@ -8,6 +8,7 @@ import { PlayersService } from '../players/players.service';
 import { CreateLeagueDto } from './dto/create-league.dto';
 import { UpdateLeagueDto } from './dto/update-league.dto';
 import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
+import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
 export class LeaguesService {
@@ -20,10 +21,11 @@ export class LeaguesService {
         private leagueMatchRepository: Repository<LeagueMatch>,
         private playersService: PlayersService,
         private dataSource: DataSource,
+        private tenant: TenantService,
     ) { }
 
     async create(createLeagueDto: CreateLeagueDto): Promise<League> {
-        const queryRunner = this.dataSource.createQueryRunner();
+        const queryRunner = await this.tenant.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
@@ -72,12 +74,12 @@ export class LeaguesService {
             queryOptions.where = { clubId };
         }
 
-        const [data, total] = await this.leagueRepository.findAndCount(queryOptions);
+        const [data, total] = await this.tenant.getRepo(League).findAndCount(queryOptions);
         return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
     }
 
     async findOne(id: string): Promise<League> {
-        const league = await this.leagueRepository.findOne({
+        const league = await this.tenant.getRepo(League).findOne({
             where: { id },
             relations: [
                 'teams', 'teams.player1', 'teams.player2',
@@ -94,8 +96,8 @@ export class LeaguesService {
 
     async update(id: string, updateLeagueDto: UpdateLeagueDto): Promise<League> {
         const league = await this.findOne(id);
-        this.leagueRepository.merge(league, updateLeagueDto);
-        return this.leagueRepository.save(league);
+        this.tenant.getRepo(League).merge(league, updateLeagueDto);
+        return this.tenant.getRepo(League).save(league);
     }
 
     async remove(id: string): Promise<void> {
@@ -112,7 +114,7 @@ export class LeaguesService {
             if (t.player2Id) playerIds.add(t.player2Id);
         });
 
-        await this.leagueRepository.remove(league);
+        await this.tenant.getRepo(League).remove(league);
 
         // Recalculate stats for affected players (points will be removed)
         if (playerIds.size > 0) {
@@ -122,13 +124,13 @@ export class LeaguesService {
 
     async addTeam(id: string, player1Id: string, player2Id: string): Promise<LeagueTeam> {
         const league = await this.findOne(id);
-        const team = this.leagueTeamRepository.create({
+        const team = this.tenant.getRepo(LeagueTeam).create({
             leagueId: id,
             player1Id,
             player2Id,
             teamName: `Team ${league.teams.length + 1}`
         });
-        return this.leagueTeamRepository.save(team);
+        return this.tenant.getRepo(LeagueTeam).save(team);
     }
 
     async generateGroups(id: string, numberOfGroups: number): Promise<LeagueTeam[]> {
@@ -154,13 +156,13 @@ export class LeaguesService {
 
         // Save config with generated groups
         league.config = { ...league.config, groups: groupNames };
-        await this.leagueRepository.save(league);
+        await this.tenant.getRepo(League).save(league);
 
-        return this.leagueTeamRepository.save(teams);
+        return this.tenant.getRepo(LeagueTeam).save(teams);
     }
 
     async updateMatchResult(matchId: string, sets: any[], winnerId: string): Promise<LeagueMatch> {
-        const match = await this.leagueMatchRepository.findOne({
+        const match = await this.tenant.getRepo(LeagueMatch).findOne({
             where: { id: matchId },
             relations: ['league']
         });
@@ -174,7 +176,7 @@ export class LeaguesService {
         match.winnerId = winnerId;
         match.status = MatchStatus.COMPLETED;
 
-        const savedMatch = await this.leagueMatchRepository.save(match);
+        const savedMatch = await this.tenant.getRepo(LeagueMatch).save(match);
 
         // Recalculate standings for this league
         await this.calculateStandings(match.leagueId);
@@ -233,7 +235,7 @@ export class LeaguesService {
                     const w2 = sfMatches[1].winnerId;
 
                     if (w1 && w2) {
-                        await this.leagueMatchRepository.save(
+                        await this.tenant.getRepo(LeagueMatch).save(
                             this.createPlayoffMatch(league.id, w1, w2, fGroup, 1) // Round 1 of Finals
                         );
                     }
@@ -253,7 +255,7 @@ export class LeaguesService {
 
                     const winners = qfMatches.map(m => m.winnerId);
                     if (winners.length === 4 && winners.every(w => !!w)) {
-                        await this.leagueMatchRepository.save([
+                        await this.tenant.getRepo(LeagueMatch).save([
                             this.createPlayoffMatch(league.id, winners[0], winners[1], sfGroup, 1),
                             this.createPlayoffMatch(league.id, winners[2], winners[3], sfGroup, 1)
                         ]);
@@ -372,12 +374,12 @@ export class LeaguesService {
         }
 
         if (matches.length > 0) {
-            await this.leagueMatchRepository.save(matches);
+            await this.tenant.getRepo(LeagueMatch).save(matches);
         }
     }
 
     private createPlayoffMatch(leagueId: string, t1Id: string, t2Id: string, group: string, round: number): LeagueMatch {
-        return this.leagueMatchRepository.create({
+        return this.tenant.getRepo(LeagueMatch).create({
             leagueId,
             team1Id: t1Id,
             team2Id: t2Id,
@@ -427,7 +429,7 @@ export class LeaguesService {
             }
         }
 
-        return this.leagueMatchRepository.save(matches);
+        return this.tenant.getRepo(LeagueMatch).save(matches);
     }
 
     private generateRoundRobinMatches(teams: LeagueTeam[], matches: LeagueMatch[], leagueId: string, group?: string, roundCycle: number = 0) {
@@ -450,7 +452,7 @@ export class LeaguesService {
                     // In even cycles, swap home/away for variety
                     const t1 = roundCycle % 2 === 0 ? home : away;
                     const t2 = roundCycle % 2 === 0 ? away : home;
-                    matches.push(this.leagueMatchRepository.create({
+                    matches.push(this.tenant.getRepo(LeagueMatch).create({
                         leagueId: leagueId,
                         team1Id: t1.id,
                         team2Id: t2.id,
@@ -470,7 +472,7 @@ export class LeaguesService {
 
     async calculateStandings(leagueId: string): Promise<void> {
         const league = await this.findOne(leagueId);
-        let matches = await this.leagueMatchRepository.find({
+        let matches = await this.tenant.getRepo(LeagueMatch).find({
             where: { leagueId, status: MatchStatus.COMPLETED },
             relations: ['winner']
         });
@@ -566,7 +568,7 @@ export class LeaguesService {
             }); // end competitiveSets.forEach
         }
 
-        await this.leagueTeamRepository.save(league.teams);
+        await this.tenant.getRepo(LeagueTeam).save(league.teams);
     }
 
     async getStandings(leagueId: string): Promise<LeagueTeam[]> {
@@ -574,7 +576,7 @@ export class LeaguesService {
         const league = await this.findOne(leagueId);
 
         // Load completed non-playoff matches for head-to-head tiebreaker
-        const completedMatches = await this.leagueMatchRepository.find({
+        const completedMatches = await this.tenant.getRepo(LeagueMatch).find({
             where: { leagueId, status: MatchStatus.COMPLETED }
         });
         const regularMatches = completedMatches.filter(m => 
@@ -670,7 +672,7 @@ export class LeaguesService {
         if (!league.endDate) {
             league.endDate = new Date();
         }
-        const saved = await this.leagueRepository.save(league);
+        const saved = await this.tenant.getRepo(League).save(league);
 
         // Trigger point recalculation for all participants
         const playerIds = new Set<string>();
@@ -774,7 +776,7 @@ export class LeaguesService {
 
         // If 2 teams, direct match
         if (tiedTeams.length === 2) {
-            matches.push(this.leagueMatchRepository.create({
+            matches.push(this.tenant.getRepo(LeagueMatch).create({
                 leagueId,
                 team1Id: tiedTeams[0].id,
                 team2Id: tiedTeams[1].id,
@@ -787,7 +789,7 @@ export class LeaguesService {
             this.generateRoundRobinMatches(tiedTeams, matches, leagueId, 'TieBreaker');
         }
 
-        return this.leagueMatchRepository.save(matches);
+        return this.tenant.getRepo(LeagueMatch).save(matches);
     }
 
     // ==========================================
@@ -866,7 +868,7 @@ export class LeaguesService {
         }
 
         if (matches.length > 0) {
-            await this.leagueMatchRepository.save(matches);
+            await this.tenant.getRepo(LeagueMatch).save(matches);
         }
     }
 
@@ -905,7 +907,7 @@ export class LeaguesService {
                     // 3rd place: Loser SF1 vs Loser SF2
                     newMatches.push(this.createPlayoffMatch(league.id, l1, l2, thirdGroup, 1));
 
-                    await this.leagueMatchRepository.save(newMatches);
+                    await this.tenant.getRepo(LeagueMatch).save(newMatches);
                 }
             }
         }
