@@ -11,7 +11,7 @@ import { TenantService } from '../tenant/tenant.service';
 @Injectable()
 export class LeaguesService {
     constructor(
-        private playersService: PlayersService
+        private playersService: PlayersService,
         private tenant: TenantService,
     ) { }
 
