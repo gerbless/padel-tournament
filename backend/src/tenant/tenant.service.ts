@@ -230,7 +230,7 @@ export class TenantService {
         // ── tournaments (no FK deps) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."tournaments" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 name character varying NOT NULL,
                 type public.tournaments_type_enum NOT NULL,
                 status public.tournaments_status_enum DEFAULT 'draft'::public.tournaments_status_enum NOT NULL,
@@ -249,7 +249,7 @@ export class TenantService {
         // ── teams (FK → tournaments) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."teams" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "player1Id" uuid NOT NULL,
                 "player2Id" uuid NOT NULL,
                 "tournamentId" uuid NOT NULL,
@@ -260,7 +260,7 @@ export class TenantService {
         // ── matches (FK → tournaments, teams) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."matches" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "tournamentId" uuid NOT NULL,
                 "team1Id" uuid NOT NULL,
                 "team2Id" uuid NOT NULL,
@@ -277,7 +277,7 @@ export class TenantService {
         // ── leagues (no FK deps) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."leagues" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 name character varying NOT NULL,
                 type public.leagues_type_enum NOT NULL,
                 config jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -293,7 +293,7 @@ export class TenantService {
         // ── league_teams (FK → leagues) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."league_teams" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "leagueId" uuid NOT NULL,
                 "player1Id" uuid NOT NULL,
                 "player2Id" uuid NOT NULL,
@@ -313,7 +313,7 @@ export class TenantService {
         // ── league_matches (FK → leagues, league_teams) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."league_matches" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "leagueId" uuid NOT NULL,
                 "team1Id" uuid NOT NULL,
                 "team2Id" uuid NOT NULL,
@@ -329,7 +329,7 @@ export class TenantService {
         // ── courts (no FK deps) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."courts" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "clubId" uuid NOT NULL,
                 name character varying NOT NULL,
                 "courtNumber" integer NOT NULL,
@@ -343,7 +343,7 @@ export class TenantService {
         // ── court_price_blocks (FK → courts) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."court_price_blocks" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "courtId" uuid NOT NULL,
                 "daysOfWeek" jsonb DEFAULT '[]'::jsonb,
                 "startTime" character varying NOT NULL,
@@ -358,7 +358,7 @@ export class TenantService {
         // ── court_blocks (no FK deps) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."court_blocks" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
                 "clubId" character varying NOT NULL,
                 "startDate" date NOT NULL,
                 "endDate" date NOT NULL,
@@ -376,7 +376,7 @@ export class TenantService {
         // ── reservations (FK → courts) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."reservations" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "courtId" uuid NOT NULL,
                 "clubId" uuid NOT NULL,
                 date date NOT NULL,
@@ -403,7 +403,7 @@ export class TenantService {
         // ── free_play_matches (FK → reservations) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."free_play_matches" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "reservationId" uuid,
                 "clubId" uuid,
                 date date NOT NULL,
@@ -425,7 +425,7 @@ export class TenantService {
         // ── mercadopago_payments (FK → reservations) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."mercadopago_payments" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "reservationId" uuid,
                 "clubId" uuid NOT NULL,
                 "preferenceId" character varying,
@@ -451,7 +451,7 @@ export class TenantService {
         // ── player_club_stats (no FK deps to other club tables) ──
         await this.dataSource.query(`
             CREATE TABLE IF NOT EXISTS ${s}."player_club_stats" (
-                id uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+                id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL PRIMARY KEY,
                 "totalPoints" integer DEFAULT 0 NOT NULL,
                 "leaguePoints" integer DEFAULT 0 NOT NULL,
                 "tournamentPoints" integer DEFAULT 0 NOT NULL,
