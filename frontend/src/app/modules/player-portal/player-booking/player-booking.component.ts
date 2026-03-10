@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -9,6 +9,7 @@ import { AuthService } from '../../../services/auth.service';
 import { ToastService } from '../../../services/toast.service';
 import { ConfirmService } from '../../../services/confirm.service';
 import { PaymentService } from '../../../services/payment.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 interface CourtSlot {
     startTime: string;
@@ -37,6 +38,7 @@ interface CourtAvailability {
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PlayerBookingComponent implements OnInit {
+    private destroyRef = inject(DestroyRef);
     clubId = '';
     clubName = '';
     selectedDate = '';
@@ -63,7 +65,9 @@ export class PlayerBookingComponent implements OnInit {
     }
 
     ngOnInit() {
-        this.clubService.selectedClub$.subscribe(club => {
+        this.clubService.selectedClub$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(club => {
             if (club) {
                 this.clubId = club.id;
                 this.clubName = club.name;

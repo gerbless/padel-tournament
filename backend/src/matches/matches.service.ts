@@ -1,6 +1,4 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { Match, MatchStatus, SetResult } from './entities/match.entity';
 import { UpdateMatchScoreDto } from './dto/update-match-score.dto';
 import { TenantService } from '../tenant/tenant.service';
@@ -8,8 +6,6 @@ import { TenantService } from '../tenant/tenant.service';
 @Injectable()
 export class MatchesService {
     constructor(
-        @InjectRepository(Match)
-        private matchRepository: Repository<Match>,
         private tenant: TenantService,
     ) { }
 

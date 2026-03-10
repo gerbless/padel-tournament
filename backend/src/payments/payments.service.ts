@@ -23,10 +23,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
     constructor(
         private configService: ConfigService,
-        @InjectRepository(MercadoPagoPayment)
-        private mpPaymentRepo: Repository<MercadoPagoPayment>,
-        @InjectRepository(Reservation)
-        private reservationRepo: Repository<Reservation>,
         @InjectRepository(Club)
         private clubRepo: Repository<Club>,
         private emailService: EmailService,
@@ -90,56 +86,78 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
     /**
      * Cancel reservations whose payment deadline has expired.
-     * Skips reservations whose MP payment has statusDetail = 'pending_contingency'
-     * or where any player has already paid (partial payment).
+     * Iterates over ALL active clubs since this runs in a background
+     * interval with no HTTP request context.
      */
     private async cancelExpiredReservations(): Promise<void> {
         try {
-            const now = new Date();
-            const expired = await this.tenant.getRepo(Reservation).find({
-                where: {
-                    paymentExpiresAt: LessThanOrEqual(now),
-                    status: Not(ReservationStatus.CANCELLED as any),
-                    paymentStatus: Not(PaymentStatus.PAID as any),
-                },
-            });
+            // Get all active clubs with schemas
+            const clubs: { id: string }[] = await this.clubRepo.query(
+                'SELECT id FROM clubs WHERE "schemaName" IS NOT NULL AND "isActive" = true',
+            );
 
-            for (const reservation of expired) {
-                // Check if any player has already paid — if so, never auto-cancel
-                if (reservation.playerPayments?.some(p => p.paid)) {
-                    await this.tenant.getRepo(Reservation).update(reservation.id, { paymentExpiresAt: null });
-                    this.logger.log(`💰 Reservation ${reservation.id} has partial player payments – skipping auto-cancel`);
-                    continue;
-                }
-
-                // Check if there's a pending_contingency MP payment — if so, skip
-                const mpPayment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
-                    where: { reservationId: reservation.id },
-                    order: { createdAt: 'DESC' },
-                });
-                if (mpPayment?.statusDetail === 'pending_contingency') {
-                    // Clear the deadline so we don't keep checking this one
-                    await this.tenant.getRepo(Reservation).update(reservation.id, { paymentExpiresAt: null });
-                    this.logger.log(`⏳ Reservation ${reservation.id} has pending_contingency – skipping auto-cancel`);
-                    continue;
-                }
-
-                // Also check if any MP payment for this reservation is approved
-                const approvedPayment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
-                    where: { reservationId: reservation.id, status: MercadoPagoPaymentStatus.APPROVED },
-                });
-                if (approvedPayment) {
-                    await this.tenant.getRepo(Reservation).update(reservation.id, { paymentExpiresAt: null });
-                    this.logger.log(`💰 Reservation ${reservation.id} has an approved payment – skipping auto-cancel`);
-                    continue;
-                }
-
-                this.logger.log(`⏰ Auto-cancelling reservation ${reservation.id} – payment deadline expired`);
-                await this.tenant.getRepo(Reservation).remove(reservation);
-                this.logger.log(`🗑️  Deleted reservation ${reservation.id} and its payment records`);
+            for (const club of clubs) {
+                await this.cancelExpiredForClub(club.id);
             }
         } catch (error) {
             this.logger.error(`Error in cancelExpiredReservations: ${error.message}`);
+        }
+    }
+
+    /**
+     * Cancel expired reservations for a single club within its schema context.
+     */
+    private async cancelExpiredForClub(clubId: string): Promise<void> {
+        try {
+            await this.tenant.run(clubId, async (em) => {
+                const now = new Date();
+                const reservationRepo = em.getRepository(Reservation);
+                const mpRepo = em.getRepository(MercadoPagoPayment);
+
+                const expired = await reservationRepo.find({
+                    where: {
+                        paymentExpiresAt: LessThanOrEqual(now),
+                        status: Not(ReservationStatus.CANCELLED as any),
+                        paymentStatus: Not(PaymentStatus.PAID as any),
+                    },
+                });
+
+                for (const reservation of expired) {
+                    // Check if any player has already paid — if so, never auto-cancel
+                    if (reservation.playerPayments?.some(p => p.paid)) {
+                        await reservationRepo.update(reservation.id, { paymentExpiresAt: null });
+                        this.logger.log(`💰 Reservation ${reservation.id} has partial player payments – skipping auto-cancel`);
+                        continue;
+                    }
+
+                    // Check if there's a pending_contingency MP payment — if so, skip
+                    const mpPayment = await mpRepo.findOne({
+                        where: { reservationId: reservation.id },
+                        order: { createdAt: 'DESC' },
+                    });
+                    if (mpPayment?.statusDetail === 'pending_contingency') {
+                        await reservationRepo.update(reservation.id, { paymentExpiresAt: null });
+                        this.logger.log(`⏳ Reservation ${reservation.id} has pending_contingency – skipping auto-cancel`);
+                        continue;
+                    }
+
+                    // Also check if any MP payment for this reservation is approved
+                    const approvedPayment = await mpRepo.findOne({
+                        where: { reservationId: reservation.id, status: MercadoPagoPaymentStatus.APPROVED },
+                    });
+                    if (approvedPayment) {
+                        await reservationRepo.update(reservation.id, { paymentExpiresAt: null });
+                        this.logger.log(`💰 Reservation ${reservation.id} has an approved payment – skipping auto-cancel`);
+                        continue;
+                    }
+
+                    this.logger.log(`⏰ Auto-cancelling reservation ${reservation.id} – payment deadline expired`);
+                    await reservationRepo.remove(reservation);
+                    this.logger.log(`🗑️  Deleted reservation ${reservation.id} and its payment records`);
+                }
+            });
+        } catch (error) {
+            this.logger.error(`Error cancelling expired reservations for club ${clubId}: ${error.message}`);
         }
     }
 

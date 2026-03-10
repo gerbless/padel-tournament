@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -8,6 +8,7 @@ import { ToastService } from '../../../../services/toast.service';
 import { ConfirmService } from '../../../../services/confirm.service';
 import { AuthService } from '../../../../services/auth.service';
 import { ClubService } from '../../../../services/club.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
     selector: 'app-court-blocks',
@@ -18,6 +19,7 @@ import { ClubService } from '../../../../services/club.service';
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CourtBlocksComponent implements OnInit {
+    private destroyRef = inject(DestroyRef);
     selectedClubId = '';
     selectedClubName = '';
     courts: Court[] = [];
@@ -57,7 +59,9 @@ export class CourtBlocksComponent implements OnInit {
     ) {}
 
     ngOnInit() {
-        this.clubService.selectedClub$.subscribe(club => {
+        this.clubService.selectedClub$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(club => {
             if (club) {
                 this.selectedClubId = club.id;
                 this.selectedClubName = club.name;

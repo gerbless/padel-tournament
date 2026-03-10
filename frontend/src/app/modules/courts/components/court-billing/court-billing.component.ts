@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -6,6 +6,7 @@ import { CourtService } from '../../../../services/court.service';
 import { ClubService } from '../../../../services/club.service';
 import { AuthService } from '../../../../services/auth.service';
 import { BillingDashboard, CourtBilling, BillingTotals, MonthlyTrend, PaymentMethodStat, PlayerBillingStat } from '../../../../models/court.model';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
     selector: 'app-court-billing',
@@ -16,6 +17,7 @@ import { BillingDashboard, CourtBilling, BillingTotals, MonthlyTrend, PaymentMet
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CourtBillingComponent implements OnInit {
+    private destroyRef = inject(DestroyRef);
     clubId = '';
     clubName = '';
     loading = true;
@@ -54,7 +56,9 @@ export class CourtBillingComponent implements OnInit {
     }
 
     ngOnInit() {
-        this.clubService.selectedClub$.subscribe(club => {
+        this.clubService.selectedClub$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(club => {
             if (club) {
                 this.clubId = club.id;
                 this.clubName = club.name;

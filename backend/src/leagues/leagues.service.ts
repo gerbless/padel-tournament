@@ -1,6 +1,4 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
 import { League, LeagueStatus } from './entities/league.entity';
 import { LeagueTeam } from './entities/league-team.entity';
 import { LeagueMatch, MatchStatus } from './entities/league-match.entity';
@@ -13,14 +11,7 @@ import { TenantService } from '../tenant/tenant.service';
 @Injectable()
 export class LeaguesService {
     constructor(
-        @InjectRepository(League)
-        private leagueRepository: Repository<League>,
-        @InjectRepository(LeagueTeam)
-        private leagueTeamRepository: Repository<LeagueTeam>,
-        @InjectRepository(LeagueMatch)
-        private leagueMatchRepository: Repository<LeagueMatch>,
-        private playersService: PlayersService,
-        private dataSource: DataSource,
+        private playersService: PlayersService
         private tenant: TenantService,
     ) { }
 

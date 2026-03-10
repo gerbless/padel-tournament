@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { Court } from './entities/court.entity';
 import { CourtPriceBlock } from './entities/court-price-block.entity';
 import { Reservation, ReservationStatus, PriceType, PaymentStatus } from './entities/reservation.entity';
@@ -23,18 +22,6 @@ export class CourtsService {
     private readonly logger = new Logger(CourtsService.name);
 
     constructor(
-        @InjectRepository(Court)
-        private courtRepository: Repository<Court>,
-        @InjectRepository(CourtPriceBlock)
-        private priceBlockRepository: Repository<CourtPriceBlock>,
-        @InjectRepository(Reservation)
-        private reservationRepository: Repository<Reservation>,
-        @InjectRepository(MercadoPagoPayment)
-        private mpPaymentRepository: Repository<MercadoPagoPayment>,
-        @InjectRepository(CourtBlock)
-        private courtBlockRepository: Repository<CourtBlock>,
-        @InjectRepository(FreePlayMatch)
-        private freePlayMatchRepository: Repository<FreePlayMatch>,
         private clubsService: ClubsService,
         private credentialsService: ClubCredentialsService,
         private usersService: UsersService,

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -7,6 +7,7 @@ import { ClubService } from '../../../services/club.service';
 import { ToastService } from '../../../services/toast.service';
 import { ConfirmService } from '../../../services/confirm.service';
 import { PaymentService } from '../../../services/payment.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 interface Booking {
     id: string;
@@ -32,6 +33,7 @@ interface Booking {
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MyBookingsComponent implements OnInit, OnDestroy {
+    private destroyRef = inject(DestroyRef);
     bookings: Booking[] = [];
     loading = true;
     clubId = '';
@@ -90,7 +92,9 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
         });
 
         // Check if MP is configured — done inside selectedClub$ so clubId is available
-        this.clubService.selectedClub$.subscribe(club => {
+        this.clubService.selectedClub$.pipe(
+            takeUntilDestroyed(this.destroyRef)
+        ).subscribe(club => {
             if (club) {
                 this.clubId = club.id;
                 this.clubName = club.name;

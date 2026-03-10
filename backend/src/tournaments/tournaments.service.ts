@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { Tournament, TournamentType, TournamentStatus, DurationMode } from './entities/tournament.entity';
 import { Team } from '../teams/entities/team.entity';
 import { Match, MatchStatus, MatchPhase } from '../matches/entities/match.entity';
@@ -72,14 +71,6 @@ function generateRoundRobinSchedule(teamCount: number): { round: number; pairing
 @Injectable()
 export class TournamentsService {
     constructor(
-        @InjectRepository(Tournament)
-        private tournamentRepository: Repository<Tournament>,
-        @InjectRepository(Team)
-        private teamRepository: Repository<Team>,
-        @InjectRepository(Match)
-        private matchRepository: Repository<Match>,
-        @InjectRepository(League)
-        private leagueRepository: Repository<League>,
         private playersService: PlayersService,
         private dataSource: DataSource,
         private tenant: TenantService,

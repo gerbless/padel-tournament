@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { Player } from './entities/player.entity';
 import { PlayerClubStats } from './entities/player-club-stats.entity';
+import { Team } from '../teams/entities/team.entity';
+import { LeagueTeam } from '../leagues/entities/league-team.entity';
 import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
@@ -10,8 +12,6 @@ export class PlayerRankingService {
     constructor(
         @InjectRepository(Player)
         private playerRepository: Repository<Player>,
-        @InjectRepository(PlayerClubStats)
-        private playerClubStatsRepository: Repository<PlayerClubStats>,
         private tenant: TenantService,
     ) { }
 
@@ -217,7 +217,7 @@ export class PlayerRankingService {
         };
 
         if (type === 'global' || type === 'tournament') {
-            let tournamentTeamsQuery = this.playerRepository.manager.getRepository('Team')
+            let tournamentTeamsQuery = this.tenant.getRepo(Team)
                 .createQueryBuilder('team')
                 .leftJoinAndSelect('team.matchesAsTeam1', 'matchesAsTeam1')
                 .leftJoinAndSelect('matchesAsTeam1.winner', 'winner1')
@@ -233,7 +233,7 @@ export class PlayerRankingService {
         }
 
         if (type === 'global' || type === 'league') {
-            let leagueTeamsQuery = this.playerRepository.manager.getRepository('LeagueTeam')
+            let leagueTeamsQuery = this.tenant.getRepo(LeagueTeam)
                 .createQueryBuilder('leagueTeam')
                 .leftJoin('leagueTeam.league', 'league');
 

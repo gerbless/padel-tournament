@@ -17,10 +17,6 @@ export class PlayersService {
     constructor(
         @InjectRepository(Player)
         private playerRepository: Repository<Player>,
-        @InjectRepository(PlayerClubStats)
-        private playerClubStatsRepository: Repository<PlayerClubStats>,
-        @InjectRepository(FreePlayMatch)
-        private freePlayMatchRepository: Repository<FreePlayMatch>,
         @InjectRepository(User)
         private userRepository: Repository<User>,
         private rankingService: PlayerRankingService,
@@ -231,14 +227,14 @@ export class PlayersService {
     async remove(id: string): Promise<void> {
         const player = await this.findOne(id);
 
-        // Check if player is part of any team (using counts)
-        const teamCount1 = await this.playerRepository.createQueryBuilder('player')
+        // Check if player is part of any team (using tenant-scoped repo for club tables)
+        const teamCount1 = await this.tenant.getRepo(Player).createQueryBuilder('player')
             .leftJoin('player.teamsAsPlayer1', 'team')
             .where('player.id = :id', { id })
             .andWhere('team.id IS NOT NULL')
             .getCount();
 
-        const teamCount2 = await this.playerRepository.createQueryBuilder('player')
+        const teamCount2 = await this.tenant.getRepo(Player).createQueryBuilder('player')
             .leftJoin('player.teamsAsPlayer2', 'team')
             .where('player.id = :id', { id })
             .andWhere('team.id IS NOT NULL')
@@ -256,7 +252,9 @@ export class PlayersService {
         if (uniqueIds.length === 0) return;
 
         // Single query: load ALL players with ALL relations at once (eliminates N+1)
-        const players = await this.playerRepository.createQueryBuilder('player')
+        // Use tenant-scoped repo so search_path includes the club schema
+        // (teams, matches, league_teams live in club schemas, not public)
+        const players = await this.tenant.getRepo(Player).createQueryBuilder('player')
             .leftJoinAndSelect('player.teamsAsPlayer1', 'tp1')
             .leftJoinAndSelect('tp1.tournament', 'tp1_tournament')
             .leftJoinAndSelect('tp1.matchesAsTeam1', 'tp1_m1')
