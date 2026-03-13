@@ -146,26 +146,21 @@ export class PlayerBookingComponent implements OnInit {
             date: this.selectedDate,
             startTime: slot.startTime,
             endTime: slot.endTime,
+            generatePaymentLink: this.mpConfigured,
         }).subscribe({
             next: (reservation) => {
-                if (this.mpConfigured && reservation?.id) {
-                    // Create MP preference and redirect
-                    this.paymentService.createPreference(reservation.id).subscribe({
-                        next: (pref) => {
-                            this.booking = false;
-                            this.toast.success('Reserva creada. Redirigiendo al pago...');
-                            this.cdr.markForCheck();
-                            // Redirect to Mercado Pago checkout
-                            window.location.href = pref.initPoint;
-                        },
-                        error: () => {
-                            // Reservation created but payment failed - still ok
-                            this.booking = false;
-                            this.toast.warning('Reserva creada, pero no se pudo iniciar el pago. Puedes pagar desde "Mis Reservas".');
-                            this.selectedSlot = null;
-                            this.loadSlots();
-                        }
-                    });
+                if (this.mpConfigured && reservation?.paymentPreference) {
+                    // Payment preference was generated atomically with the reservation
+                    this.booking = false;
+                    this.toast.success('Reserva creada. Redirigiendo al pago...');
+                    this.cdr.markForCheck();
+                    window.location.href = reservation.paymentPreference.initPoint;
+                } else if (this.mpConfigured && reservation?.id) {
+                    // Reservation created but payment link failed — redirect to "Mis Reservas"
+                    this.booking = false;
+                    this.toast.warning('Reserva creada, pero no se pudo iniciar el pago. Puedes pagar desde "Mis Reservas".');
+                    this.selectedSlot = null;
+                    this.loadSlots();
                 } else {
                     this.booking = false;
                     this.toast.success('¡Reserva confirmada!');

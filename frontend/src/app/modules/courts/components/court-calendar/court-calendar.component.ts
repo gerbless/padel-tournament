@@ -911,16 +911,16 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
             paymentStatus: this.reservationForm.paymentStatus,
             paymentMethod: this.reservationForm.paymentMethod || undefined,
             paymentNotes: this.reservationForm.paymentNotes || undefined,
-            playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null
+            playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null,
+            generatePaymentLinks: true,
         };
 
         if (this.editingReservation) {
-            // Update existing reservation to sync data, then generate links
+            // Update existing reservation + generate payment links atomically
             this.courtService.updateReservation(this.editingReservation.id, data).subscribe({
-                next: () => {
-                    // Re-snapshot so auto-refresh can detect future payment changes
+                next: (result: any) => {
                     this._syncSnapshotsAfterSave();
-                    this.doGeneratePaymentLinks(this.editingReservation!.id);
+                    this.handlePaymentLinksResponse(result);
                 },
                 error: (err) => {
                     this.paymentLinkLoading = false;
@@ -929,12 +929,13 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
                 }
             });
         } else {
+            // Create reservation + generate payment links atomically
             this.courtService.createReservation(data).subscribe({
-                next: (res: any) => {
-                    this.editingReservation = res;
+                next: (created: any) => {
+                    this.editingReservation = created;
                     this.loadReservations();
                     this.toast.success('Reserva creada');
-                    this.doGeneratePaymentLinks(res.id);
+                    this.handlePaymentLinksResponse(created);
                 },
                 error: (err) => {
                     this.paymentLinkLoading = false;
@@ -945,45 +946,32 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
         }
     }
 
-    private doGeneratePaymentLinks(reservationId: string) {
-        if (this.reservationForm.priceType === 'per_player' && this.reservationForm.playerPayments.length > 0) {
-            this.paymentService.createPerPlayerLinks(reservationId).subscribe({
-                next: (result) => {
-                    this.paymentLinks = result.links.map(l => ({
-                        playerName: l.playerName,
-                        amount: l.amount,
-                        paymentUrl: l.paymentUrl,
-                        shortUrl: l.shortUrl,
-                        status: l.status,
-                    }));
-                    this.paymentLinkLoading = false;
-                    this.cdr.markForCheck();
-                },
-                error: (err) => {
-                    this.paymentLinkError = err.error?.message || 'Error al generar links';
-                    this.paymentLinkLoading = false;
-                    this.cdr.markForCheck();
-                }
-            });
-        } else {
-            this.paymentService.createPaymentLink(reservationId).subscribe({
-                next: (result) => {
-                    this.paymentLinks = [{
-                        paymentUrl: result.paymentUrl,
-                        shortUrl: result.shortUrl,
-                        amount: this.reservationForm.finalPrice,
-                        status: 'pending',
-                    }];
-                    this.paymentLinkLoading = false;
-                    this.cdr.markForCheck();
-                },
-                error: (err) => {
-                    this.paymentLinkError = err.error?.message || 'Error al generar link';
-                    this.paymentLinkLoading = false;
-                    this.cdr.markForCheck();
-                }
-            });
+    private handlePaymentLinksResponse(response: any) {
+        if (response.paymentError || !response.paymentLinks) {
+            this.paymentLinkError = response.paymentError || 'Error al generar links de pago';
+            this.paymentLinkLoading = false;
+            this.cdr.markForCheck();
+            return;
         }
+        const isPerPlayer = this.reservationForm.priceType === 'per_player' && this.reservationForm.playerPayments.length > 0;
+        if (isPerPlayer) {
+            this.paymentLinks = response.paymentLinks.map((l: any) => ({
+                playerName: l.playerName,
+                amount: l.amount,
+                paymentUrl: l.paymentUrl,
+                shortUrl: l.shortUrl,
+                status: l.status,
+            }));
+        } else {
+            this.paymentLinks = [{
+                paymentUrl: response.paymentLinks[0]?.paymentUrl,
+                shortUrl: response.paymentLinks[0]?.shortUrl,
+                amount: response.paymentLinks[0]?.amount ?? this.reservationForm.finalPrice,
+                status: response.paymentLinks[0]?.status ?? 'pending',
+            }];
+        }
+        this.paymentLinkLoading = false;
+        this.cdr.markForCheck();
     }
 
     // ── Per-player link on demand ───────────────────────────
@@ -1011,15 +999,15 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
             paymentStatus: this.reservationForm.paymentStatus,
             paymentMethod: this.reservationForm.paymentMethod || undefined,
             paymentNotes: this.reservationForm.paymentNotes || undefined,
-            playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null
+            playerPayments: this.reservationForm.priceType === 'per_player' ? this.reservationForm.playerPayments : null,
+            generateSinglePlayerLink: playerIndex,
         };
 
         if (this.editingReservation) {
             this.courtService.updateReservation(this.editingReservation.id, data).subscribe({
-                next: () => {
-                    // Re-snapshot so auto-refresh can detect future payment changes
+                next: (result: any) => {
                     this._syncSnapshotsAfterSave();
-                    this.doGenerateSinglePlayerLink(this.editingReservation!.id, playerIndex);
+                    this.handleSinglePlayerLinkResponse(result, playerIndex);
                 },
                 error: (err) => {
                     this.paymentLinkError = err.error?.message || 'Error al guardar reserva';
@@ -1029,11 +1017,11 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
             });
         } else {
             this.courtService.createReservation(data).subscribe({
-                next: (res: any) => {
-                    this.editingReservation = res;
+                next: (created: any) => {
+                    this.editingReservation = created;
                     this.loadReservations();
                     this.toast.success('Reserva creada');
-                    this.doGenerateSinglePlayerLink(res.id, playerIndex);
+                    this.handleSinglePlayerLinkResponse(created, playerIndex);
                 },
                 error: (err) => {
                     this.paymentLinkError = err.error?.message || 'Error al crear reserva';
@@ -1044,25 +1032,23 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
         }
     }
 
-    private doGenerateSinglePlayerLink(reservationId: string, playerIndex: number) {
-        this.paymentService.createSinglePlayerLink(reservationId, playerIndex).subscribe({
-            next: (result) => {
-                this.paymentLinks = [{
-                    playerName: result.playerName,
-                    amount: result.amount,
-                    paymentUrl: result.paymentUrl,
-                    shortUrl: result.shortUrl,
-                    status: result.status,
-                }];
-                this.paymentLinkLoading = false;
-                this.cdr.markForCheck();
-            },
-            error: (err) => {
-                this.paymentLinkError = err.error?.message || 'Error al generar link';
-                this.paymentLinkLoading = false;
-                this.cdr.markForCheck();
-            }
-        });
+    private handleSinglePlayerLinkResponse(response: any, playerIndex: number) {
+        if (response.paymentError || !response.paymentLinks?.[0]) {
+            this.paymentLinkError = response.paymentError || 'Error al generar link';
+            this.paymentLinkLoading = false;
+            this.cdr.markForCheck();
+            return;
+        }
+        const link = response.paymentLinks[0];
+        this.paymentLinks = [{
+            playerName: link.playerName,
+            amount: link.amount,
+            paymentUrl: link.paymentUrl,
+            shortUrl: link.shortUrl,
+            status: link.status,
+        }];
+        this.paymentLinkLoading = false;
+        this.cdr.markForCheck();
     }
 
     // ── Score modal helpers ───────────────────────────

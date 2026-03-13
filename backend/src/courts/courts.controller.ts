@@ -8,12 +8,14 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClubRoleGuard } from '../auth/club-role.guard';
 import { ClubRoles } from '../auth/club-roles.decorator';
 import { PlayersService } from '../players/players.service';
+import { PaymentsService } from '../payments/payments.service';
 
 @Controller('courts')
 export class CourtsController {
     constructor(
         private readonly courtsService: CourtsService,
         private readonly playersService: PlayersService,
+        private readonly paymentsService: PaymentsService,
     ) { }
 
     // ==========================================
@@ -131,8 +133,37 @@ export class CourtsController {
     @UseGuards(JwtAuthGuard, ClubRoleGuard)
     @ClubRoles('editor')
     @Post('reservations')
-    createReservation(@Body() dto: CreateReservationDto) {
-        return this.courtsService.createReservation(dto);
+    async createReservation(@Body() dto: CreateReservationDto & {
+        generatePaymentLinks?: boolean;
+        generateSinglePlayerLink?: number;
+    }) {
+        const { generatePaymentLinks, generateSinglePlayerLink, ...reservationDto } = dto;
+        const reservation = await this.courtsService.createReservation(reservationDto as CreateReservationDto);
+
+        // Generate payment links atomically in the same request
+        if (generateSinglePlayerLink !== undefined && generateSinglePlayerLink !== null) {
+            try {
+                const link = await this.paymentsService.createSinglePlayerLink(reservation.id, generateSinglePlayerLink);
+                return { ...reservation, paymentLinks: [link] };
+            } catch (err) {
+                return { ...reservation, paymentLinks: null, paymentError: err.message };
+            }
+        }
+        if (generatePaymentLinks) {
+            try {
+                if (dto.priceType === 'per_player' && dto.playerPayments?.length > 0) {
+                    const result = await this.paymentsService.createPerPlayerPaymentLinks(reservation.id);
+                    return { ...reservation, paymentLinks: result.links };
+                } else {
+                    const result = await this.paymentsService.createPaymentLink(reservation.id);
+                    return { ...reservation, paymentLinks: [{ ...result, amount: reservation.finalPrice, status: 'pending' }] };
+                }
+            } catch (err) {
+                return { ...reservation, paymentLinks: null, paymentError: err.message };
+            }
+        }
+
+        return reservation;
     }
 
     @Get(':courtId/reservations')
@@ -156,8 +187,37 @@ export class CourtsController {
     @UseGuards(JwtAuthGuard, ClubRoleGuard)
     @ClubRoles('editor')
     @Patch('reservations/:id')
-    updateReservation(@Param('id') id: string, @Body() dto: Partial<CreateReservationDto>) {
-        return this.courtsService.updateReservation(id, dto);
+    async updateReservation(@Param('id') id: string, @Body() dto: Partial<CreateReservationDto> & {
+        generatePaymentLinks?: boolean;
+        generateSinglePlayerLink?: number;
+    }) {
+        const { generatePaymentLinks, generateSinglePlayerLink, ...reservationDto } = dto;
+        const reservation = await this.courtsService.updateReservation(id, reservationDto);
+
+        // Generate payment links atomically in the same request
+        if (generateSinglePlayerLink !== undefined && generateSinglePlayerLink !== null) {
+            try {
+                const link = await this.paymentsService.createSinglePlayerLink(id, generateSinglePlayerLink);
+                return { ...reservation, paymentLinks: [link] };
+            } catch (err) {
+                return { ...reservation, paymentLinks: null, paymentError: err.message };
+            }
+        }
+        if (generatePaymentLinks) {
+            try {
+                if (dto.priceType === 'per_player' && dto.playerPayments?.length > 0) {
+                    const result = await this.paymentsService.createPerPlayerPaymentLinks(id);
+                    return { ...reservation, paymentLinks: result.links };
+                } else {
+                    const result = await this.paymentsService.createPaymentLink(id);
+                    return { ...reservation, paymentLinks: [{ ...result, amount: reservation.finalPrice, status: 'pending' }] };
+                }
+            } catch (err) {
+                return { ...reservation, paymentLinks: null, paymentError: err.message };
+            }
+        }
+
+        return reservation;
     }
 
     @UseGuards(JwtAuthGuard, ClubRoleGuard)
@@ -249,9 +309,22 @@ export class CourtsController {
 
     @UseGuards(JwtAuthGuard)
     @Post('player-booking')
-    async createPlayerBooking(@Request() req, @Body() dto: { courtId: string; clubId: string; date: string; startTime: string; endTime: string }) {
+    async createPlayerBooking(@Request() req, @Body() dto: { courtId: string; clubId: string; date: string; startTime: string; endTime: string; generatePaymentLink?: boolean }) {
         const player = await this.playersService.findOne(req.user.playerId);
-        return this.courtsService.createPlayerBooking(req.user.userId, req.user.playerId, player.name, dto);
+        const reservation = await this.courtsService.createPlayerBooking(req.user.userId, req.user.playerId, player.name, dto);
+
+        // Generate payment preference in the same request to avoid race conditions
+        if (dto.generatePaymentLink && reservation?.id) {
+            try {
+                const pref = await this.paymentsService.createPreference(reservation.id, req.user.email);
+                return { ...reservation, paymentPreference: pref };
+            } catch (err) {
+                // Reservation was created successfully — return it even if payment link fails
+                return { ...reservation, paymentPreference: null, paymentError: err.message };
+            }
+        }
+
+        return reservation;
     }
 
     @UseGuards(JwtAuthGuard)
