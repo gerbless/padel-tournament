@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual, Not } from 'typeorm';
+import { Repository, LessThanOrEqual, Not, QueryRunner } from 'typeorm';
 import { MercadoPagoPayment, MercadoPagoPaymentStatus } from './entities/mercadopago-payment.entity';
 import { Reservation, PaymentStatus, PaymentMethod, ReservationStatus } from '../courts/entities/reservation.entity';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
@@ -187,14 +187,46 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Create a checkout preference for a reservation
+     * Create a checkout preference for a reservation.
+     * Uses a DEDICATED QueryRunner (isolated from the interceptor's QR)
+     * so the search_path is guaranteed throughout the entire operation.
      */
-    async createPreference(reservationId: string, payerEmail?: string): Promise<{
+    async createPreference(reservationId: string, payerEmail?: string, clubId?: string): Promise<{
         preferenceId: string;
         initPoint: string;
         externalReference: string;
     }> {
-        const reservation = await this.tenant.getRepo(Reservation).findOne({
+        // Resolve clubId and create an isolated QR with the correct search_path
+        const cid = clubId || this.tenant.getCurrentClubId();
+        if (!cid) {
+            throw new BadRequestException('Se requiere contexto de club para crear preferencia de pago.');
+        }
+
+        const qr = await this.tenant.createQueryRunner(cid);
+        try {
+            return await this._createPreferenceWithQR(qr, reservationId, payerEmail);
+        } finally {
+            await qr.query('SET search_path TO public').catch(() => {});
+            await qr.release();
+        }
+    }
+
+    /**
+     * Internal: runs createPreference logic using the provided QueryRunner.
+     */
+    private async _createPreferenceWithQR(
+        qr: QueryRunner,
+        reservationId: string,
+        payerEmail?: string,
+    ): Promise<{
+        preferenceId: string;
+        initPoint: string;
+        externalReference: string;
+    }> {
+        const reservationRepo = qr.manager.getRepository(Reservation);
+        const mpRepo = qr.manager.getRepository(MercadoPagoPayment);
+
+        const reservation = await reservationRepo.findOne({
             where: { id: reservationId },
             relations: ['court'],
         });
@@ -207,7 +239,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         }
 
         // Reuse existing pending/rejected payment record for this reservation
-        const existingPayment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
+        const existingPayment = await mpRepo.findOne({
             where: { reservationId },
             order: { createdAt: 'DESC' },
         });
@@ -227,11 +259,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                 patchFields.status = MercadoPagoPaymentStatus.PENDING;
             }
             if (Object.keys(patchFields).length > 0) {
-                await this.tenant.getRepo(MercadoPagoPayment).update(existingPayment.id, patchFields);
+                await mpRepo.update(existingPayment.id, patchFields);
             }
 
             // Reset payment deadline
-            await this.tenant.getRepo(Reservation).update(reservationId, {
+            await reservationRepo.update(reservationId, {
                 paymentExpiresAt: new Date(Date.now() + this.paymentExpiryMs),
             });
 
@@ -285,7 +317,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
             // If there's an old record (e.g. cancelled), update it instead of creating new
             if (existingPayment) {
-                await this.tenant.getRepo(MercadoPagoPayment).update(existingPayment.id, {
+                await mpRepo.update(existingPayment.id, {
                     preferenceId: preferenceResponse.id,
                     externalReference,
                     amount,
@@ -300,7 +332,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                 this.logger.log(`✅ Updated existing payment record with new preference: ${preferenceResponse.id}`);
             } else {
                 // First time — insert new record
-                await this.tenant.getRepo(MercadoPagoPayment).insert({
+                await mpRepo.insert({
                     reservationId,
                     clubId: reservation.clubId,
                     preferenceId: preferenceResponse.id,
@@ -314,7 +346,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             }
 
             // Set payment deadline
-            await this.tenant.getRepo(Reservation).update(reservationId, {
+            await reservationRepo.update(reservationId, {
                 paymentExpiresAt: new Date(Date.now() + this.paymentExpiryMs),
             });
 

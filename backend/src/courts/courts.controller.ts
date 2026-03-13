@@ -318,7 +318,7 @@ export class CourtsController {
         // Generate payment preference in the same request to avoid race conditions
         if (dto.generatePaymentLink && reservation?.id) {
             try {
-                const pref = await this.paymentsService.createPreference(reservation.id, req.user.email);
+                const pref = await this.paymentsService.createPreference(reservation.id, req.user.email, dto.clubId);
                 return { ...reservation, paymentPreference: pref };
             } catch (err) {
                 // Reservation was created successfully — return it even if payment link fails
