@@ -218,16 +218,16 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             existingPayment.status !== MercadoPagoPaymentStatus.APPROVED) {
             this.logger.log(`Reusing existing preference ${existingPayment.preferenceId} for reservation ${reservationId}`);
 
-            // Update payer email if provided
+            // Update payer email and/or status if needed
+            const patchFields: Partial<MercadoPagoPayment> = {};
             if (payerEmail && existingPayment.payerEmail !== payerEmail) {
-                existingPayment.payerEmail = payerEmail;
-                await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
+                patchFields.payerEmail = payerEmail;
             }
-
-            // Reset status back to pending for retry
             if (existingPayment.status !== MercadoPagoPaymentStatus.PENDING) {
-                existingPayment.status = MercadoPagoPaymentStatus.PENDING;
-                await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
+                patchFields.status = MercadoPagoPaymentStatus.PENDING;
+            }
+            if (Object.keys(patchFields).length > 0) {
+                await this.tenant.getRepo(MercadoPagoPayment).update(existingPayment.id, patchFields);
             }
 
             // Reset payment deadline
@@ -285,21 +285,22 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
             // If there's an old record (e.g. cancelled), update it instead of creating new
             if (existingPayment) {
-                existingPayment.preferenceId = preferenceResponse.id;
-                existingPayment.externalReference = externalReference;
-                existingPayment.amount = amount;
-                existingPayment.description = description;
-                existingPayment.payerEmail = payerEmail || existingPayment.payerEmail;
-                existingPayment.status = MercadoPagoPaymentStatus.PENDING;
-                existingPayment.mpPaymentId = null;
-                existingPayment.mpData = null;
-                existingPayment.statusDetail = null;
-                existingPayment.paymentMethod = null;
-                await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
+                await this.tenant.getRepo(MercadoPagoPayment).update(existingPayment.id, {
+                    preferenceId: preferenceResponse.id,
+                    externalReference,
+                    amount,
+                    description,
+                    payerEmail: payerEmail || existingPayment.payerEmail,
+                    status: MercadoPagoPaymentStatus.PENDING,
+                    mpPaymentId: null,
+                    mpData: null,
+                    statusDetail: null,
+                    paymentMethod: null,
+                });
                 this.logger.log(`✅ Updated existing payment record with new preference: ${preferenceResponse.id}`);
             } else {
-                // First time — create new record
-                const mpPayment = this.tenant.getRepo(MercadoPagoPayment).create({
+                // First time — insert new record
+                await this.tenant.getRepo(MercadoPagoPayment).insert({
                     reservationId,
                     clubId: reservation.clubId,
                     preferenceId: preferenceResponse.id,
@@ -309,7 +310,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     payerEmail: payerEmail || null,
                     status: MercadoPagoPaymentStatus.PENDING,
                 });
-                await this.tenant.getRepo(MercadoPagoPayment).save(mpPayment);
                 this.logger.log(`✅ Created new payment record with preference: ${preferenceResponse.id}`);
             }
 
@@ -451,25 +451,25 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
             // Create or update payment record
             if (existingPayment) {
-                existingPayment.preferenceId = preferenceResponse.id;
-                existingPayment.externalReference = externalReference;
-                existingPayment.amount = amount;
-                existingPayment.description = description;
-                existingPayment.status = MercadoPagoPaymentStatus.PENDING;
-                existingPayment.mpPaymentId = null;
-                existingPayment.mpData = null;
-                existingPayment.statusDetail = null;
-                existingPayment.paymentMethod = null;
-                await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
+                await this.tenant.getRepo(MercadoPagoPayment).update(existingPayment.id, {
+                    preferenceId: preferenceResponse.id,
+                    externalReference,
+                    amount,
+                    description,
+                    status: MercadoPagoPaymentStatus.PENDING,
+                    mpPaymentId: null,
+                    mpData: null,
+                    statusDetail: null,
+                    paymentMethod: null,
+                });
             } else {
-                const mpPayment = this.tenant.getRepo(MercadoPagoPayment).create({
+                await this.tenant.getRepo(MercadoPagoPayment).insert({
                     reservationId, clubId: reservation.clubId,
                     preferenceId: preferenceResponse.id, externalReference,
                     amount, description, playerIndex, playerName,
                     playerId: playerIdFromPP,
                     status: MercadoPagoPaymentStatus.PENDING,
                 });
-                await this.tenant.getRepo(MercadoPagoPayment).save(mpPayment);
             }
 
             const paymentUrl = preferenceResponse.init_point;
@@ -579,18 +579,19 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
                 // Create or update payment record
                 if (existingPayment) {
-                    existingPayment.preferenceId = preferenceResponse.id;
-                    existingPayment.externalReference = externalReference;
-                    existingPayment.amount = amount;
-                    existingPayment.description = description;
-                    existingPayment.status = MercadoPagoPaymentStatus.PENDING;
-                    existingPayment.mpPaymentId = null;
-                    existingPayment.mpData = null;
-                    existingPayment.statusDetail = null;
-                    existingPayment.paymentMethod = null;
-                    await this.tenant.getRepo(MercadoPagoPayment).save(existingPayment);
+                    await this.tenant.getRepo(MercadoPagoPayment).update(existingPayment.id, {
+                        preferenceId: preferenceResponse.id,
+                        externalReference,
+                        amount,
+                        description,
+                        status: MercadoPagoPaymentStatus.PENDING,
+                        mpPaymentId: null,
+                        mpData: null,
+                        statusDetail: null,
+                        paymentMethod: null,
+                    });
                 } else {
-                    const mpPayment = this.tenant.getRepo(MercadoPagoPayment).create({
+                    await this.tenant.getRepo(MercadoPagoPayment).insert({
                         reservationId,
                         clubId: reservation.clubId,
                         preferenceId: preferenceResponse.id,
@@ -602,7 +603,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                         playerId: pp.playerId || null,
                         status: MercadoPagoPaymentStatus.PENDING,
                     });
-                    await this.tenant.getRepo(MercadoPagoPayment).save(mpPayment);
                 }
 
                 const paymentUrl = preferenceResponse.init_point;
@@ -681,7 +681,12 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             this.logger.log(`½ Partial payment for reservation ${reservationId}: ${paidNames} – timer cleared`);
         }
 
-        await this.tenant.getRepo(Reservation).save(reservation);
+        await this.tenant.getRepo(Reservation).update(reservationId, {
+            playerPayments: reservation.playerPayments,
+            paymentStatus: reservation.paymentStatus,
+            paymentNotes: reservation.paymentNotes,
+            paymentExpiresAt: reservation.paymentExpiresAt,
+        });
     }
 
     /**
@@ -718,7 +723,12 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
             this.logger.log(`½ Partial payment for reservation ${reservationId}: ${paidNames} – timer cleared`);
         }
 
-        await reservationRepo.save(reservation);
+        await reservationRepo.update(reservationId, {
+            playerPayments: reservation.playerPayments,
+            paymentStatus: reservation.paymentStatus,
+            paymentNotes: reservation.paymentNotes,
+            paymentExpiresAt: reservation.paymentExpiresAt,
+        });
     }
 
     /**
@@ -824,7 +834,13 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                 payment.statusDetail = statusDetail;
                 payment.paymentMethod = mpPayment.payment_method_id || null;
                 payment.mpData = mpPayment;
-                await mpRepo.save(payment);
+                await mpRepo.update(payment.id, {
+                    mpPaymentId: String(paymentId),
+                    status: this.mapMpStatus(status),
+                    statusDetail,
+                    paymentMethod: mpPayment.payment_method_id || null,
+                    mpData: mpPayment as any,
+                });
 
                 // If approved, update reservation payment status and send confirmation email
                 if (status === 'approved') {
@@ -912,7 +928,13 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                 payment.statusDetail = mpPayment.status_detail;
                 payment.paymentMethod = mpPayment.payment_method_id || null;
                 payment.mpData = mpPayment;
-                await this.tenant.getRepo(MercadoPagoPayment).save(payment);
+                await this.tenant.getRepo(MercadoPagoPayment).update(payment.id, {
+                    mpPaymentId: String(mpPayment.id),
+                    status: this.mapMpStatus(mpStatus),
+                    statusDetail: mpPayment.status_detail,
+                    paymentMethod: mpPayment.payment_method_id || null,
+                    mpData: mpPayment,
+                });
 
                 // If approved, update reservation and send confirmation email
                 if (payment.reservationId) {
