@@ -795,7 +795,11 @@ export class CourtsService {
             return [];
         }
 
-        return this.tenant.run(cid, async (em) => {
+        return this.tenant.run(cid, async (em, qr) => {
+            // Verify the search_path inside the callback
+            const sp = await qr.query('SHOW search_path');
+            this.logger.log(`getPlayerBookings: inside tenant.run, search_path=${sp?.[0]?.search_path}`);
+
             const reservationRepo = em.getRepository(Reservation);
             const mpPaymentRepo = em.getRepository(MercadoPagoPayment);
 

@@ -176,9 +176,14 @@ export class TenantService {
         await qr.connect();
         try {
             await qr.query(`SET search_path TO "${schemaName}", public`);
+            // Verify the search_path was actually set
+            const verifyResult = await qr.query('SHOW search_path');
+            if (isDev) {
+                this.logger.log(`tenant.run(${clubId}): search_path=${verifyResult?.[0]?.search_path}, qr.isReleased=${qr.isReleased}`);
+            }
             return await fn(qr.manager, qr);
         } finally {
-            await qr.query(`SET search_path TO public`);
+            try { await qr.query(`SET search_path TO public`); } catch {}
             await qr.release();
         }
     }
