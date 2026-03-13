@@ -889,6 +889,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                             paymentNotes: `Pagado via Mercado Pago (ID: ${paymentId})`,
                             paymentExpiresAt: null,
                         });
+                        console.log(`\u2705 Reservation ${payment.reservationId} marked as PAID via webhook`);
+                        console.log(`Sending confirmation email to ${payment.payerEmail} for reservation ${payment.reservationId}`);
                         await this.sendPaymentConfirmationEmailWithRepo(reservationRepo, payment.reservationId, String(paymentId), payment.payerEmail);
                     }
                 } else if (statusDetail === 'pending_contingency') {
