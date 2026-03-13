@@ -227,7 +227,7 @@ export class CourtsService {
             }
         }
 
-        const reservation = this.tenant.getRepo(Reservation).create({
+        const data: Partial<Reservation> = {
             courtId: dto.courtId,
             clubId: dto.clubId,
             date: dto.date,
@@ -243,8 +243,10 @@ export class CourtsService {
             paymentMethod: (dto.paymentMethod as any) || null,
             paymentNotes: dto.paymentNotes,
             playerPayments: dto.playerPayments || null,
-        } as Partial<Reservation>);
-        return this.tenant.getRepo(Reservation).save(reservation as Reservation);
+        };
+        const insertResult = await this.tenant.getRepo(Reservation).insert(data as any);
+        const newId = insertResult.identifiers[0].id;
+        return this.tenant.getRepo(Reservation).findOne({ where: { id: newId } });
     }
 
     async getReservations(courtId: string, startDate: string, endDate: string): Promise<Reservation[]> {
@@ -304,15 +306,16 @@ export class CourtsService {
             }
         }
 
-        Object.assign(reservation, dto);
-        return this.tenant.getRepo(Reservation).save(reservation);
+        await this.tenant.getRepo(Reservation).update(id, dto as any);
+        return this.tenant.getRepo(Reservation).findOne({ where: { id } });
     }
 
     async cancelReservation(id: string): Promise<Reservation> {
         const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id } });
         if (!reservation) throw new NotFoundException(`Reservation ${id} not found`);
+        await this.tenant.getRepo(Reservation).update(id, { status: ReservationStatus.CANCELLED });
         reservation.status = ReservationStatus.CANCELLED;
-        return this.tenant.getRepo(Reservation).save(reservation);
+        return reservation;
     }
 
     // ==========================================
@@ -725,14 +728,20 @@ export class CourtsService {
 
     /** Fire-and-forget: sends email and/or WhatsApp booking confirmation. */
     private async sendBookingNotifications(userId: string, reservation: Reservation, clubId: string, playerName: string): Promise<void> {
-        // Load club and user in parallel
-        const [club, user, court] = await Promise.all([
-            this.clubsService.findOne(clubId).catch(() => null),
-            this.usersService.findById(userId).catch(() => null),
-            this.tenant.getRepo(Court).findOne({ where: { id: reservation.courtId } }).catch(() => null),
-        ]);
+        // Check if MP is active first — if so, no manual notification needed.
+        // IMPORTANT: query club info BEFORE any tenant-scoped queries to avoid
+        // sharing the request's QR in a fire-and-forget async context.
+        const club = await this.clubsService.findOne(clubId).catch(() => null);
+        if (!club || club.enablePayments !== false) return; // MP is active — skip
 
-        if (!club || club.enablePayments !== false) return; // MP is active — no manual notification needed
+        // MP is disabled — send booking confirmation notification.
+        // Use tenant.run() for an independent QR so we don't share the request's QR.
+        const [user, court] = await Promise.all([
+            this.usersService.findById(userId).catch(() => null),
+            this.tenant.run(clubId, em =>
+                em.getRepository(Court).findOne({ where: { id: reservation.courtId } })
+            ).catch(() => null),
+        ]);
 
         const courtName = court?.name ?? 'Cancha';
         const clubName  = club.name;
@@ -834,7 +843,7 @@ export class CourtsService {
         }
 
         // Delete the reservation (cascades to mercadopago_payments via FK)
-        await this.tenant.getRepo(Reservation).remove(reservation);
+        await this.tenant.getRepo(Reservation).delete(reservationId);
 
         // Return the deleted entity (id will be gone but data is still in memory)
         return reservation;
@@ -945,28 +954,34 @@ export class CourtsService {
 
         if (match) {
             // Update existing
-            match.team1PlayerIds = data.team1PlayerIds;
-            match.team2PlayerIds = data.team2PlayerIds;
-            match.team1Names = data.team1Names;
-            match.team2Names = data.team2Names;
-            match.sets = data.sets;
-            match.winner = winner;
-            match.status = status;
-            match.countsForRanking = data.countsForRanking;
-            match.pointsPerWin = data.pointsPerWin;
+            const updateFields = {
+                team1PlayerIds: data.team1PlayerIds,
+                team2PlayerIds: data.team2PlayerIds,
+                team1Names: data.team1Names,
+                team2Names: data.team2Names,
+                sets: data.sets,
+                winner,
+                status,
+                countsForRanking: data.countsForRanking,
+                pointsPerWin: data.pointsPerWin,
+            };
+            await this.tenant.getRepo(FreePlayMatch).update(match.id, updateFields as any);
+            Object.assign(match, updateFields);
         } else {
             // Create new
-            match = this.tenant.getRepo(FreePlayMatch).create({
+            const insertData = {
                 ...data,
                 winner,
                 status,
-            });
+            };
+            const result = await this.tenant.getRepo(FreePlayMatch).insert(insertData as any);
+            match = { ...insertData, id: result.identifiers[0].id } as FreePlayMatch;
         }
 
         // Also update reservation countsForRanking flag
         await this.tenant.getRepo(Reservation).update(data.reservationId, { countsForRanking: data.countsForRanking });
 
-        return this.tenant.getRepo(FreePlayMatch).save(match);
+        return match;
     }
 
     async deleteFreePlayMatch(reservationId: string): Promise<void> {

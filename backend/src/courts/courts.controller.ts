@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpCode, HttpStatus, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpCode, HttpStatus, UseGuards, Request, Logger } from '@nestjs/common';
 import { CourtsService } from './courts.service';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { CreatePriceBlockDto } from './dto/create-price-block.dto';
@@ -12,6 +12,8 @@ import { PaymentsService } from '../payments/payments.service';
 
 @Controller('courts')
 export class CourtsController {
+    private readonly logger = new Logger(CourtsController.name);
+
     constructor(
         private readonly courtsService: CourtsService,
         private readonly playersService: PlayersService,
@@ -320,6 +322,7 @@ export class CourtsController {
                 return { ...reservation, paymentPreference: pref };
             } catch (err) {
                 // Reservation was created successfully — return it even if payment link fails
+                this.logger.error(`❌ createPreference failed for reservation ${reservation.id}: ${err.message}`, err.stack);
                 return { ...reservation, paymentPreference: null, paymentError: err.message };
             }
         }
