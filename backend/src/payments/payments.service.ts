@@ -860,18 +860,17 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     return;
                 }
 
-                // Update payment record
-                payment.mpPaymentId = String(paymentId);
-                payment.status = this.mapMpStatus(status);
-                payment.statusDetail = statusDetail;
-                payment.paymentMethod = mpPayment.payment_method_id || null;
-                payment.mpData = mpPayment;
+                // Resolve payer email: prefer stored, fall back to MP payer info
+                const resolvedPayerEmail = payment.payerEmail || mpPayment.payer?.email || null;
+
+                // Update payment record (including payerEmail if we resolved it from MP)
                 await mpRepo.update(payment.id, {
                     mpPaymentId: String(paymentId),
                     status: this.mapMpStatus(status),
                     statusDetail,
                     paymentMethod: mpPayment.payment_method_id || null,
                     mpData: mpPayment as any,
+                    ...(resolvedPayerEmail && !payment.payerEmail ? { payerEmail: resolvedPayerEmail } : {}),
                 });
 
                 // If approved, update reservation payment status and send confirmation email
@@ -889,9 +888,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                             paymentNotes: `Pagado via Mercado Pago (ID: ${paymentId})`,
                             paymentExpiresAt: null,
                         });
-                        console.log(`\u2705 Reservation ${payment.reservationId} marked as PAID via webhook`);
-                        console.log(`Sending confirmation email to ${payment.payerEmail} for reservation ${payment.reservationId}`);
-                        await this.sendPaymentConfirmationEmailWithRepo(reservationRepo, payment.reservationId, String(paymentId), payment.payerEmail);
+                        this.logger.log(`\u2705 Reservation ${payment.reservationId} marked as PAID via webhook`);
+                        this.logger.log(`Sending confirmation email to ${resolvedPayerEmail} for reservation ${payment.reservationId}`);
+                        await this.sendPaymentConfirmationEmailWithRepo(reservationRepo, payment.reservationId, String(paymentId), resolvedPayerEmail);
                     }
                 } else if (statusDetail === 'pending_contingency') {
                     this.logger.log(`⏳ Payment pending_contingency for reservation ${payment.reservationId} – clearing deadline`);
@@ -967,13 +966,17 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
                     this.logger.log(`Sync: Payment ${mpPayment.id} for ref ${payment.externalReference} status=${mpStatus}`);
 
-                    // Update our record
+                    // Resolve payer email: prefer stored, fall back to MP payer info
+                    const syncPayerEmail = payment.payerEmail || mpPayment.payer?.email || null;
+
+                    // Update our record (including payerEmail if we resolved it from MP)
                     await mpRepo.update(payment.id, {
                         mpPaymentId: String(mpPayment.id),
                         status: this.mapMpStatus(mpStatus),
                         statusDetail: mpPayment.status_detail,
                         paymentMethod: mpPayment.payment_method_id || null,
                         mpData: mpPayment as any,
+                        ...(syncPayerEmail && !payment.payerEmail ? { payerEmail: syncPayerEmail } : {}),
                     });
 
                     // If approved, update reservation and send confirmation email
@@ -985,7 +988,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                                 paymentExpiresAt: null,
                             });
                             this.logger.log(`\u2705 Reservation ${payment.reservationId} marked as PAID via sync`);
-                            await this.sendPaymentConfirmationEmailWithRepo(reservationRepo, payment.reservationId, String(mpPayment.id), payment.payerEmail);
+                            await this.sendPaymentConfirmationEmailWithRepo(reservationRepo, payment.reservationId, String(mpPayment.id), syncPayerEmail);
                         } else if (mpPayment.status_detail === 'pending_contingency') {
                             this.logger.log(`\u23f3 Payment pending_contingency for reservation ${payment.reservationId} via sync \u2013 clearing deadline`);
                             await reservationRepo.update(payment.reservationId, {
