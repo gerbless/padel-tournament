@@ -796,21 +796,17 @@ export class CourtsService {
         }
 
         return this.tenant.run(cid, async (em, qr) => {
-            // Verify the search_path inside the callback
-            const sp = await qr.query('SHOW search_path');
-            this.logger.log(`getPlayerBookings: inside tenant.run, search_path=${sp?.[0]?.search_path}`);
-
-            const reservationRepo = em.getRepository(Reservation);
-            const mpPaymentRepo = em.getRepository(MercadoPagoPayment);
-
-            const qb = reservationRepo
-                .createQueryBuilder('r')
+            // Use em.createQueryBuilder() directly — this guarantees the QR
+            // is passed through EntityManager.queryRunner, unlike
+            // repo.createQueryBuilder() which can lose the QR reference
+            // in some TypeORM 0.3.x versions.
+            const reservations = await em
+                .createQueryBuilder(Reservation, 'r')
                 .leftJoinAndSelect('r.court', 'court')
                 .where("r.title LIKE :pattern", { pattern: `%${playerName}%` })
                 .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
-                .andWhere('r.clubId = :clubId', { clubId: cid });
-
-            const reservations = await qb.orderBy('r.date', 'DESC')
+                .andWhere('r.clubId = :clubId', { clubId: cid })
+                .orderBy('r.date', 'DESC')
                 .addOrderBy('r.startTime', 'ASC')
                 .getMany();
 
@@ -818,8 +814,8 @@ export class CourtsService {
             const reservationIds = reservations.map(r => r.id);
             let mpPaymentMap: Record<string, { status: string; statusDetail: string | null }> = {};
             if (reservationIds.length > 0) {
-                const mpPayments = await mpPaymentRepo
-                    .createQueryBuilder('mp')
+                const mpPayments = await em
+                    .createQueryBuilder(MercadoPagoPayment, 'mp')
                     .where('mp.reservationId IN (:...ids)', { ids: reservationIds })
                     .orderBy('mp.createdAt', 'DESC')
                     .getMany();
@@ -840,24 +836,30 @@ export class CourtsService {
     }
 
     async cancelPlayerBooking(playerId: string, playerName: string, reservationId: string): Promise<Reservation> {
-        const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id: reservationId } });
-        if (!reservation) throw new NotFoundException('Reserva no encontrada');
+        const cid = this.tenant.getCurrentClubId();
+        if (!cid) throw new BadRequestException('Se requiere contexto de club');
 
-        // Verify this reservation belongs to this player
-        if (!reservation.title?.includes(playerName)) {
-            throw new ForbiddenException('No tienes permiso para cancelar esta reserva');
-        }
+        return this.tenant.run(cid, async (em) => {
+            const reservationRepo = em.getRepository(Reservation);
+            const reservation = await reservationRepo.findOne({ where: { id: reservationId } });
+            if (!reservation) throw new NotFoundException('Reserva no encontrada');
 
-        // Prevent cancellation of paid reservations
-        if (reservation.paymentStatus === PaymentStatus.PAID) {
-            throw new ForbiddenException('No puedes cancelar una reserva que ya fue pagada');
-        }
+            // Verify this reservation belongs to this player
+            if (!reservation.title?.includes(playerName)) {
+                throw new ForbiddenException('No tienes permiso para cancelar esta reserva');
+            }
 
-        // Delete the reservation (cascades to mercadopago_payments via FK)
-        await this.tenant.getRepo(Reservation).delete(reservationId);
+            // Prevent cancellation of paid reservations
+            if (reservation.paymentStatus === PaymentStatus.PAID) {
+                throw new ForbiddenException('No puedes cancelar una reserva que ya fue pagada');
+            }
 
-        // Return the deleted entity (id will be gone but data is still in memory)
-        return reservation;
+            // Delete the reservation (cascades to mercadopago_payments via FK)
+            await reservationRepo.delete(reservationId);
+
+            // Return the deleted entity (id will be gone but data is still in memory)
+            return reservation;
+        });
     }
 
     // ==========================================
