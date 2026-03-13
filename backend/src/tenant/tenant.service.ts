@@ -164,21 +164,13 @@ export class TenantService {
     /**
      * Execute `fn` within a club's schema context.
      *
-     * If the TenantInterceptor has already set the search_path for the
-     * same club, the existing EntityManager is reused (no extra connection).
-     * Otherwise acquires a dedicated QueryRunner, sets search_path,
-     * executes fn, and cleans up.
+     * ALWAYS acquires a dedicated QueryRunner with its own search_path
+     * to guarantee isolation from the interceptor's shared QR.
      */
     async run<T>(
         clubId: string,
         fn: (em: EntityManager, qr: QueryRunner) => Promise<T>,
     ): Promise<T> {
-        // Reuse interceptor-created context if it matches the requested club
-        const store = tenantContext.getStore();
-        if (store?.entityManager && store?.queryRunner && store.clubId === clubId) {
-            return fn(store.entityManager, store.queryRunner);
-        }
-
         const schemaName = await this.getSchemaName(clubId);
         const qr = this.dataSource.createQueryRunner();
         await qr.connect();
