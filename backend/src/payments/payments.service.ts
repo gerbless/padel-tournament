@@ -914,96 +914,98 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Sync payment status from MP API (called when user returns from checkout)
+     * Sync payment status from MP API (called when user returns from checkout).
+     * Uses tenant.run() for a dedicated QR with guaranteed search_path.
      */
     async syncPaymentStatus(reservationId: string): Promise<{ status: string; synced: boolean }> {
-        const payment = await this.tenant.getRepo(MercadoPagoPayment).findOne({
-            where: { reservationId },
-            order: { createdAt: 'DESC' },
-        });
-
-        if (!payment) {
-            return { status: 'no_payment', synced: false };
+        const clubId = this.tenant.getCurrentClubId();
+        if (!clubId) {
+            this.logger.warn('syncPaymentStatus called without tenant context');
+            return { status: 'no_context', synced: false };
         }
 
-        // If already approved, no need to sync
-        if (payment.status === MercadoPagoPaymentStatus.APPROVED) {
-            return { status: 'approved', synced: false };
-        }
+        return this.tenant.run(clubId, async (em) => {
+            const mpRepo = em.getRepository(MercadoPagoPayment);
+            const reservationRepo = em.getRepository(Reservation);
 
-        // Search for payments by external_reference via MP API
-        if (!this.paymentClient) {
-            return { status: payment.status, synced: false };
-        }
+            const payment = await mpRepo.findOne({
+                where: { reservationId },
+                order: { createdAt: 'DESC' },
+            });
 
-        try {
-            // Use the MP Payment Search API
-            const searchResponse = await fetch(
-                `https://api.mercadopago.com/v1/payments/search?external_reference=${payment.externalReference}&sort=date_created&criteria=desc`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.configService.get<string>('MP_ACCESS_TOKEN')}`,
-                    },
-                }
-            );
-            const searchData = await searchResponse.json();
+            if (!payment) {
+                return { status: 'no_payment', synced: false };
+            }
 
-            if (searchData.results && searchData.results.length > 0) {
-                const mpPayment = searchData.results[0];
-                const mpStatus = mpPayment.status;
+            // If already approved, no need to sync
+            if (payment.status === MercadoPagoPaymentStatus.APPROVED) {
+                return { status: 'approved', synced: false };
+            }
 
-                this.logger.log(`Sync: Payment ${mpPayment.id} for ref ${payment.externalReference} status=${mpStatus}`);
+            // Search for payments by external_reference via MP API
+            if (!this.paymentClient) {
+                return { status: payment.status, synced: false };
+            }
 
-                // Update our record
-                payment.mpPaymentId = String(mpPayment.id);
-                payment.status = this.mapMpStatus(mpStatus);
-                payment.statusDetail = mpPayment.status_detail;
-                payment.paymentMethod = mpPayment.payment_method_id || null;
-                payment.mpData = mpPayment;
-                await this.tenant.getRepo(MercadoPagoPayment).update(payment.id, {
-                    mpPaymentId: String(mpPayment.id),
-                    status: this.mapMpStatus(mpStatus),
-                    statusDetail: mpPayment.status_detail,
-                    paymentMethod: mpPayment.payment_method_id || null,
-                    mpData: mpPayment,
-                });
+            try {
+                // Use the MP Payment Search API
+                const searchResponse = await fetch(
+                    `https://api.mercadopago.com/v1/payments/search?external_reference=${payment.externalReference}&sort=date_created&criteria=desc`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${this.configService.get<string>('MP_ACCESS_TOKEN')}`,
+                        },
+                    }
+                );
+                const searchData = await searchResponse.json();
 
-                // If approved, update reservation and send confirmation email
-                if (payment.reservationId) {
-                    if (mpStatus === 'approved') {
-                        await this.tenant.getRepo(Reservation).update(payment.reservationId, {
-                            paymentStatus: PaymentStatus.PAID,
-                            paymentNotes: `Pagado via Mercado Pago (ID: ${mpPayment.id})`,
-                            paymentExpiresAt: null, // Clear deadline
-                        });
-                        this.logger.log(`✅ Reservation ${payment.reservationId} marked as PAID via sync`);
-                        // Send confirmation email
-                        await this.sendPaymentConfirmationEmail(payment.reservationId, String(mpPayment.id), payment.payerEmail);
-                    } else if (mpPayment.status_detail === 'pending_contingency') {
-                        this.logger.log(`⏳ Payment pending_contingency for reservation ${payment.reservationId} via sync – clearing deadline`);
-                        await this.tenant.getRepo(Reservation).update(payment.reservationId, {
-                            paymentExpiresAt: null,
-                        });
-                    } else if (mpStatus === 'rejected') {
-                        // Just log – let the timer handle deletion so the user can retry
-                        this.logger.log(`❌ Payment rejected for reservation ${payment.reservationId} via sync – waiting for timer`);
-                    } else if (mpStatus === 'cancelled') {
-                        this.logger.log(`❌ Payment cancelled for reservation ${payment.reservationId} via sync – deleting reservation`);
-                        const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id: payment.reservationId } });
-                        if (reservation) {
-                            await this.tenant.getRepo(Reservation).remove(reservation);
-                            this.logger.log(`🗑️ Deleted reservation ${payment.reservationId} and its payment records`);
+                if (searchData.results && searchData.results.length > 0) {
+                    const mpPayment = searchData.results[0];
+                    const mpStatus = mpPayment.status;
+
+                    this.logger.log(`Sync: Payment ${mpPayment.id} for ref ${payment.externalReference} status=${mpStatus}`);
+
+                    // Update our record
+                    await mpRepo.update(payment.id, {
+                        mpPaymentId: String(mpPayment.id),
+                        status: this.mapMpStatus(mpStatus),
+                        statusDetail: mpPayment.status_detail,
+                        paymentMethod: mpPayment.payment_method_id || null,
+                        mpData: mpPayment as any,
+                    });
+
+                    // If approved, update reservation and send confirmation email
+                    if (payment.reservationId) {
+                        if (mpStatus === 'approved') {
+                            await reservationRepo.update(payment.reservationId, {
+                                paymentStatus: PaymentStatus.PAID,
+                                paymentNotes: `Pagado via Mercado Pago (ID: ${mpPayment.id})`,
+                                paymentExpiresAt: null,
+                            });
+                            this.logger.log(`\u2705 Reservation ${payment.reservationId} marked as PAID via sync`);
+                            await this.sendPaymentConfirmationEmailWithRepo(reservationRepo, payment.reservationId, String(mpPayment.id), payment.payerEmail);
+                        } else if (mpPayment.status_detail === 'pending_contingency') {
+                            this.logger.log(`\u23f3 Payment pending_contingency for reservation ${payment.reservationId} via sync \u2013 clearing deadline`);
+                            await reservationRepo.update(payment.reservationId, {
+                                paymentExpiresAt: null,
+                            });
+                        } else if (mpStatus === 'rejected') {
+                            this.logger.log(`\u274c Payment rejected for reservation ${payment.reservationId} via sync \u2013 waiting for timer`);
+                        } else if (mpStatus === 'cancelled') {
+                            this.logger.log(`\u274c Payment cancelled for reservation ${payment.reservationId} via sync \u2013 deleting reservation`);
+                            await reservationRepo.delete(payment.reservationId);
+                            this.logger.log(`\ud83d\uddd1\ufe0f Deleted reservation ${payment.reservationId} and its payment records`);
                         }
                     }
+
+                    return { status: mpStatus, synced: true };
                 }
-
-                return { status: mpStatus, synced: true };
+            } catch (error) {
+                this.logger.error(`Error syncing payment: ${error.message}`);
             }
-        } catch (error) {
-            this.logger.error(`Error syncing payment: ${error.message}`);
-        }
 
-        return { status: payment.status, synced: false };
+            return { status: payment.status, synced: false };
+        });
     }
 
     /**
@@ -1029,36 +1031,20 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Load reservation with court and send payment confirmation email
+     * Load reservation with court and send payment confirmation email.
+     * Uses tenant.run() for a dedicated QR.
      */
     private async sendPaymentConfirmationEmail(reservationId: string, mpPaymentId: string, payerEmail?: string): Promise<void> {
+        const clubId = this.tenant.getCurrentClubId();
+        if (!clubId) {
+            this.logger.warn('sendPaymentConfirmationEmail: no tenant context');
+            return;
+        }
         try {
-            const reservation = await this.tenant.getRepo(Reservation).findOne({
-                where: { id: reservationId },
-                relations: ['court'],
+            await this.tenant.run(clubId, async (em) => {
+                const reservationRepo = em.getRepository(Reservation);
+                await this.sendPaymentConfirmationEmailWithRepo(reservationRepo, reservationId, mpPaymentId, payerEmail);
             });
-            if (!reservation) {
-                this.logger.warn(`Cannot send confirmation email: reservation ${reservationId} not found`);
-                return;
-            }
-
-            const email = payerEmail;
-            if (!email) {
-                this.logger.warn(`Cannot send confirmation email: no payer email for reservation ${reservationId}`);
-                return;
-            }
-
-            await this.emailService.sendPaymentConfirmationEmail(
-                email,
-                {
-                    date: reservation.date,
-                    startTime: reservation.startTime,
-                    endTime: reservation.endTime,
-                    courtName: reservation.court?.name || 'Cancha',
-                    finalPrice: Number(reservation.finalPrice),
-                },
-                mpPaymentId,
-            );
         } catch (error) {
             this.logger.error(`Error sending payment confirmation email: ${error.message}`);
         }
