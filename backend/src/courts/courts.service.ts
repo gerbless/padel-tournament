@@ -789,43 +789,50 @@ export class CourtsService {
     }
 
     async getPlayerBookings(playerId: string, playerName: string, clubId?: string): Promise<any[]> {
-        const qb = this.tenant.getRepo(Reservation)
-            .createQueryBuilder('r')
-            .leftJoinAndSelect('r.court', 'court')
-            .where("r.title LIKE :pattern", { pattern: `%${playerName}%` })
-            .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED });
-
-        if (clubId) {
-            qb.andWhere('r.clubId = :clubId', { clubId });
+        const cid = clubId || this.tenant.getCurrentClubId();
+        if (!cid) {
+            this.logger.warn('getPlayerBookings called without clubId — returning empty');
+            return [];
         }
 
-        const reservations = await qb.orderBy('r.date', 'DESC')
-            .addOrderBy('r.startTime', 'ASC')
-            .getMany();
+        return this.tenant.run(cid, async (em) => {
+            const reservationRepo = em.getRepository(Reservation);
+            const mpPaymentRepo = em.getRepository(MercadoPagoPayment);
 
-        // Enrich with MP payment statusDetail
-        const reservationIds = reservations.map(r => r.id);
-        let mpPaymentMap: Record<string, { status: string; statusDetail: string | null }> = {};
-        if (reservationIds.length > 0) {
-            const mpPayments = await this.tenant.getRepo(MercadoPagoPayment)
-                .createQueryBuilder('mp')
-                .where('mp.reservationId IN (:...ids)', { ids: reservationIds })
-                .orderBy('mp.createdAt', 'DESC')
+            const qb = reservationRepo
+                .createQueryBuilder('r')
+                .leftJoinAndSelect('r.court', 'court')
+                .where("r.title LIKE :pattern", { pattern: `%${playerName}%` })
+                .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
+                .andWhere('r.clubId = :clubId', { clubId: cid });
+
+            const reservations = await qb.orderBy('r.date', 'DESC')
+                .addOrderBy('r.startTime', 'ASC')
                 .getMany();
 
-            // Keep only the latest payment per reservation
-            for (const mp of mpPayments) {
-                if (!mpPaymentMap[mp.reservationId]) {
-                    mpPaymentMap[mp.reservationId] = { status: mp.status, statusDetail: mp.statusDetail };
+            // Enrich with MP payment statusDetail
+            const reservationIds = reservations.map(r => r.id);
+            let mpPaymentMap: Record<string, { status: string; statusDetail: string | null }> = {};
+            if (reservationIds.length > 0) {
+                const mpPayments = await mpPaymentRepo
+                    .createQueryBuilder('mp')
+                    .where('mp.reservationId IN (:...ids)', { ids: reservationIds })
+                    .orderBy('mp.createdAt', 'DESC')
+                    .getMany();
+
+                for (const mp of mpPayments) {
+                    if (!mpPaymentMap[mp.reservationId]) {
+                        mpPaymentMap[mp.reservationId] = { status: mp.status, statusDetail: mp.statusDetail };
+                    }
                 }
             }
-        }
 
-        return reservations.map(r => ({
-            ...r,
-            mpStatus: mpPaymentMap[r.id]?.status || null,
-            mpStatusDetail: mpPaymentMap[r.id]?.statusDetail || null,
-        }));
+            return reservations.map(r => ({
+                ...r,
+                mpStatus: mpPaymentMap[r.id]?.status || null,
+                mpStatusDetail: mpPaymentMap[r.id]?.statusDetail || null,
+            }));
+        });
     }
 
     async cancelPlayerBooking(playerId: string, playerName: string, reservationId: string): Promise<Reservation> {
