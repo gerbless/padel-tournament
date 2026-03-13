@@ -509,28 +509,33 @@ export class TournamentsService {
         await queryRunner.startTransaction();
 
         try {
-            tournament.status = TournamentStatus.COMPLETED;
-            const savedTournament = await queryRunner.manager.save(tournament);
-
-            await queryRunner.commitTransaction();
-
-            // Collect all players to update their stats
-            const playerIds = new Set<string>();
-            savedTournament.teams.forEach(t => {
-                playerIds.add(t.player1Id);
-                playerIds.add(t.player2Id);
+            // Update only the status column to avoid cascade-saving all relations
+            await queryRunner.manager.update(Tournament, id, {
+                status: TournamentStatus.COMPLETED,
             });
 
-            // Recalculate global stats (outside transaction — non-critical)
-            await this.playersService.recalculateTotalPoints(Array.from(playerIds));
-
-            return savedTournament;
+            await queryRunner.commitTransaction();
         } catch (error) {
             await queryRunner.rollbackTransaction();
             throw error;
         } finally {
             await queryRunner.release();
         }
+
+        // Update local entity for the return value
+        tournament.status = TournamentStatus.COMPLETED;
+
+        // Collect all players to update their stats
+        const playerIds = new Set<string>();
+        tournament.teams.forEach(t => {
+            playerIds.add(t.player1Id);
+            playerIds.add(t.player2Id);
+        });
+
+        // Recalculate global stats (outside transaction — non-critical)
+        await this.playersService.recalculateTotalPoints(Array.from(playerIds));
+
+        return tournament;
     }
 
     /**

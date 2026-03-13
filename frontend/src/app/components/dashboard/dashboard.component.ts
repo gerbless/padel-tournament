@@ -1,9 +1,9 @@
 import { Component, OnInit, DestroyRef, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NgChartsModule } from 'ng2-charts';
-import { ChartConfiguration, ChartOptions } from 'chart.js';
+import { ChartConfiguration } from 'chart.js';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { PlayerService, Player } from '../../services/player.service';
+import { PlayerService } from '../../services/player.service';
 import { TournamentService, Tournament } from '../../services/tournament.service';
 import { LeagueService } from '../../modules/league/services/league.service';
 import { League } from '../../models/league.model';

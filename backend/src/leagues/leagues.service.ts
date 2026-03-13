@@ -87,8 +87,9 @@ export class LeaguesService {
 
     async update(id: string, updateLeagueDto: UpdateLeagueDto): Promise<League> {
         const league = await this.findOne(id);
-        this.tenant.getRepo(League).merge(league, updateLeagueDto);
-        return this.tenant.getRepo(League).save(league);
+        // Use update() instead of save() to avoid TypeORM cascade issues in multi-schema
+        await this.tenant.getRepo(League).update(id, updateLeagueDto);
+        return this.findOne(id);
     }
 
     async remove(id: string): Promise<void> {
@@ -147,9 +148,13 @@ export class LeaguesService {
 
         // Save config with generated groups
         league.config = { ...league.config, groups: groupNames };
-        await this.tenant.getRepo(League).save(league);
+        await this.tenant.getRepo(League).update(id, { config: league.config });
 
-        return this.tenant.getRepo(LeagueTeam).save(teams);
+        // Use individual update() instead of save() to avoid cascade issues
+        for (const team of teams) {
+            await this.tenant.getRepo(LeagueTeam).update(team.id, { group: team.group });
+        }
+        return this.tenant.getRepo(LeagueTeam).find({ where: { leagueId: id } });
     }
 
     async updateMatchResult(matchId: string, sets: any[], winnerId: string): Promise<LeagueMatch> {
@@ -163,24 +168,35 @@ export class LeaguesService {
             throw new BadRequestException('Cannot update match result for a completed league');
         }
 
-        match.sets = sets;
-        match.winnerId = winnerId;
-        match.status = MatchStatus.COMPLETED;
+        const leagueId = match.leagueId;
+        const leagueType = match.league?.type;
 
-        const savedMatch = await this.tenant.getRepo(LeagueMatch).save(match);
+        // Use update() instead of save() to avoid TypeORM cascade issues
+        // that cause "relation 'teams' does not exist" in multi-schema setups
+        await this.tenant.getRepo(LeagueMatch).update(matchId, {
+            sets,
+            winnerId,
+            status: MatchStatus.COMPLETED,
+        });
+
+        // Re-fetch the updated match
+        const savedMatch = await this.tenant.getRepo(LeagueMatch).findOne({
+            where: { id: matchId },
+        });
+        if (!savedMatch) throw new NotFoundException('Match not found after update');
 
         // Recalculate standings for this league
-        await this.calculateStandings(match.leagueId);
+        await this.calculateStandings(leagueId);
 
         // Check for playoff generation
-        if (match.league.type === 'groups_playoff') {
-            await this.checkAndGeneratePlayoffs(match.leagueId);
-        } else if (match.league.type === 'round_robin_playoff') {
-            await this.checkAndGenerateRoundRobinPlayoffs(match.leagueId);
+        if (leagueType === 'groups_playoff') {
+            await this.checkAndGeneratePlayoffs(leagueId);
+        } else if (leagueType === 'round_robin_playoff') {
+            await this.checkAndGenerateRoundRobinPlayoffs(leagueId);
         }
 
         // Check for automatic completion
-        await this.checkAutomaticCompletion(match.leagueId);
+        await this.checkAutomaticCompletion(leagueId);
 
         return savedMatch;
     }
@@ -559,7 +575,20 @@ export class LeaguesService {
             }); // end competitiveSets.forEach
         }
 
-        await this.tenant.getRepo(LeagueTeam).save(league.teams);
+        // Use individual update() calls instead of save() to avoid TypeORM cascade issues
+        // in multi-schema setups
+        for (const team of league.teams) {
+            await this.tenant.getRepo(LeagueTeam).update(team.id, {
+                matchesPlayed: team.matchesPlayed,
+                matchesWon: team.matchesWon,
+                matchesLost: team.matchesLost,
+                points: team.points,
+                setsWon: team.setsWon,
+                setsLost: team.setsLost,
+                gamesWon: team.gamesWon,
+                gamesLost: team.gamesLost,
+            });
+        }
     }
 
     async getStandings(leagueId: string): Promise<LeagueTeam[]> {
@@ -660,10 +689,14 @@ export class LeaguesService {
 
         league.status = LeagueStatus.COMPLETED;
         // Set end date if not set
+        const updateData: any = { status: LeagueStatus.COMPLETED };
         if (!league.endDate) {
             league.endDate = new Date();
+            updateData.endDate = league.endDate;
         }
-        const saved = await this.tenant.getRepo(League).save(league);
+        // Use update() instead of save() to avoid TypeORM cascade issues in multi-schema
+        await this.tenant.getRepo(League).update(id, updateData);
+        const saved = await this.findOne(id);
 
         // Trigger point recalculation for all participants
         const playerIds = new Set<string>();

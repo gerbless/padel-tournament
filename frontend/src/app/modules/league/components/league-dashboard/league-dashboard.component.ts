@@ -2,9 +2,8 @@ import { Component, OnInit, DestroyRef, inject, ChangeDetectionStrategy, ChangeD
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LeagueService } from '../../services/league.service';
-import { League, Match, MatchResult, SetScore, Pair } from '../../../../models/league.model';
+import { League, Match, MatchResult, Pair } from '../../../../models/league.model';
 
 import { AuthService } from '../../../../services/auth.service';
 import { ToastService } from '../../../../services/toast.service';
@@ -122,11 +121,11 @@ export class LeagueDashboardComponent implements OnInit {
 
     private updatePermissions() {
         if (this.league?.clubId) {
-            this.canEdit = this.authService.hasClubRole(this.league.clubId, 'editor');
-            this.canAdmin = this.authService.hasClubRole(this.league.clubId, 'admin');
+            this.canEdit = this.authService.hasClubRole(this.league.clubId, 'editor') || this.authService.isSuperAdmin();
+            this.canAdmin = this.authService.hasClubRole(this.league.clubId, 'admin') || this.authService.isSuperAdmin();
         } else {
-            this.canEdit = false;
-            this.canAdmin = false;
+            this.canEdit = this.authService.isSuperAdmin();
+            this.canAdmin = this.authService.isSuperAdmin();
         }
     }
 

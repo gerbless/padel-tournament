@@ -1,16 +1,20 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Player } from './entities/player.entity';
 import { PlayerClubStats } from './entities/player-club-stats.entity';
 import { FreePlayMatch } from '../courts/entities/free-play-match.entity';
 import { User } from '../users/entities/user.entity';
+import { Club } from '../clubs/entities/club.entity';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
 import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
 import { PlayerRankingService } from './player-ranking.service';
 import { PlayerRecommendationService } from './player-recommendation.service';
 import { TenantService } from '../tenant/tenant.service';
+import { EmailService } from '../email/email.service';
+import { PhoneVerificationService } from '../phone-verification/phone-verification.service';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class PlayersService {
@@ -19,9 +23,13 @@ export class PlayersService {
         private playerRepository: Repository<Player>,
         @InjectRepository(User)
         private userRepository: Repository<User>,
+        @InjectRepository(Club)
+        private clubRepository: Repository<Club>,
         private rankingService: PlayerRankingService,
         private recommendationService: PlayerRecommendationService,
         private tenant: TenantService,
+        private emailService: EmailService,
+        private phoneVerificationService: PhoneVerificationService,
     ) { }
 
     async create(createPlayerDto: CreatePlayerDto): Promise<Player> {
@@ -433,17 +441,19 @@ export class PlayersService {
                 stats.leaguesPlayed = stats.leagueIds.size;
             });
 
-            // Update global player stats
+            // Update global player stats — use update() instead of save()
+            // to avoid TypeORM cascade issues with cross-schema relations (teams, league_teams)
             globalTotalPoints = globalTournamentPoints + globalLeaguePoints + globalFreePlayPoints;
-            player.totalPoints = globalTotalPoints;
-            player.tournamentPoints = globalTournamentPoints;
-            player.leaguePoints = globalLeaguePoints;
-            player.freePlayPoints = globalFreePlayPoints;
-            player.matchesWon = globalMatchesWon;
-            player.tournamentsPlayed = globalTournamentIds.size;
-            player.leaguesPlayed = globalLeagueIds.size;
 
-            await this.playerRepository.save(player);
+            await this.playerRepository.update(player.id, {
+                totalPoints: globalTotalPoints,
+                tournamentPoints: globalTournamentPoints,
+                leaguePoints: globalLeaguePoints,
+                freePlayPoints: globalFreePlayPoints,
+                matchesWon: globalMatchesWon,
+                tournamentsPlayed: globalTournamentIds.size,
+                leaguesPlayed: globalLeagueIds.size,
+            });
 
             // Update PlayerClubStats for each club
             for (const [key, stats] of statsByClub.entries()) {
@@ -454,16 +464,17 @@ export class PlayersService {
 
                 const clubStats = await this.getOrCreatePlayerClubStats(player.id, stats.clubId);
                 if (clubStats) {
-                    clubStats.totalPoints = stats.totalPoints;
-                    clubStats.leaguePoints = stats.leaguePoints;
-                    clubStats.tournamentPoints = stats.tournamentPoints;
-                    clubStats.freePlayPoints = stats.freePlayPoints || 0;
-                    clubStats.matchesWon = stats.matchesWon;
-                    clubStats.matchesLost = stats.matchesLost;
-                    clubStats.tournamentsPlayed = stats.tournamentsPlayed;
-                    clubStats.leaguesPlayed = stats.leaguesPlayed;
-
-                    await this.tenant.getRepo(PlayerClubStats).save(clubStats);
+                    // Use update() instead of save() to avoid cascade issues
+                    await this.tenant.getRepo(PlayerClubStats).update(clubStats.id, {
+                        totalPoints: stats.totalPoints,
+                        leaguePoints: stats.leaguePoints,
+                        tournamentPoints: stats.tournamentPoints,
+                        freePlayPoints: stats.freePlayPoints || 0,
+                        matchesWon: stats.matchesWon,
+                        matchesLost: stats.matchesLost,
+                        tournamentsPlayed: stats.tournamentsPlayed,
+                        leaguesPlayed: stats.leaguesPlayed,
+                    });
                 }
             }
         }
@@ -606,6 +617,183 @@ export class PlayersService {
         });
 
         return this.playerRepository.save(player);
+    }
+
+    // ==================== Player Self-Service Profile ====================
+
+    /**
+     * Returns the full profile for the authenticated player, including:
+     * - Player data (name, email, phone, identification, position, category, clubs)
+     * - Verification status from the linked User
+     * - Whether phone verification is available (any club has enablePhoneVerification)
+     */
+    async getFullProfile(playerId: string, userId: string) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+
+        // If the user has no linked player, return a minimal profile from User data
+        if (!playerId) {
+            return {
+                id: null,
+                name: user?.email ?? '',
+                email: user?.email ?? '',
+                identification: null,
+                phone: user?.phone ?? null,
+                position: null,
+                category: null,
+                clubs: [],
+                isEmailVerified: user?.isEmailVerified ?? false,
+                isPhoneVerified: user?.isPhoneVerified ?? false,
+                showPhone: false,
+                noPlayer: true,
+            };
+        }
+
+        const player = await this.playerRepository.findOne({
+            where: { id: playerId },
+            relations: ['category', 'clubs'],
+        });
+        if (!player) {
+            throw new NotFoundException(`Jugador no encontrado.`);
+        }
+
+        // Check if ANY club the player belongs to has phone verification enabled
+        let showPhone = false;
+        if (player.clubs && player.clubs.length > 0) {
+            const clubIds = player.clubs.map(c => c.id);
+            const clubsWithPhone = await this.clubRepository
+                .createQueryBuilder('club')
+                .where('club.id IN (:...ids)', { ids: clubIds })
+                .andWhere('club.enablePhoneVerification = true')
+                .getCount();
+            showPhone = clubsWithPhone > 0;
+        }
+
+        return {
+            id: player.id,
+            name: player.name,
+            email: player.email,
+            identification: player.identification,
+            phone: player.phone,
+            position: player.position,
+            category: player.category ? { id: player.category.id, name: (player.category as any).name } : null,
+            clubs: (player.clubs || []).map(c => ({ id: c.id, name: c.name })),
+            isEmailVerified: user?.isEmailVerified ?? false,
+            isPhoneVerified: user?.isPhoneVerified ?? false,
+            showPhone,
+            noPlayer: false,
+        };
+    }
+
+    /**
+     * Update the authenticated player's profile.
+     * If email changes, reset email verification and send a new verification email.
+     */
+    async updateMyProfile(playerId: string, userId: string, dto: UpdatePlayerDto) {
+        if (!playerId) {
+            throw new BadRequestException('Tu cuenta no tiene un jugador asociado.');
+        }
+
+        const player = await this.playerRepository.findOne({
+            where: { id: playerId },
+            relations: ['clubs'],
+        });
+        if (!player) {
+            throw new NotFoundException(`Jugador no encontrado.`);
+        }
+
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+
+        // Check if email is changing
+        const emailChanged = dto.email !== undefined && dto.email !== player.email;
+
+        // Apply simple field updates
+        if (dto.name !== undefined) player.name = dto.name;
+        if (dto.email !== undefined) player.email = dto.email;
+        if (dto.identification !== undefined) player.identification = dto.identification;
+        if (dto.phone !== undefined) player.phone = dto.phone;
+        if (dto.position !== undefined) player.position = dto.position;
+        if (dto.categoryId !== undefined) {
+            player.category = dto.categoryId ? { id: dto.categoryId } as any : null;
+        }
+        if (dto.clubIds !== undefined) {
+            player.clubs = dto.clubIds.length > 0
+                ? dto.clubIds.map(id => ({ id } as any))
+                : [];
+        }
+
+        await this.playerRepository.save(player);
+
+        // If email changed, reset verification on User and send new verification email
+        if (emailChanged && user) {
+            const newToken = randomUUID();
+            await this.userRepository.update(user.id, {
+                email: dto.email,
+                isEmailVerified: false,
+                emailVerificationToken: newToken,
+            });
+            await this.emailService.sendVerificationEmail(dto.email, newToken);
+        }
+
+        return this.getFullProfile(playerId, userId);
+    }
+
+    /**
+     * Resend email verification for the authenticated user.
+     */
+    async resendEmailVerification(userId: string) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('Usuario no encontrado.');
+        if (user.isEmailVerified) return { message: 'Tu email ya está verificado.' };
+
+        const newToken = randomUUID();
+        await this.userRepository.update(user.id, { emailVerificationToken: newToken });
+        await this.emailService.sendVerificationEmail(user.email, newToken);
+        return { message: 'Se envió un nuevo correo de verificación.' };
+    }
+
+    /**
+     * Send phone OTP via WhatsApp for the authenticated user.
+     */
+    async sendPhoneOtp(userId: string, phone: string) {
+        // Find any club the user belongs to that has phone verification enabled, to get Twilio creds
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user || !user.playerId) throw new BadRequestException('Cuenta sin jugador asociado.');
+
+        const player = await this.playerRepository.findOne({
+            where: { id: user.playerId },
+            relations: ['clubs'],
+        });
+
+        let clubId: string | undefined;
+        let clubName: string | undefined;
+        if (player?.clubs?.length) {
+            const club = await this.clubRepository
+                .createQueryBuilder('club')
+                .where('club.id IN (:...ids)', { ids: player.clubs.map(c => c.id) })
+                .andWhere('club.enablePhoneVerification = true')
+                .getOne();
+            if (club) {
+                clubId = club.id;
+                clubName = club.name;
+            }
+        }
+
+        return this.phoneVerificationService.sendOtp(phone, clubName, clubId);
+    }
+
+    /**
+     * Verify phone OTP and mark user as phone-verified.
+     */
+    async verifyPhone(userId: string, playerId: string, phone: string, code: string) {
+        const result = await this.phoneVerificationService.verifyOtp(phone, code);
+        if (result.verified) {
+            // Mark user as phone-verified and update phone on both user and player
+            await this.userRepository.update(userId, { phone, isPhoneVerified: true });
+            if (playerId) {
+                await this.playerRepository.update(playerId, { phone });
+            }
+        }
+        return { verified: result.verified };
     }
 
     /**

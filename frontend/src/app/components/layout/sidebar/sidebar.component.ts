@@ -1,12 +1,14 @@
 import { Component, OnInit, DestroyRef, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LayoutService } from '../../../services/layout.service';
 import { ClubService } from '../../../services/club.service';
 import { Club } from '../../../models/club.model';
 import { AuthService } from '../../../services/auth.service';
 import { PermissionsService, NavItem } from '../../../services/permissions.service';
+import { environment } from '../../../../environments/environment';
 
 @Component({
     selector: 'app-sidebar',
@@ -25,7 +27,7 @@ import { PermissionsService, NavItem } from '../../../services/permissions.servi
             </div>
 
             <div class="brand-content" *ngIf="!isCollapsed">
-                <span class="title" *ngIf="!selectedClub">PADEL MGR</span>
+                <span class="title" *ngIf="!selectedClub">Agon Padel</span>
                 
                 <div class="club-info" *ngIf="selectedClub">
                     <span class="club-name" title="{{ selectedClub.name }}">{{ selectedClub.name }}</span>
@@ -50,8 +52,8 @@ import { PermissionsService, NavItem } from '../../../services/permissions.servi
                 <span class="label" *ngIf="!isCollapsed">{{ item.label }}</span>
             </a>
 
-            <!-- Admin Settings (for club admins and super_admin) -->
-            <a *ngIf="(isSuperAdmin || isAdmin) && selectedClub"
+            <!-- Admin Settings (super_admin only) -->
+            <a *ngIf="isSuperAdmin && selectedClub"
                routerLink="/admin/club-settings"
                routerLinkActive="active"
                class="nav-item admin-item"
@@ -64,7 +66,7 @@ import { PermissionsService, NavItem } from '../../../services/permissions.servi
             <div *ngIf="selectedClub" class="divider" style="height: 1px; background: rgba(255,255,255,0.1); margin: 0.5rem 0;"></div>
             <div *ngIf="selectedClub && !isCollapsed" class="nav-section-label" style="padding: 0.25rem 1rem; font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px;">Jugador</div>
 
-            <a *ngIf="selectedClub"
+            <a *ngIf="canBookCourt && selectedClub && !isSuperAdmin && !clubRole"
                routerLink="/player/booking"
                routerLinkActive="active"
                class="nav-item"
@@ -350,6 +352,7 @@ export class SidebarComponent implements OnInit {
     clubRole: string | null = null;
     isAdmin = false;
     isSuperAdmin = false;
+    canBookCourt = false;
     visibleNavItems: NavItem[] = [];
 
     private destroyRef = inject(DestroyRef);
@@ -361,7 +364,8 @@ export class SidebarComponent implements OnInit {
         private clubService: ClubService,
         private authService: AuthService,
         private permissionsService: PermissionsService,
-        private router: Router
+        private router: Router,
+        private http: HttpClient,
     ) {
         this.layoutService.sidebarCollapsed$.pipe(
             takeUntilDestroyed(this.destroyRef)
@@ -383,6 +387,11 @@ export class SidebarComponent implements OnInit {
             takeUntilDestroyed(this.destroyRef)
         ).subscribe((user: any) => {
             this.isLoggedIn = !!user;
+            if (user) {
+                this.loadVerificationStatus();
+            } else {
+                this.canBookCourt = false;
+            }
             this.cdr.markForCheck();
         });
     }
@@ -450,5 +459,18 @@ export class SidebarComponent implements OnInit {
         this.clubService.clearSelectedClub();
         this.router.navigate(['/']);
         this.closeMobileMenu();
+    }
+
+    private loadVerificationStatus(): void {
+        this.http.get<any>(`${environment.apiUrl}/players/me`).subscribe({
+            next: (profile) => {
+                this.canBookCourt = !!(profile?.isEmailVerified && profile?.isPhoneVerified);
+                this.cdr.markForCheck();
+            },
+            error: () => {
+                this.canBookCourt = false;
+                this.cdr.markForCheck();
+            }
+        });
     }
 }

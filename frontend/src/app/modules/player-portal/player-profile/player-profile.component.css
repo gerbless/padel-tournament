@@ -49,9 +49,64 @@
 .info-label {
     font-size: 0.85rem;
     color: var(--text-secondary);
+    flex-shrink: 0;
+    margin-right: 1rem;
 }
 .info-value {
     font-weight: 500;
+    text-align: right;
+}
+
+/* Verification badges */
+.badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    margin-left: 0.5rem;
+    font-weight: 600;
+    vertical-align: middle;
+}
+.badge-verified {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.badge-pending {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+/* Verification action button */
+.verification-action {
+    padding: 0.5rem 0 0.75rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.btn-verify {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.82rem;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #818cf8;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+}
+.btn-verify:hover { background: rgba(99, 102, 241, 0.2); }
+.btn-verify:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* OTP inline form */
+.otp-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.otp-input {
+    max-width: 160px;
+    text-align: center;
+    letter-spacing: 0.3rem;
+    font-size: 1.05rem;
 }
 
 .stats-grid {
@@ -105,10 +160,45 @@
     background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 0.95rem;
+    box-sizing: border-box;
 }
 .form-control:focus {
     outline: none;
     border-color: var(--primary);
+}
+
+.help-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.78rem;
+    color: #fbbf24;
+}
+
+/* Club chips for multi-select */
+.club-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.chip {
+    padding: 0.4rem 0.85rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    transition: all 0.15s;
+}
+.chip:hover {
+    border-color: var(--primary);
+    color: var(--text-primary);
+}
+.chip-selected {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: #10b981;
+    color: #10b981;
+    font-weight: 600;
 }
 
 .edit-actions {

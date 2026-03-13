@@ -22,7 +22,7 @@ import { filter } from 'rxjs/operators';
                 <button class="menu-fab" (click)="toggleMobileMenu()">
                     ☰
                 </button>
-                <div class="mobile-title">PADEL MGR</div>
+                <div class="mobile-title">Agon Padel</div>
             </header>
             <router-outlet></router-outlet>
         </main>
@@ -138,7 +138,7 @@ import { filter } from 'rxjs/operators';
     `]
 })
 export class AppComponent implements OnInit {
-    title = 'Padel Tournament Manager';
+    title = 'Agon Padel';
     sidebarCollapsed = false;
     showSidebar = true;
 

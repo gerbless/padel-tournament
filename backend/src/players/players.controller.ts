@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { PlayersService } from './players.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
@@ -94,13 +94,33 @@ export class PlayersController {
     @UseGuards(JwtAuthGuard)
     @Get('me')
     async getMyProfile(@Request() req) {
-        return this.playersService.findOne(req.user.playerId);
+        return this.playersService.getFullProfile(req.user.playerId, req.user.userId);
     }
 
     @UseGuards(JwtAuthGuard)
     @Patch('me')
     async updateMyProfile(@Request() req, @Body() dto: UpdatePlayerDto) {
-        return this.playersService.update(req.user.playerId, dto);
+        return this.playersService.updateMyProfile(req.user.playerId, req.user.userId, dto);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('me/resend-email-verification')
+    async resendEmailVerification(@Request() req) {
+        return this.playersService.resendEmailVerification(req.user.userId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('me/send-phone-otp')
+    async sendPhoneOtp(@Request() req, @Body() body: { phone: string }) {
+        if (!body.phone) throw new BadRequestException('Teléfono requerido');
+        return this.playersService.sendPhoneOtp(req.user.userId, body.phone);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('me/verify-phone')
+    async verifyPhone(@Request() req, @Body() body: { phone: string; code: string }) {
+        if (!body.phone || !body.code) throw new BadRequestException('Teléfono y código requeridos');
+        return this.playersService.verifyPhone(req.user.userId, req.user.playerId, body.phone, body.code);
     }
 
     /**

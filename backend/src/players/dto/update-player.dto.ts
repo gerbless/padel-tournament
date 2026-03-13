@@ -15,6 +15,10 @@ export class UpdatePlayerDto {
 
     @IsOptional()
     @IsString()
+    phone?: string;
+
+    @IsOptional()
+    @IsString()
     categoryId?: string;
 
     @IsOptional()

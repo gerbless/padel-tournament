@@ -89,10 +89,10 @@ export class EmailService implements OnModuleInit {
         this.logger.log(`  Link: ${verifyLink}`);
         this.logger.log(`  Transporter: ${transporter ? 'SÍ' : 'NO'}`);
 
-        const subject = 'Verifica tu cuenta – Padel MGR';
+        const subject = 'Verifica tu cuenta – Agon Padel';
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
-                <h2 style="text-align: center; color: #333;">🎾 PADEL MGR</h2>
+                <h2 style="text-align: center; color: #333;">🎾 Agon Padel</h2>
                 <p>¡Hola!</p>
                 <p>Gracias por registrarte. Para activar tu cuenta, haz clic en el siguiente enlace:</p>
                 <div style="text-align: center; margin: 30px 0;">
@@ -107,7 +107,7 @@ export class EmailService implements OnModuleInit {
                     Si no creaste esta cuenta, puedes ignorar este correo.
                 </p>
                 <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">
-                    © Padel MGR
+                    © Agon Padel
                 </p>
             </div>
         `;
@@ -162,7 +162,7 @@ export class EmailService implements OnModuleInit {
 
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
-                <h2 style="text-align: center; color: #333;">🎾 PADEL MGR</h2>
+                <h2 style="text-align: center; color: #333;">🎾 Agon Padel</h2>
                 <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 24px; margin: 20px 0;">
                     <h3 style="color: #16a34a; margin-top: 0;">✅ ¡Pago recibido exitosamente!</h3>
                     <p style="color: #333;">Tu reserva ha sido confirmada con los siguientes detalles:</p>
@@ -190,7 +190,7 @@ export class EmailService implements OnModuleInit {
                     </table>
                 </div>
                 <p style="color: #666; font-size: 13px;">¡Nos vemos en la cancha! 🎾</p>
-                <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">© Padel MGR</p>
+                <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">© Agon Padel</p>
             </div>
         `;
 
@@ -265,7 +265,7 @@ export class EmailService implements OnModuleInit {
                 </div>
                 ${transferSection}
                 <p style="color: #666; font-size: 13px;">¡Nos vemos en la cancha! 🎾</p>
-                <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">© ${reservation.clubName} · Padel MGR</p>
+                <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">© ${reservation.clubName} · Agon Padel</p>
             </div>`;
 
         this.logger.log(`--- Enviando email de reserva (sin MP) a ${to} ---`);

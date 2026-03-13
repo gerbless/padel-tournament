@@ -11,7 +11,7 @@ import { environment } from '../../../environments/environment';
     template: `
         <div class="verify-container fade-in">
             <div class="verify-card">
-                <div class="logo">🎾 PADEL MGR</div>
+                <div class="logo">🎾 Agon Padel</div>
 
                 <div *ngIf="loading" class="status">
                     <div class="spinner"></div>

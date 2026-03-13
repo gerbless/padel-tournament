@@ -41,7 +41,7 @@ export class NotificationsService {
 
     // ─── Convenience shortcuts ────────────────────────────────────────────────
 
-    async sendPhoneOtp(to: string, code: string, clubName = 'Padel MGR', twilioCreds?: ResolvedTwilioCreds): Promise<SendMessageResult> {
+    async sendPhoneOtp(to: string, code: string, clubName = 'Agon Padel', twilioCreds?: ResolvedTwilioCreds): Promise<SendMessageResult> {
         return this.send({
             to,
             template: NotificationTemplate.PHONE_OTP,
@@ -115,7 +115,7 @@ export class NotificationsService {
         switch (dto.template) {
             case NotificationTemplate.PHONE_OTP:
                 return (
-                    `🎾 *${p['clubName'] ?? 'Padel MGR'}*\n\n` +
+                    `🎾 *${p['clubName'] ?? 'Agon Padel'}*\n\n` +
                     `Tu código de verificación es:\n\n` +
                     `*${p['code']}*\n\n` +
                     `Válido por 5 minutos. No lo compartas con nadie.`
@@ -140,7 +140,7 @@ export class NotificationsService {
 
             case NotificationTemplate.PAYMENT_LINK:
                 return (
-                    `💳 *Reserva de Cancha — ${p['clubName'] ?? p['concept'] ?? 'Padel MGR'}*\n\n` +
+                    `💳 *Reserva de Cancha — ${p['clubName'] ?? p['concept'] ?? 'Agon Padel'}*\n\n` +
                     `Hola ${p['playerName']}, tienes un pago pendiente para:\n\n` +
                     `📅 *Fecha:* ${p['date'] ?? ''}${p['date'] ? ' — ' + p['time'] : ''}\n` +
                     `🎾 *Cancha:* ${p['courtName'] ?? ''}\n` +

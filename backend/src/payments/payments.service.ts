@@ -279,7 +279,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     },
                     auto_return: 'approved',
                     notification_url: `${backendUrl}/api/payments/webhook${reservation.clubId ? `?clubId=${reservation.clubId}` : ''}`,
-                    statement_descriptor: 'PADEL MGR',
+                    statement_descriptor: 'Agon Padel',
                 },
             });
 
@@ -433,7 +433,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                     },
                     auto_return: 'approved',
                     notification_url: `${backendUrl}/api/payments/webhook${reservation.clubId ? `?clubId=${reservation.clubId}` : ''}`,
-                    statement_descriptor: 'PADEL MGR',
+                    statement_descriptor: 'Agon Padel',
                 },
             });
 
@@ -573,7 +573,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                         },
                         auto_return: 'approved',
                         notification_url: `${backendUrl}/api/payments/webhook${reservation.clubId ? `?clubId=${reservation.clubId}` : ''}`,
-                        statement_descriptor: 'PADEL MGR',
+                        statement_descriptor: 'Agon Padel',
                     },
                 });
 
@@ -1005,7 +1005,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
                         <a href="${dto.link}" style="color: #2563eb; word-break: break-all;">${dto.link}</a>
                     </p>
                 </div>
-                <p style="color: #999; font-size: 12px; text-align: center;">© ${dto.clubName} — Padel MGR</p>
+                <p style="color: #999; font-size: 12px; text-align: center;">© ${dto.clubName} — Agon Padel</p>
             </div>
         `;
 

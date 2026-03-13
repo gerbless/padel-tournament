@@ -1,4 +1,4 @@
-# 🎾 Padel Tournament Manager
+# 🎾 Agon Padel
 
 Sistema integral para la gestión de torneos de pádel, diseñado para clubes y organizadores. Permite la creación de torneos, gestión de partidos en tiempo real, y un ranking global automatizado de jugadores.
 

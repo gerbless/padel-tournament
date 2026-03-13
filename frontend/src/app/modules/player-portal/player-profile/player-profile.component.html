@@ -13,48 +13,80 @@
         </div>
 
         <div class="profile-content">
-            <!-- View Mode -->
+            <!-- ═══════ View Mode ═══════ -->
             <div *ngIf="!editMode" class="profile-view">
                 <div class="info-row">
                     <span class="info-label">Nombre</span>
                     <span class="info-value">{{ player.name }}</span>
                 </div>
+
+                <!-- Email + verification -->
                 <div class="info-row">
                     <span class="info-label">Email</span>
-                    <span class="info-value">{{ player.email || 'No registrado' }}</span>
+                    <span class="info-value">
+                        {{ player.email || 'No registrado' }}
+                        <span *ngIf="player.email && player.isEmailVerified" class="badge badge-verified">✓ Verificado</span>
+                        <span *ngIf="player.email && !player.isEmailVerified" class="badge badge-pending">Sin verificar</span>
+                    </span>
                 </div>
+                <div *ngIf="player.email && !player.isEmailVerified" class="verification-action">
+                    <button class="btn btn-verify" (click)="resendEmailVerification()" [disabled]="sendingEmail">
+                        {{ sendingEmail ? 'Enviando...' : '📧 Enviar email de verificación' }}
+                    </button>
+                </div>
+
                 <div class="info-row">
                     <span class="info-label">Identificación</span>
                     <span class="info-value">{{ player.identification || 'No registrada' }}</span>
                 </div>
+
+                <!-- Phone -->
                 <div class="info-row">
-                    <span class="info-label">Posición</span>
-                    <span class="info-value">{{ player.position ? (player.position === 'drive' ? 'Drive' : player.position === 'reves' ? 'Revés' : 'Mixto') : 'Sin definir' }}</span>
+                    <span class="info-label">Teléfono</span>
+                    <span class="info-value">
+                        {{ player.phone || 'No registrado' }}
+                        <span *ngIf="player.phone && player.isPhoneVerified" class="badge badge-verified">✓ Verificado</span>
+                        <span *ngIf="player.phone && !player.isPhoneVerified && player.showPhone" class="badge badge-pending">Sin verificar</span>
+                    </span>
                 </div>
-                <div class="info-row" *ngIf="player.category">
-                    <span class="info-label">Categoría</span>
-                    <span class="info-value">{{ player.category.name }}</span>
+                <div *ngIf="player.showPhone && player.phone && !player.isPhoneVerified" class="verification-action">
+                    <div *ngIf="!phoneOtpSent">
+                        <button class="btn btn-verify" (click)="sendPhoneOtp()" [disabled]="sendingOtp">
+                            {{ sendingOtp ? 'Enviando...' : '📱 Verificar teléfono por WhatsApp' }}
+                        </button>
+                    </div>
+                    <div *ngIf="phoneOtpSent" class="otp-form">
+                        <input type="text" [(ngModel)]="phoneCode" class="form-control otp-input" placeholder="Código de 6 dígitos" maxlength="6">
+                        <button class="btn btn-verify" (click)="verifyPhoneCode()" [disabled]="verifyingPhone || phoneCode.length < 4">
+                            {{ verifyingPhone ? 'Verificando...' : 'Verificar' }}
+                        </button>
+                    </div>
                 </div>
 
-                <div class="stats-grid" *ngIf="player.totalPoints > 0 || player.tournamentsPlayed > 0">
-                    <div class="stat">
-                        <span class="stat-value">{{ player.totalPoints }}</span>
-                        <span class="stat-label">Puntos</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value">{{ player.matchesWon }}</span>
-                        <span class="stat-label">Victorias</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value">{{ player.tournamentsPlayed }}</span>
-                        <span class="stat-label">Torneos</span>
-                    </div>
+                <div class="info-row">
+                    <span class="info-label">Posición</span>
+                    <span class="info-value">{{ getPositionLabel(player.position) }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Categoría</span>
+                    <span class="info-value">{{ player.category?.name || 'Sin categoría' }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Clubs</span>
+                    <span class="info-value">
+                        <ng-container *ngIf="player.clubs?.length; else noClubs">
+                            <span *ngFor="let c of player.clubs; let last = last">{{ c.name }}<span *ngIf="!last">, </span></span>
+                        </ng-container>
+                        <ng-template #noClubs>Todos los clubs</ng-template>
+                    </span>
                 </div>
 
                 <button class="btn btn-edit" (click)="toggleEdit()">✏️ Editar Perfil</button>
             </div>
 
-            <!-- Edit Mode -->
+            <!-- ═══════ Edit Mode ═══════ -->
             <div *ngIf="editMode" class="profile-edit">
                 <div class="form-group">
                     <label>Nombre</label>
@@ -63,11 +95,20 @@
                 <div class="form-group">
                     <label>Email</label>
                     <input type="email" [(ngModel)]="form.email" class="form-control" placeholder="tu@email.com">
+                    <small *ngIf="form.email && form.email !== player.email" class="help-text">
+                        ⚠️ Al cambiar el email se enviará un nuevo correo de verificación.
+                    </small>
                 </div>
                 <div class="form-group">
                     <label>Identificación</label>
                     <input type="text" [(ngModel)]="form.identification" class="form-control" placeholder="RUT o Pasaporte">
                 </div>
+
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="tel" [(ngModel)]="form.phone" class="form-control" placeholder="+56912345678">
+                </div>
+
                 <div class="form-group">
                     <label>Posición</label>
                     <select [(ngModel)]="form.position" class="form-control">
@@ -76,6 +117,27 @@
                         <option value="reves">Revés</option>
                         <option value="mixto">Mixto</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Categoría</label>
+                    <select [(ngModel)]="form.categoryId" class="form-control">
+                        <option value="">Sin categoría</option>
+                        <option *ngFor="let cat of allCategories" [value]="cat.id">{{ cat.name }}</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Clubs</label>
+                    <div class="club-chips">
+                        <button *ngFor="let club of allClubs"
+                                class="chip"
+                                [class.chip-selected]="isClubSelected(club.id)"
+                                (click)="toggleClub(club.id)"
+                                type="button">
+                            {{ club.name }}
+                        </button>
+                    </div>
                 </div>
 
                 <div class="edit-actions">
