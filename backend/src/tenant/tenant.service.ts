@@ -164,25 +164,52 @@ export class TenantService {
     /**
      * Execute `fn` within a club's schema context.
      *
-     * ALWAYS acquires a dedicated QueryRunner with its own search_path
-     * to guarantee isolation from the interceptor's shared QR.
+     * If an existing ALS QueryRunner is available and its search_path
+     * already points to the target schema, reuses it to avoid
+     * exhausting the connection pool with duplicate QRs.
      *
-     * Also temporarily overrides the ALS store so that any `getRepo()`
-     * or `query()` calls inside `fn` use the fresh QR's EntityManager
-     * instead of the potentially-stale interceptor EM.
+     * Otherwise acquires a dedicated QueryRunner with its own
+     * search_path and temporarily overrides the ALS store so that any
+     * `getRepo()` / `query()` calls inside `fn` use the fresh QR's
+     * EntityManager.
      */
     async run<T>(
         clubId: string,
         fn: (em: EntityManager, qr: QueryRunner) => Promise<T>,
     ): Promise<T> {
         const schemaName = await this.getSchemaName(clubId);
+
+        // ── Fast path: reuse existing ALS QR if it already has the right schema
+        const store = tenantContext.getStore();
+        if (store?.queryRunner && !store.queryRunner.isReleased) {
+            try {
+                const rows = await store.queryRunner.query('SHOW search_path');
+                const currentPath: string = rows?.[0]?.search_path || '';
+                if (currentPath.includes(schemaName)) {
+                    if (isDev) {
+                        this.logger.debug(
+                            `run(${clubId}): reusing ALS QR (search_path=${currentPath})`,
+                        );
+                    }
+                    return await fn(store.entityManager!, store.queryRunner);
+                }
+            } catch {
+                // QR might be broken — fall through to create a new one
+            }
+        }
+
+        // ── Slow path: create a dedicated QR
         const qr = this.dataSource.createQueryRunner();
         await qr.connect();
         try {
             await qr.query(`SET search_path TO "${schemaName}", public`);
 
+            if (isDev) {
+                const [{ search_path }] = await qr.query('SHOW search_path');
+                this.logger.debug(`run(${clubId}): new QR search_path = ${search_path}`);
+            }
+
             // Override ALS context so getRepo()/query() use this fresh QR
-            const store = tenantContext.getStore();
             const prevEM = store?.entityManager;
             const prevQR = store?.queryRunner;
             if (store) {

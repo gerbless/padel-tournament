@@ -34,6 +34,9 @@ import { TenantModule } from './tenant/tenant.module';
                 database: configService.get('DB_DATABASE'),
                 entities: [__dirname + '/**/*.entity{.ts,.js}'],
                 synchronize: false, // Set to false in production
+                extra: {
+                    max: 20, // Increase connection pool size for multi-tenant QR usage
+                },
             }),
             inject: [ConfigService],
         }),
