@@ -1017,22 +1017,26 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
      * Get payment status for a reservation
      */
     async getPaymentStatus(reservationId: string): Promise<MercadoPagoPayment | null> {
-        return this.tenant.getRepo(MercadoPagoPayment).findOne({
-            where: { reservationId },
-            order: { createdAt: 'DESC' },
-        });
+        return this.tenant.runInContext(em =>
+            em.getRepository(MercadoPagoPayment).findOne({
+                where: { reservationId },
+                order: { createdAt: 'DESC' },
+            })
+        );
     }
 
     /**
      * Get all payments for a club
      */
     async getClubPayments(clubId: string, limit = 50): Promise<MercadoPagoPayment[]> {
-        return this.tenant.getRepo(MercadoPagoPayment).find({
-            where: { clubId },
-            order: { createdAt: 'DESC' },
-            take: limit,
-            relations: ['reservation'],
-        });
+        return this.tenant.run(clubId, em =>
+            em.getRepository(MercadoPagoPayment).find({
+                where: { clubId },
+                order: { createdAt: 'DESC' },
+                take: limit,
+                relations: ['reservation'],
+            })
+        );
     }
 
     /**

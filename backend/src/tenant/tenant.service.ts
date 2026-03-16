@@ -166,6 +166,10 @@ export class TenantService {
      *
      * ALWAYS acquires a dedicated QueryRunner with its own search_path
      * to guarantee isolation from the interceptor's shared QR.
+     *
+     * Also temporarily overrides the ALS store so that any `getRepo()`
+     * or `query()` calls inside `fn` use the fresh QR's EntityManager
+     * instead of the potentially-stale interceptor EM.
      */
     async run<T>(
         clubId: string,
@@ -176,7 +180,25 @@ export class TenantService {
         await qr.connect();
         try {
             await qr.query(`SET search_path TO "${schemaName}", public`);
-            return await fn(qr.manager, qr);
+
+            // Override ALS context so getRepo()/query() use this fresh QR
+            const store = tenantContext.getStore();
+            const prevEM = store?.entityManager;
+            const prevQR = store?.queryRunner;
+            if (store) {
+                store.entityManager = qr.manager;
+                store.queryRunner = qr;
+            }
+
+            try {
+                return await fn(qr.manager, qr);
+            } finally {
+                // Restore previous ALS context
+                if (store) {
+                    store.entityManager = prevEM;
+                    store.queryRunner = prevQR;
+                }
+            }
         } finally {
             try { await qr.query(`SET search_path TO public`); } catch {}
             await qr.release();

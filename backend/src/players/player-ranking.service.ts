@@ -42,22 +42,24 @@ export class PlayerRankingService {
                 .getMany();
         }
 
-        let statsQuery = this.tenant.getRepo(PlayerClubStats).createQueryBuilder('stats')
-            .leftJoinAndSelect('stats.player', 'player')
-            .leftJoinAndSelect('player.category', 'category')
-            .where('stats.club.id = :clubId', { clubId })
-            .andWhere('stats.totalPoints > 0');
+        return this.tenant.run(clubId, async (em) => {
+            let statsQuery = em.getRepository(PlayerClubStats).createQueryBuilder('stats')
+                .leftJoinAndSelect('stats.player', 'player')
+                .leftJoinAndSelect('player.category', 'category')
+                .where('stats.club.id = :clubId', { clubId })
+                .andWhere('stats.totalPoints > 0');
 
-        if (categoryId) {
-            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
-        }
+            if (categoryId) {
+                statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
+            }
 
-        const stats = await statsQuery
-            .orderBy('stats.totalPoints', 'DESC')
-            .addOrderBy('stats.matchesWon', 'DESC')
-            .getMany();
+            const stats = await statsQuery
+                .orderBy('stats.totalPoints', 'DESC')
+                .addOrderBy('stats.matchesWon', 'DESC')
+                .getMany();
 
-        return this.mapClubStatsToPlayers(stats);
+            return this.mapClubStatsToPlayers(stats);
+        });
     }
 
     async getLeagueRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
@@ -76,23 +78,25 @@ export class PlayerRankingService {
                 .getMany();
         }
 
-        let statsQuery = this.tenant.getRepo(PlayerClubStats).createQueryBuilder('stats')
-            .leftJoinAndSelect('stats.player', 'player')
-            .leftJoinAndSelect('player.category', 'category')
-            .where('stats.club.id = :clubId', { clubId })
-            .andWhere('stats.leaguePoints > 0');
+        return this.tenant.run(clubId, async (em) => {
+            let statsQuery = em.getRepository(PlayerClubStats).createQueryBuilder('stats')
+                .leftJoinAndSelect('stats.player', 'player')
+                .leftJoinAndSelect('player.category', 'category')
+                .where('stats.club.id = :clubId', { clubId })
+                .andWhere('stats.leaguePoints > 0');
 
-        if (categoryId) {
-            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
-        }
+            if (categoryId) {
+                statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
+            }
 
-        const stats = await statsQuery
-            .orderBy('stats.leaguePoints', 'DESC')
-            .addOrderBy('stats.totalPoints', 'DESC')
-            .addOrderBy('stats.matchesWon', 'DESC')
-            .getMany();
+            const stats = await statsQuery
+                .orderBy('stats.leaguePoints', 'DESC')
+                .addOrderBy('stats.totalPoints', 'DESC')
+                .addOrderBy('stats.matchesWon', 'DESC')
+                .getMany();
 
-        return this.mapClubStatsToPlayers(stats);
+            return this.mapClubStatsToPlayers(stats);
+        });
     }
 
     async getTournamentRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
@@ -111,23 +115,25 @@ export class PlayerRankingService {
                 .getMany();
         }
 
-        let statsQuery = this.tenant.getRepo(PlayerClubStats).createQueryBuilder('stats')
-            .leftJoinAndSelect('stats.player', 'player')
-            .leftJoinAndSelect('player.category', 'category')
-            .where('stats.club.id = :clubId', { clubId })
-            .andWhere('stats.tournamentPoints > 0');
+        return this.tenant.run(clubId, async (em) => {
+            let statsQuery = em.getRepository(PlayerClubStats).createQueryBuilder('stats')
+                .leftJoinAndSelect('stats.player', 'player')
+                .leftJoinAndSelect('player.category', 'category')
+                .where('stats.club.id = :clubId', { clubId })
+                .andWhere('stats.tournamentPoints > 0');
 
-        if (categoryId) {
-            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
-        }
+            if (categoryId) {
+                statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
+            }
 
-        const stats = await statsQuery
-            .orderBy('stats.tournamentPoints', 'DESC')
-            .addOrderBy('stats.totalPoints', 'DESC')
-            .addOrderBy('stats.matchesWon', 'DESC')
-            .getMany();
+            const stats = await statsQuery
+                .orderBy('stats.tournamentPoints', 'DESC')
+                .addOrderBy('stats.totalPoints', 'DESC')
+                .addOrderBy('stats.matchesWon', 'DESC')
+                .getMany();
 
-        return this.mapClubStatsToPlayers(stats);
+            return this.mapClubStatsToPlayers(stats);
+        });
     }
 
     async getPairRankings(type: 'global' | 'league' | 'tournament', categoryId?: string, clubId?: string): Promise<any[]> {
@@ -216,33 +222,35 @@ export class PlayerRankingService {
             });
         };
 
-        if (type === 'global' || type === 'tournament') {
-            let tournamentTeamsQuery = this.tenant.getRepo(Team)
-                .createQueryBuilder('team')
-                .leftJoinAndSelect('team.matchesAsTeam1', 'matchesAsTeam1')
-                .leftJoinAndSelect('matchesAsTeam1.winner', 'winner1')
-                .leftJoinAndSelect('team.matchesAsTeam2', 'matchesAsTeam2')
-                .leftJoinAndSelect('matchesAsTeam2.winner', 'winner2')
-                .leftJoin('team.tournament', 'tournament');
+        await this.tenant.runInContext(async (em) => {
+            if (type === 'global' || type === 'tournament') {
+                let tournamentTeamsQuery = em.getRepository(Team)
+                    .createQueryBuilder('team')
+                    .leftJoinAndSelect('team.matchesAsTeam1', 'matchesAsTeam1')
+                    .leftJoinAndSelect('matchesAsTeam1.winner', 'winner1')
+                    .leftJoinAndSelect('team.matchesAsTeam2', 'matchesAsTeam2')
+                    .leftJoinAndSelect('matchesAsTeam2.winner', 'winner2')
+                    .leftJoin('team.tournament', 'tournament');
 
-            if (clubId) {
-                tournamentTeamsQuery = tournamentTeamsQuery.where('tournament.clubId = :clubId OR tournament.clubId IS NULL', { clubId });
+                if (clubId) {
+                    tournamentTeamsQuery = tournamentTeamsQuery.where('tournament.clubId = :clubId OR tournament.clubId IS NULL', { clubId });
+                }
+
+                processTeams(await tournamentTeamsQuery.getMany(), true);
             }
 
-            processTeams(await tournamentTeamsQuery.getMany(), true);
-        }
+            if (type === 'global' || type === 'league') {
+                let leagueTeamsQuery = em.getRepository(LeagueTeam)
+                    .createQueryBuilder('leagueTeam')
+                    .leftJoin('leagueTeam.league', 'league');
 
-        if (type === 'global' || type === 'league') {
-            let leagueTeamsQuery = this.tenant.getRepo(LeagueTeam)
-                .createQueryBuilder('leagueTeam')
-                .leftJoin('leagueTeam.league', 'league');
+                if (clubId) {
+                    leagueTeamsQuery = leagueTeamsQuery.where('league.clubId = :clubId OR league.clubId IS NULL', { clubId });
+                }
 
-            if (clubId) {
-                leagueTeamsQuery = leagueTeamsQuery.where('league.clubId = :clubId OR league.clubId IS NULL', { clubId });
+                processTeams(await leagueTeamsQuery.getMany(), false);
             }
-
-            processTeams(await leagueTeamsQuery.getMany(), false);
-        }
+        });
 
         return Array.from(pairMap.values()).sort((a, b) => b.points - a.points);
     }
@@ -272,21 +280,23 @@ export class PlayerRankingService {
                 .getMany();
         }
 
-        let statsQuery = this.tenant.getRepo(PlayerClubStats).createQueryBuilder('stats')
-            .leftJoinAndSelect('stats.player', 'player')
-            .leftJoinAndSelect('player.category', 'category')
-            .where('stats.club.id = :clubId', { clubId })
-            .andWhere('stats.freePlayPoints > 0');
+        return this.tenant.run(clubId, async (em) => {
+            let statsQuery = em.getRepository(PlayerClubStats).createQueryBuilder('stats')
+                .leftJoinAndSelect('stats.player', 'player')
+                .leftJoinAndSelect('player.category', 'category')
+                .where('stats.club.id = :clubId', { clubId })
+                .andWhere('stats.freePlayPoints > 0');
 
-        if (categoryId) {
-            statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
-        }
+            if (categoryId) {
+                statsQuery = statsQuery.andWhere('player.categoryId = :categoryId', { categoryId });
+            }
 
-        const stats = await statsQuery
-            .orderBy('stats.freePlayPoints', 'DESC')
-            .addOrderBy('stats.matchesWon', 'DESC')
-            .getMany();
+            const stats = await statsQuery
+                .orderBy('stats.freePlayPoints', 'DESC')
+                .addOrderBy('stats.matchesWon', 'DESC')
+                .getMany();
 
-        return this.mapClubStatsToPlayers(stats);
+            return this.mapClubStatsToPlayers(stats);
+        });
     }
 }

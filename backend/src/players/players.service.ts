@@ -236,17 +236,21 @@ export class PlayersService {
         const player = await this.findOne(id);
 
         // Check if player is part of any team (using tenant-scoped repo for club tables)
-        const teamCount1 = await this.tenant.getRepo(Player).createQueryBuilder('player')
-            .leftJoin('player.teamsAsPlayer1', 'team')
-            .where('player.id = :id', { id })
-            .andWhere('team.id IS NOT NULL')
-            .getCount();
+        const [teamCount1, teamCount2] = await this.tenant.runInContext(async (em) => {
+            const tc1 = await em.getRepository(Player).createQueryBuilder('player')
+                .leftJoin('player.teamsAsPlayer1', 'team')
+                .where('player.id = :id', { id })
+                .andWhere('team.id IS NOT NULL')
+                .getCount();
 
-        const teamCount2 = await this.tenant.getRepo(Player).createQueryBuilder('player')
-            .leftJoin('player.teamsAsPlayer2', 'team')
-            .where('player.id = :id', { id })
-            .andWhere('team.id IS NOT NULL')
-            .getCount();
+            const tc2 = await em.getRepository(Player).createQueryBuilder('player')
+                .leftJoin('player.teamsAsPlayer2', 'team')
+                .where('player.id = :id', { id })
+                .andWhere('team.id IS NOT NULL')
+                .getCount();
+
+            return [tc1, tc2];
+        });
 
         if (player.tournamentsPlayed > 0 || teamCount1 > 0 || teamCount2 > 0) {
             throw new ConflictException('No se puede eliminar el jugador porque tiene torneos jugados');
@@ -259,10 +263,12 @@ export class PlayersService {
         const uniqueIds = [...new Set(playerIds)];
         if (uniqueIds.length === 0) return;
 
+        await this.tenant.runInContext(async (em) => {
+
         // Single query: load ALL players with ALL relations at once (eliminates N+1)
         // Use tenant-scoped repo so search_path includes the club schema
         // (teams, matches, league_teams live in club schemas, not public)
-        const players = await this.tenant.getRepo(Player).createQueryBuilder('player')
+        const players = await em.getRepository(Player).createQueryBuilder('player')
             .leftJoinAndSelect('player.teamsAsPlayer1', 'tp1')
             .leftJoinAndSelect('tp1.tournament', 'tp1_tournament')
             .leftJoinAndSelect('tp1.matchesAsTeam1', 'tp1_m1')
@@ -410,7 +416,7 @@ export class PlayersService {
             let globalFreePlayPoints = 0;
             let globalFreePlayWins = 0;
 
-            const freePlayMatches = await this.tenant.getRepo(FreePlayMatch).createQueryBuilder('fpm')
+            const freePlayMatches = await em.getRepository(FreePlayMatch).createQueryBuilder('fpm')
                 .where('fpm.status = :status', { status: 'completed' })
                 .andWhere('fpm.countsForRanking = true')
                 .getMany();
@@ -465,7 +471,7 @@ export class PlayersService {
                 const clubStats = await this.getOrCreatePlayerClubStats(player.id, stats.clubId);
                 if (clubStats) {
                     // Use update() instead of save() to avoid cascade issues
-                    await this.tenant.getRepo(PlayerClubStats).update(clubStats.id, {
+                    await em.getRepository(PlayerClubStats).update(clubStats.id, {
                         totalPoints: stats.totalPoints,
                         leaguePoints: stats.leaguePoints,
                         tournamentPoints: stats.tournamentPoints,
@@ -478,6 +484,7 @@ export class PlayersService {
                 }
             }
         }
+        }); // end tenant.runInContext
     }
 
     async getLeagueRanking(categoryId?: string, clubId?: string): Promise<Player[]> {
@@ -533,34 +540,36 @@ export class PlayersService {
             return null; // No club stats for inter-club players
         }
 
-        // Try to find existing stats
-        let stats = await this.tenant.getRepo(PlayerClubStats).findOne({
-            where: {
-                player: { id: playerId },
-                club: { id: clubId }
-            },
-            relations: ['player', 'club']
-        });
-
-        if (!stats) {
-            // Create new stats
-            stats = this.tenant.getRepo(PlayerClubStats).create({
-                player: { id: playerId } as Player,
-                club: { id: clubId } as any,
-                totalPoints: 0,
-                leaguePoints: 0,
-                tournamentPoints: 0,
-                matchesWon: 0,
-                matchesLost: 0,
-                gamesWon: 0,
-                gamesLost: 0,
-                tournamentsPlayed: 0,
-                leaguesPlayed: 0
+        return this.tenant.runInContext(async (em) => {
+            // Try to find existing stats
+            let stats = await em.getRepository(PlayerClubStats).findOne({
+                where: {
+                    player: { id: playerId },
+                    club: { id: clubId }
+                },
+                relations: ['player', 'club']
             });
-            stats = await this.tenant.getRepo(PlayerClubStats).save(stats);
-        }
 
-        return stats;
+            if (!stats) {
+                // Create new stats
+                stats = em.getRepository(PlayerClubStats).create({
+                    player: { id: playerId } as Player,
+                    club: { id: clubId } as any,
+                    totalPoints: 0,
+                    leaguePoints: 0,
+                    tournamentPoints: 0,
+                    matchesWon: 0,
+                    matchesLost: 0,
+                    gamesWon: 0,
+                    gamesLost: 0,
+                    tournamentsPlayed: 0,
+                    leaguesPlayed: 0
+                });
+                stats = await em.getRepository(PlayerClubStats).save(stats);
+            }
+
+            return stats;
+        });
     }
 
     async updatePlayerClubStats(
@@ -591,7 +600,9 @@ export class PlayersService {
             }
         });
 
-        return this.tenant.getRepo(PlayerClubStats).save(stats);
+        return this.tenant.runInContext(async (em) => {
+            return em.getRepository(PlayerClubStats).save(stats);
+        });
     }
 
     async updatePlayerGlobalStats(

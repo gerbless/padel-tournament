@@ -6,6 +6,7 @@ import { PlayersService } from '../players/players.service';
 import { CreateLeagueDto } from './dto/create-league.dto';
 import { UpdateLeagueDto } from './dto/update-league.dto';
 import { PaginationQueryDto, PaginatedResult } from '../common/dto/pagination.dto';
+import { EntityManager } from 'typeorm';
 import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
@@ -51,45 +52,52 @@ export class LeaguesService {
     }
 
     async findAll(clubId?: string, pagination?: PaginationQueryDto): Promise<PaginatedResult<League>> {
-        const page = pagination?.page || 1;
-        const limit = pagination?.limit || 20;
-        const skip = (page - 1) * limit;
+        const fn = async (em: EntityManager) => {
+            const page = pagination?.page || 1;
+            const limit = pagination?.limit || 20;
+            const skip = (page - 1) * limit;
 
-        const queryOptions: any = {
-            relations: ['teams', 'teams.player1', 'teams.player2', 'matches'],
-            skip,
-            take: limit,
+            const queryOptions: any = {
+                relations: ['teams', 'teams.player1', 'teams.player2', 'matches'],
+                skip,
+                take: limit,
+            };
+
+            if (clubId) {
+                queryOptions.where = { clubId };
+            }
+
+            const [data, total] = await em.getRepository(League).findAndCount(queryOptions);
+            return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
         };
-
-        if (clubId) {
-            queryOptions.where = { clubId };
-        }
-
-        const [data, total] = await this.tenant.getRepo(League).findAndCount(queryOptions);
-        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+        return clubId ? this.tenant.run(clubId, fn) : this.tenant.runInContext(fn);
     }
 
     async findOne(id: string): Promise<League> {
-        const league = await this.tenant.getRepo(League).findOne({
-            where: { id },
-            relations: [
-                'teams', 'teams.player1', 'teams.player2',
-                'matches',
-                'matches.team1', 'matches.team1.player1', 'matches.team1.player2',
-                'matches.team2', 'matches.team2.player1', 'matches.team2.player2'
-            ]
+        return this.tenant.runInContext(async (em) => {
+            const league = await em.getRepository(League).findOne({
+                where: { id },
+                relations: [
+                    'teams', 'teams.player1', 'teams.player2',
+                    'matches',
+                    'matches.team1', 'matches.team1.player1', 'matches.team1.player2',
+                    'matches.team2', 'matches.team2.player1', 'matches.team2.player2'
+                ]
+            });
+            if (!league) {
+                throw new NotFoundException(`League with ID ${id} not found`);
+            }
+            return league;
         });
-        if (!league) {
-            throw new NotFoundException(`League with ID ${id} not found`);
-        }
-        return league;
     }
 
     async update(id: string, updateLeagueDto: UpdateLeagueDto): Promise<League> {
-        const league = await this.findOne(id);
-        // Use update() instead of save() to avoid TypeORM cascade issues in multi-schema
-        await this.tenant.getRepo(League).update(id, updateLeagueDto);
-        return this.findOne(id);
+        return this.tenant.runInContext(async (em) => {
+            await this.findOne(id);
+            // Use update() instead of save() to avoid TypeORM cascade issues in multi-schema
+            await em.getRepository(League).update(id, updateLeagueDto);
+            return this.findOne(id);
+        });
     }
 
     async remove(id: string): Promise<void> {
@@ -106,7 +114,9 @@ export class LeaguesService {
             if (t.player2Id) playerIds.add(t.player2Id);
         });
 
-        await this.tenant.getRepo(League).remove(league);
+        await this.tenant.runInContext(async (em) => {
+            await em.getRepository(League).remove(league);
+        });
 
         // Recalculate stats for affected players (points will be removed)
         if (playerIds.size > 0) {
@@ -115,17 +125,20 @@ export class LeaguesService {
     }
 
     async addTeam(id: string, player1Id: string, player2Id: string): Promise<LeagueTeam> {
-        const league = await this.findOne(id);
-        const team = this.tenant.getRepo(LeagueTeam).create({
-            leagueId: id,
-            player1Id,
-            player2Id,
-            teamName: `Team ${league.teams.length + 1}`
+        return this.tenant.runInContext(async (em) => {
+            const league = await this.findOne(id);
+            const team = em.getRepository(LeagueTeam).create({
+                leagueId: id,
+                player1Id,
+                player2Id,
+                teamName: `Team ${league.teams.length + 1}`
+            });
+            return em.getRepository(LeagueTeam).save(team);
         });
-        return this.tenant.getRepo(LeagueTeam).save(team);
     }
 
     async generateGroups(id: string, numberOfGroups: number): Promise<LeagueTeam[]> {
+      return this.tenant.runInContext(async (em) => {
         const league = await this.findOne(id);
         if (league.teams.length < numberOfGroups * 2) {
             throw new Error('Not enough teams for the requested number of groups (min 2 per group)');
@@ -148,17 +161,19 @@ export class LeaguesService {
 
         // Save config with generated groups
         league.config = { ...league.config, groups: groupNames };
-        await this.tenant.getRepo(League).update(id, { config: league.config });
+        await em.getRepository(League).update(id, { config: league.config });
 
         // Use individual update() instead of save() to avoid cascade issues
         for (const team of teams) {
-            await this.tenant.getRepo(LeagueTeam).update(team.id, { group: team.group });
+            await em.getRepository(LeagueTeam).update(team.id, { group: team.group });
         }
-        return this.tenant.getRepo(LeagueTeam).find({ where: { leagueId: id } });
+        return em.getRepository(LeagueTeam).find({ where: { leagueId: id } });
+      });
     }
 
     async updateMatchResult(matchId: string, sets: any[], winnerId: string): Promise<LeagueMatch> {
-        const match = await this.tenant.getRepo(LeagueMatch).findOne({
+      return this.tenant.runInContext(async (em) => {
+        const match = await em.getRepository(LeagueMatch).findOne({
             where: { id: matchId },
             relations: ['league']
         });
@@ -173,14 +188,14 @@ export class LeaguesService {
 
         // Use update() instead of save() to avoid TypeORM cascade issues
         // that cause "relation 'teams' does not exist" in multi-schema setups
-        await this.tenant.getRepo(LeagueMatch).update(matchId, {
+        await em.getRepository(LeagueMatch).update(matchId, {
             sets,
             winnerId,
             status: MatchStatus.COMPLETED,
         });
 
         // Re-fetch the updated match
-        const savedMatch = await this.tenant.getRepo(LeagueMatch).findOne({
+        const savedMatch = await em.getRepository(LeagueMatch).findOne({
             where: { id: matchId },
         });
         if (!savedMatch) throw new NotFoundException('Match not found after update');
@@ -199,6 +214,7 @@ export class LeaguesService {
         await this.checkAutomaticCompletion(leagueId);
 
         return savedMatch;
+      });
     }
 
     private async checkAndGeneratePlayoffs(leagueId: string) {
@@ -223,6 +239,7 @@ export class LeaguesService {
     }
 
     private async checkPlayoffProgression(league: League) {
+      return this.tenant.runInContext(async (em) => {
         const tiers = ['', '_Gold', '_Silver', '_Bronze'];
 
         for (const tier of tiers) {
@@ -242,7 +259,7 @@ export class LeaguesService {
                     const w2 = sfMatches[1].winnerId;
 
                     if (w1 && w2) {
-                        await this.tenant.getRepo(LeagueMatch).save(
+                        await em.getRepository(LeagueMatch).save(
                             this.createPlayoffMatch(league.id, w1, w2, fGroup, 1) // Round 1 of Finals
                         );
                     }
@@ -262,7 +279,7 @@ export class LeaguesService {
 
                     const winners = qfMatches.map(m => m.winnerId);
                     if (winners.length === 4 && winners.every(w => !!w)) {
-                        await this.tenant.getRepo(LeagueMatch).save([
+                        await em.getRepository(LeagueMatch).save([
                             this.createPlayoffMatch(league.id, winners[0], winners[1], sfGroup, 1),
                             this.createPlayoffMatch(league.id, winners[2], winners[3], sfGroup, 1)
                         ]);
@@ -270,9 +287,11 @@ export class LeaguesService {
                 }
             }
         }
+      });
     }
 
     private async generateInitialPlayoffFixtures(league: League) {
+      return this.tenant.runInContext(async (em) => {
         const teams = league.teams;
 
         const groups: Record<string, LeagueTeam[]> = {};
@@ -381,12 +400,13 @@ export class LeaguesService {
         }
 
         if (matches.length > 0) {
-            await this.tenant.getRepo(LeagueMatch).save(matches);
+            await em.getRepository(LeagueMatch).save(matches);
         }
+      });
     }
 
     private createPlayoffMatch(leagueId: string, t1Id: string, t2Id: string, group: string, round: number): LeagueMatch {
-        return this.tenant.getRepo(LeagueMatch).create({
+        return Object.assign(new LeagueMatch(), {
             leagueId,
             team1Id: t1Id,
             team2Id: t2Id,
@@ -397,6 +417,7 @@ export class LeaguesService {
     }
 
     async generateFixtures(id: string): Promise<LeagueMatch[]> {
+      return this.tenant.runInContext(async (em) => {
         const league = await this.findOne(id);
 
         if (league.teams.length < 2) {
@@ -436,7 +457,8 @@ export class LeaguesService {
             }
         }
 
-        return this.tenant.getRepo(LeagueMatch).save(matches);
+        return em.getRepository(LeagueMatch).save(matches);
+      });
     }
 
     private generateRoundRobinMatches(teams: LeagueTeam[], matches: LeagueMatch[], leagueId: string, group?: string, roundCycle: number = 0) {
@@ -459,7 +481,7 @@ export class LeaguesService {
                     // In even cycles, swap home/away for variety
                     const t1 = roundCycle % 2 === 0 ? home : away;
                     const t2 = roundCycle % 2 === 0 ? away : home;
-                    matches.push(this.tenant.getRepo(LeagueMatch).create({
+                    matches.push(Object.assign(new LeagueMatch(), {
                         leagueId: leagueId,
                         team1Id: t1.id,
                         team2Id: t2.id,
@@ -478,8 +500,9 @@ export class LeaguesService {
     }
 
     async calculateStandings(leagueId: string): Promise<void> {
+      return this.tenant.runInContext(async (em) => {
         const league = await this.findOne(leagueId);
-        let matches = await this.tenant.getRepo(LeagueMatch).find({
+        let matches = await em.getRepository(LeagueMatch).find({
             where: { leagueId, status: MatchStatus.COMPLETED },
             relations: ['winner']
         });
@@ -578,7 +601,7 @@ export class LeaguesService {
         // Use individual update() calls instead of save() to avoid TypeORM cascade issues
         // in multi-schema setups
         for (const team of league.teams) {
-            await this.tenant.getRepo(LeagueTeam).update(team.id, {
+            await em.getRepository(LeagueTeam).update(team.id, {
                 matchesPlayed: team.matchesPlayed,
                 matchesWon: team.matchesWon,
                 matchesLost: team.matchesLost,
@@ -589,14 +612,16 @@ export class LeaguesService {
                 gamesLost: team.gamesLost,
             });
         }
+      });
     }
 
     async getStandings(leagueId: string): Promise<LeagueTeam[]> {
+      return this.tenant.runInContext(async (em) => {
         await this.calculateStandings(leagueId); // Ensure fresh stats
         const league = await this.findOne(leagueId);
 
         // Load completed non-playoff matches for head-to-head tiebreaker
-        const completedMatches = await this.tenant.getRepo(LeagueMatch).find({
+        const completedMatches = await em.getRepository(LeagueMatch).find({
             where: { leagueId, status: MatchStatus.COMPLETED }
         });
         const regularMatches = completedMatches.filter(m => 
@@ -623,6 +648,7 @@ export class LeaguesService {
 
             return 0;
         });
+      });
     }
 
     /**
@@ -684,6 +710,7 @@ export class LeaguesService {
     }
 
     async completeLeague(id: string): Promise<League> {
+      return this.tenant.runInContext(async (em) => {
         const league = await this.findOne(id);
         if (league.status === LeagueStatus.COMPLETED) return league;
 
@@ -695,7 +722,7 @@ export class LeaguesService {
             updateData.endDate = league.endDate;
         }
         // Use update() instead of save() to avoid TypeORM cascade issues in multi-schema
-        await this.tenant.getRepo(League).update(id, updateData);
+        await em.getRepository(League).update(id, updateData);
         const saved = await this.findOne(id);
 
         // Trigger point recalculation for all participants
@@ -710,6 +737,7 @@ export class LeaguesService {
         }
 
         return saved;
+      });
     }
 
     private async checkAutomaticCompletion(leagueId: string) {
@@ -791,6 +819,7 @@ export class LeaguesService {
     }
 
     async generateTieBreakerMatches(leagueId: string): Promise<LeagueMatch[]> {
+      return this.tenant.runInContext(async (em) => {
         const tiedTeams = await this.checkStandingsTies(leagueId);
         if (tiedTeams.length < 2) {
             throw new Error('No ties detected for the top positions.');
@@ -800,7 +829,7 @@ export class LeaguesService {
 
         // If 2 teams, direct match
         if (tiedTeams.length === 2) {
-            matches.push(this.tenant.getRepo(LeagueMatch).create({
+            matches.push(Object.assign(new LeagueMatch(), {
                 leagueId,
                 team1Id: tiedTeams[0].id,
                 team2Id: tiedTeams[1].id,
@@ -813,7 +842,8 @@ export class LeaguesService {
             this.generateRoundRobinMatches(tiedTeams, matches, leagueId, 'TieBreaker');
         }
 
-        return this.tenant.getRepo(LeagueMatch).save(matches);
+        return em.getRepository(LeagueMatch).save(matches);
+      });
     }
 
     // ==========================================
@@ -851,6 +881,7 @@ export class LeaguesService {
     }
 
     private async generateRoundRobinPlayoffFixtures(league: League) {
+      return this.tenant.runInContext(async (em) => {
         const standings = await this.getStandings(league.id);
         const matches: LeagueMatch[] = [];
 
@@ -892,8 +923,9 @@ export class LeaguesService {
         }
 
         if (matches.length > 0) {
-            await this.tenant.getRepo(LeagueMatch).save(matches);
+            await em.getRepository(LeagueMatch).save(matches);
         }
+      });
     }
 
     /**
@@ -901,6 +933,7 @@ export class LeaguesService {
      * SF → Final + 3rd place match (losers of SF play for 3rd/4th)
      */
     private async checkRoundRobinPlayoffProgression(league: League) {
+      return this.tenant.runInContext(async (em) => {
         const tiers = ['_Gold', '_Silver'];
 
         for (const tier of tiers) {
@@ -931,9 +964,10 @@ export class LeaguesService {
                     // 3rd place: Loser SF1 vs Loser SF2
                     newMatches.push(this.createPlayoffMatch(league.id, l1, l2, thirdGroup, 1));
 
-                    await this.tenant.getRepo(LeagueMatch).save(newMatches);
+                    await em.getRepository(LeagueMatch).save(newMatches);
                 }
             }
         }
+      });
     }
 }

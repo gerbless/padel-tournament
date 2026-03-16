@@ -110,35 +110,43 @@ export class CourtsService {
     // ==========================================
 
     async createPriceBlock(dto: CreatePriceBlockDto): Promise<CourtPriceBlock> {
-        const block = this.tenant.getRepo(CourtPriceBlock).create(dto);
-        return this.tenant.getRepo(CourtPriceBlock).save(block);
-    }
-
-    async createPriceBlockForAllCourts(clubId: string, dto: CreatePriceBlockDto): Promise<CourtPriceBlock[]> {
-        const courts = await this.tenant.getRepo(Court).find({ where: { clubId, isActive: true } });
-        const blocks: CourtPriceBlock[] = [];
-        for (const court of courts) {
-            const block = this.tenant.getRepo(CourtPriceBlock).create({
-                ...dto,
-                courtId: court.id,
-            });
-            blocks.push(await this.tenant.getRepo(CourtPriceBlock).save(block));
-        }
-        return blocks;
-    }
-
-    async getPriceBlocks(courtId: string): Promise<CourtPriceBlock[]> {
-        return this.tenant.getRepo(CourtPriceBlock).find({
-            where: { courtId },
-            order: { startTime: 'ASC' }
+        return this.tenant.runInContext(async (em) => {
+            const block = em.getRepository(CourtPriceBlock).create(dto);
+            return em.getRepository(CourtPriceBlock).save(block);
         });
     }
 
+    async createPriceBlockForAllCourts(clubId: string, dto: CreatePriceBlockDto): Promise<CourtPriceBlock[]> {
+        return this.tenant.run(clubId, async (em) => {
+            const courts = await em.getRepository(Court).find({ where: { clubId, isActive: true } });
+            const blocks: CourtPriceBlock[] = [];
+            for (const court of courts) {
+                const block = em.getRepository(CourtPriceBlock).create({
+                    ...dto,
+                    courtId: court.id,
+                });
+                blocks.push(await em.getRepository(CourtPriceBlock).save(block));
+            }
+            return blocks;
+        });
+    }
+
+    async getPriceBlocks(courtId: string): Promise<CourtPriceBlock[]> {
+        return this.tenant.runInContext(em =>
+            em.getRepository(CourtPriceBlock).find({
+                where: { courtId },
+                order: { startTime: 'ASC' }
+            })
+        );
+    }
+
     async updatePriceBlock(id: string, dto: Partial<CreatePriceBlockDto>): Promise<CourtPriceBlock> {
-        const block = await this.tenant.getRepo(CourtPriceBlock).findOne({ where: { id } });
-        if (!block) throw new NotFoundException(`Price block ${id} not found`);
-        Object.assign(block, dto);
-        return this.tenant.getRepo(CourtPriceBlock).save(block);
+        return this.tenant.runInContext(async (em) => {
+            const block = await em.getRepository(CourtPriceBlock).findOne({ where: { id } });
+            if (!block) throw new NotFoundException(`Price block ${id} not found`);
+            Object.assign(block, dto);
+            return em.getRepository(CourtPriceBlock).save(block);
+        });
     }
 
     async bulkUpdatePriceBlocks(
@@ -146,35 +154,37 @@ export class CourtsService {
         matchCriteria: { startTime: string; endTime: string; daysOfWeek: number[] },
         newValues: Partial<CreatePriceBlockDto>,
     ): Promise<{ updated: number }> {
-        // Get all courts for this club
-        const courts = await this.tenant.getRepo(Court).find({ where: { clubId } });
-        const courtIds = courts.map(c => c.id);
-        if (courtIds.length === 0) return { updated: 0 };
+        return this.tenant.run(clubId, async (em) => {
+            const courts = await em.getRepository(Court).find({ where: { clubId } });
+            const courtIds = courts.map(c => c.id);
+            if (courtIds.length === 0) return { updated: 0 };
 
-        // Find all matching price blocks across these courts
-        const allBlocks = await this.tenant.getRepo(CourtPriceBlock).find({
-            where: { courtId: In(courtIds) },
+            const allBlocks = await em.getRepository(CourtPriceBlock).find({
+                where: { courtId: In(courtIds) },
+            });
+
+            const sortedMatch = [...matchCriteria.daysOfWeek].sort().join(',');
+            const matching = allBlocks.filter(b =>
+                b.startTime === matchCriteria.startTime &&
+                b.endTime === matchCriteria.endTime &&
+                [...b.daysOfWeek].sort().join(',') === sortedMatch
+            );
+
+            for (const block of matching) {
+                Object.assign(block, newValues);
+                await em.getRepository(CourtPriceBlock).save(block);
+            }
+
+            return { updated: matching.length };
         });
-
-        const sortedMatch = [...matchCriteria.daysOfWeek].sort().join(',');
-        const matching = allBlocks.filter(b =>
-            b.startTime === matchCriteria.startTime &&
-            b.endTime === matchCriteria.endTime &&
-            [...b.daysOfWeek].sort().join(',') === sortedMatch
-        );
-
-        for (const block of matching) {
-            Object.assign(block, newValues);
-            await this.tenant.getRepo(CourtPriceBlock).save(block);
-        }
-
-        return { updated: matching.length };
     }
 
     async removePriceBlock(id: string): Promise<void> {
-        const block = await this.tenant.getRepo(CourtPriceBlock).findOne({ where: { id } });
-        if (!block) throw new NotFoundException(`Price block ${id} not found`);
-        await this.tenant.getRepo(CourtPriceBlock).remove(block);
+        return this.tenant.runInContext(async (em) => {
+            const block = await em.getRepository(CourtPriceBlock).findOne({ where: { id } });
+            if (!block) throw new NotFoundException(`Price block ${id} not found`);
+            await em.getRepository(CourtPriceBlock).remove(block);
+        });
     }
 
     /**
@@ -182,7 +192,9 @@ export class CourtsService {
      */
     async getPrice(courtId: string, date: string, startTime: string): Promise<CourtPriceBlock | null> {
         const dayOfWeek = new Date(date + 'T12:00:00').getDay(); // 0=Sunday
-        const blocks = await this.tenant.getRepo(CourtPriceBlock).find({ where: { courtId } });
+        const blocks = await this.tenant.runInContext(em =>
+            em.getRepository(CourtPriceBlock).find({ where: { courtId } })
+        );
 
         return blocks.find(b =>
             b.daysOfWeek.includes(dayOfWeek) &&
@@ -196,126 +208,140 @@ export class CourtsService {
     // ==========================================
 
     async createReservation(dto: CreateReservationDto): Promise<Reservation> {
-        // Check for time conflicts
-        const conflicts = await this.tenant.getRepo(Reservation).find({
-            where: {
-                courtId: dto.courtId,
-                date: dto.date,
-                status: ReservationStatus.CONFIRMED
-            }
-        });
+        const cid = dto.clubId || this.tenant.getCurrentClubId();
+        if (!cid) throw new BadRequestException('Club ID required');
 
-        const hasConflict = conflicts.some(r =>
-            (dto.startTime >= r.startTime && dto.startTime < r.endTime) ||
-            (dto.endTime > r.startTime && dto.endTime <= r.endTime) ||
-            (dto.startTime <= r.startTime && dto.endTime >= r.endTime)
-        );
-
-        if (hasConflict) {
-            throw new BadRequestException('Ya existe una reserva en ese horario');
-        }
-
-        // Auto-calculate price from price blocks if not provided
-        if (dto.finalPrice === undefined || dto.finalPrice === null) {
-            const priceBlock = await this.getPrice(dto.courtId, dto.date, dto.startTime);
-            if (priceBlock) {
-                const basePrice = dto.priceType === 'per_player'
-                    ? Number(priceBlock.pricePerPlayer)
-                    : Number(priceBlock.priceFullCourt);
-                (dto as any).basePrice = basePrice;
-                dto.finalPrice = basePrice;
-            }
-        }
-
-        const data: Partial<Reservation> = {
-            courtId: dto.courtId,
-            clubId: dto.clubId,
-            date: dto.date,
-            startTime: dto.startTime,
-            endTime: dto.endTime,
-            title: dto.title,
-            players: dto.players || [],
-            playerCount: dto.playerCount || 4,
-            priceType: (dto.priceType as any) || PriceType.FULL_COURT,
-            basePrice: (dto as any).basePrice || dto.finalPrice || 0,
-            finalPrice: dto.finalPrice || 0,
-            paymentStatus: (dto.paymentStatus as any) || PaymentStatus.PENDING,
-            paymentMethod: (dto.paymentMethod as any) || null,
-            paymentNotes: dto.paymentNotes,
-            playerPayments: dto.playerPayments || null,
-        };
-        const insertResult = await this.tenant.getRepo(Reservation).insert(data as any);
-        const newId = insertResult.identifiers[0].id;
-        return this.tenant.getRepo(Reservation).findOne({ where: { id: newId } });
-    }
-
-    async getReservations(courtId: string, startDate: string, endDate: string): Promise<Reservation[]> {
-        return this.tenant.getRepo(Reservation)
-            .createQueryBuilder('r')
-            .where('r.courtId = :courtId', { courtId })
-            .andWhere('r.date >= :startDate', { startDate })
-            .andWhere('r.date <= :endDate', { endDate })
-            .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
-            .orderBy('r.date', 'ASC')
-            .addOrderBy('r.startTime', 'ASC')
-            .getMany();
-    }
-
-    async getReservationsByClub(clubId: string, startDate: string, endDate: string): Promise<Reservation[]> {
-        return this.tenant.getRepo(Reservation)
-            .createQueryBuilder('r')
-            .leftJoinAndSelect('r.court', 'court')
-            .where('r.clubId = :clubId', { clubId })
-            .andWhere('r.date >= :startDate', { startDate })
-            .andWhere('r.date <= :endDate', { endDate })
-            .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
-            .orderBy('r.date', 'ASC')
-            .addOrderBy('r.startTime', 'ASC')
-            .getMany();
-    }
-
-    async updateReservation(id: string, dto: Partial<CreateReservationDto>): Promise<Reservation> {
-        const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id } });
-        if (!reservation) throw new NotFoundException(`Reservation ${id} not found`);
-
-        // If time changed, check conflicts
-        if (dto.startTime || dto.endTime || dto.date) {
-            const checkDate = dto.date || reservation.date;
-            const checkStart = dto.startTime || reservation.startTime;
-            const checkEnd = dto.endTime || reservation.endTime;
-            const checkCourtId = dto.courtId || reservation.courtId;
-
-            const conflicts = await this.tenant.getRepo(Reservation).find({
+        return this.tenant.run(cid, async (em) => {
+            const reservationRepo = em.getRepository(Reservation);
+            // Check for time conflicts
+            const conflicts = await reservationRepo.find({
                 where: {
-                    courtId: checkCourtId,
-                    date: checkDate,
+                    courtId: dto.courtId,
+                    date: dto.date,
                     status: ReservationStatus.CONFIRMED
                 }
             });
 
-            const hasConflict = conflicts
-                .filter(r => r.id !== id)
-                .some(r =>
-                    (checkStart >= r.startTime && checkStart < r.endTime) ||
-                    (checkEnd > r.startTime && checkEnd <= r.endTime) ||
-                    (checkStart <= r.startTime && checkEnd >= r.endTime)
-                );
+            const hasConflict = conflicts.some(r =>
+                (dto.startTime >= r.startTime && dto.startTime < r.endTime) ||
+                (dto.endTime > r.startTime && dto.endTime <= r.endTime) ||
+                (dto.startTime <= r.startTime && dto.endTime >= r.endTime)
+            );
 
             if (hasConflict) {
                 throw new BadRequestException('Ya existe una reserva en ese horario');
             }
-        }
 
-        await this.tenant.getRepo(Reservation).update(id, dto as any);
-        return this.tenant.getRepo(Reservation).findOne({ where: { id } });
+            // Auto-calculate price from price blocks if not provided
+            if (dto.finalPrice === undefined || dto.finalPrice === null) {
+                const priceBlock = await this.getPrice(dto.courtId, dto.date, dto.startTime);
+                if (priceBlock) {
+                    const basePrice = dto.priceType === 'per_player'
+                        ? Number(priceBlock.pricePerPlayer)
+                        : Number(priceBlock.priceFullCourt);
+                    (dto as any).basePrice = basePrice;
+                    dto.finalPrice = basePrice;
+                }
+            }
+
+            const data: Partial<Reservation> = {
+                courtId: dto.courtId,
+                clubId: dto.clubId,
+                date: dto.date,
+                startTime: dto.startTime,
+                endTime: dto.endTime,
+                title: dto.title,
+                players: dto.players || [],
+                playerCount: dto.playerCount || 4,
+                priceType: (dto.priceType as any) || PriceType.FULL_COURT,
+                basePrice: (dto as any).basePrice || dto.finalPrice || 0,
+                finalPrice: dto.finalPrice || 0,
+                paymentStatus: (dto.paymentStatus as any) || PaymentStatus.PENDING,
+                paymentMethod: (dto.paymentMethod as any) || null,
+                paymentNotes: dto.paymentNotes,
+                playerPayments: dto.playerPayments || null,
+            };
+            const insertResult = await reservationRepo.insert(data as any);
+            const newId = insertResult.identifiers[0].id;
+            return reservationRepo.findOne({ where: { id: newId } });
+        });
+    }
+
+    async getReservations(courtId: string, startDate: string, endDate: string): Promise<Reservation[]> {
+        return this.tenant.runInContext(em =>
+            em.createQueryBuilder(Reservation, 'r')
+                .where('r.courtId = :courtId', { courtId })
+                .andWhere('r.date >= :startDate', { startDate })
+                .andWhere('r.date <= :endDate', { endDate })
+                .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
+                .orderBy('r.date', 'ASC')
+                .addOrderBy('r.startTime', 'ASC')
+                .getMany()
+        );
+    }
+
+    async getReservationsByClub(clubId: string, startDate: string, endDate: string): Promise<Reservation[]> {
+        return this.tenant.run(clubId, em =>
+            em.createQueryBuilder(Reservation, 'r')
+                .leftJoinAndSelect('r.court', 'court')
+                .where('r.clubId = :clubId', { clubId })
+                .andWhere('r.date >= :startDate', { startDate })
+                .andWhere('r.date <= :endDate', { endDate })
+                .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
+                .orderBy('r.date', 'ASC')
+                .addOrderBy('r.startTime', 'ASC')
+                .getMany()
+        );
+    }
+
+    async updateReservation(id: string, dto: Partial<CreateReservationDto>): Promise<Reservation> {
+        return this.tenant.runInContext(async (em) => {
+            const reservationRepo = em.getRepository(Reservation);
+            const reservation = await reservationRepo.findOne({ where: { id } });
+            if (!reservation) throw new NotFoundException(`Reservation ${id} not found`);
+
+            // If time changed, check conflicts
+            if (dto.startTime || dto.endTime || dto.date) {
+                const checkDate = dto.date || reservation.date;
+                const checkStart = dto.startTime || reservation.startTime;
+                const checkEnd = dto.endTime || reservation.endTime;
+                const checkCourtId = dto.courtId || reservation.courtId;
+
+                const conflicts = await reservationRepo.find({
+                    where: {
+                        courtId: checkCourtId,
+                        date: checkDate,
+                        status: ReservationStatus.CONFIRMED
+                    }
+                });
+
+                const hasConflict = conflicts
+                    .filter(r => r.id !== id)
+                    .some(r =>
+                        (checkStart >= r.startTime && checkStart < r.endTime) ||
+                        (checkEnd > r.startTime && checkEnd <= r.endTime) ||
+                        (checkStart <= r.startTime && checkEnd >= r.endTime)
+                    );
+
+                if (hasConflict) {
+                    throw new BadRequestException('Ya existe una reserva en ese horario');
+                }
+            }
+
+            await reservationRepo.update(id, dto as any);
+            return reservationRepo.findOne({ where: { id } });
+        });
     }
 
     async cancelReservation(id: string): Promise<Reservation> {
-        const reservation = await this.tenant.getRepo(Reservation).findOne({ where: { id } });
-        if (!reservation) throw new NotFoundException(`Reservation ${id} not found`);
-        await this.tenant.getRepo(Reservation).update(id, { status: ReservationStatus.CANCELLED });
-        reservation.status = ReservationStatus.CANCELLED;
-        return reservation;
+        return this.tenant.runInContext(async (em) => {
+            const reservationRepo = em.getRepository(Reservation);
+            const reservation = await reservationRepo.findOne({ where: { id } });
+            if (!reservation) throw new NotFoundException(`Reservation ${id} not found`);
+            await reservationRepo.update(id, { status: ReservationStatus.CANCELLED });
+            reservation.status = ReservationStatus.CANCELLED;
+            return reservation;
+        });
     }
 
     // ==========================================
@@ -323,64 +349,67 @@ export class CourtsService {
     // ==========================================
 
     async getRevenue(clubId: string, year: number, month?: number): Promise<any> {
-        const qb = this.tenant.getRepo(Reservation)
-            .createQueryBuilder('r')
-            .select(`COALESCE(SUM(
-                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
-                     THEN (SELECT COALESCE(SUM((pp->>'amount')::numeric), 0) FROM jsonb_array_elements(r.playerPayments) pp)
-                     ELSE CAST(r.finalPrice AS numeric)
-                END
-            ), 0)`, 'totalRevenue')
-            .addSelect('COUNT(r.id)', 'totalReservations')
-            .addSelect(`COALESCE(SUM(
-                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
-                     THEN (SELECT COALESCE(SUM(CASE WHEN (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r.playerPayments) pp)
-                     ELSE CASE WHEN r.paymentStatus = 'paid' THEN CAST(r.finalPrice AS numeric) ELSE 0 END
-                END
-            ), 0)`, 'paidRevenue')
-            .addSelect(`COALESCE(SUM(
-                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
-                     THEN (SELECT COALESCE(SUM(CASE WHEN NOT (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r.playerPayments) pp)
-                     ELSE CASE WHEN r.paymentStatus IN ('pending', 'partial') THEN CAST(r.finalPrice AS numeric) ELSE 0 END
-                END
-            ), 0)`, 'pendingRevenue')
-            .where('r.clubId = :clubId', { clubId })
-            .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
-            .andWhere("EXTRACT(YEAR FROM r.date::date) = :year", { year });
+        return this.tenant.run(clubId, async (em) => {
+            const qb = em.createQueryBuilder(Reservation, 'r')
+                .select(`COALESCE(SUM(
+                    CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                         THEN (SELECT COALESCE(SUM((pp->>'amount')::numeric), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                         ELSE CAST(r.finalPrice AS numeric)
+                    END
+                ), 0)`, 'totalRevenue')
+                .addSelect('COUNT(r.id)', 'totalReservations')
+                .addSelect(`COALESCE(SUM(
+                    CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                         THEN (SELECT COALESCE(SUM(CASE WHEN (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                         ELSE CASE WHEN r.paymentStatus = 'paid' THEN CAST(r.finalPrice AS numeric) ELSE 0 END
+                    END
+                ), 0)`, 'paidRevenue')
+                .addSelect(`COALESCE(SUM(
+                    CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                         THEN (SELECT COALESCE(SUM(CASE WHEN NOT (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                         ELSE CASE WHEN r.paymentStatus IN ('pending', 'partial') THEN CAST(r.finalPrice AS numeric) ELSE 0 END
+                    END
+                ), 0)`, 'pendingRevenue')
+                .where('r.clubId = :clubId', { clubId })
+                .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
+                .andWhere("EXTRACT(YEAR FROM r.date::date) = :year", { year });
 
-        if (month) {
-            qb.andWhere("EXTRACT(MONTH FROM r.date::date) = :month", { month });
-        }
+            if (month) {
+                qb.andWhere("EXTRACT(MONTH FROM r.date::date) = :month", { month });
+            }
 
-        return qb.getRawOne();
+            return qb.getRawOne();
+        });
     }
 
     async getMonthlyRevenue(clubId: string, year: number): Promise<any[]> {
-        return this.tenant.getRepo(Reservation)
-            .createQueryBuilder('r')
-            .select("EXTRACT(MONTH FROM r.date::date)", 'month')
-            .addSelect(`COALESCE(SUM(
-                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
-                     THEN (SELECT COALESCE(SUM((pp->>'amount')::numeric), 0) FROM jsonb_array_elements(r.playerPayments) pp)
-                     ELSE CAST(r.finalPrice AS numeric)
-                END
-            ), 0)`, 'totalRevenue')
-            .addSelect('COUNT(r.id)', 'totalReservations')
-            .addSelect(`COALESCE(SUM(
-                CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
-                     THEN (SELECT COALESCE(SUM(CASE WHEN (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r.playerPayments) pp)
-                     ELSE CASE WHEN r.paymentStatus = 'paid' THEN CAST(r.finalPrice AS numeric) ELSE 0 END
-                END
-            ), 0)`, 'paidRevenue')
-            .where('r.clubId = :clubId', { clubId })
-            .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
-            .andWhere("EXTRACT(YEAR FROM r.date::date) = :year", { year })
-            .groupBy("EXTRACT(MONTH FROM r.date::date)")
-            .orderBy("EXTRACT(MONTH FROM r.date::date)", 'ASC')
-            .getRawMany();
+        return this.tenant.run(clubId, em =>
+            em.createQueryBuilder(Reservation, 'r')
+                .select("EXTRACT(MONTH FROM r.date::date)", 'month')
+                .addSelect(`COALESCE(SUM(
+                    CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                         THEN (SELECT COALESCE(SUM((pp->>'amount')::numeric), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                         ELSE CAST(r.finalPrice AS numeric)
+                    END
+                ), 0)`, 'totalRevenue')
+                .addSelect('COUNT(r.id)', 'totalReservations')
+                .addSelect(`COALESCE(SUM(
+                    CASE WHEN r.playerPayments IS NOT NULL AND jsonb_array_length(r.playerPayments) > 0
+                         THEN (SELECT COALESCE(SUM(CASE WHEN (pp->>'paid')::boolean THEN (pp->>'amount')::numeric ELSE 0 END), 0) FROM jsonb_array_elements(r.playerPayments) pp)
+                         ELSE CASE WHEN r.paymentStatus = 'paid' THEN CAST(r.finalPrice AS numeric) ELSE 0 END
+                    END
+                ), 0)`, 'paidRevenue')
+                .where('r.clubId = :clubId', { clubId })
+                .andWhere('r.status != :cancelled', { cancelled: ReservationStatus.CANCELLED })
+                .andWhere("EXTRACT(YEAR FROM r.date::date) = :year", { year })
+                .groupBy("EXTRACT(MONTH FROM r.date::date)")
+                .orderBy("EXTRACT(MONTH FROM r.date::date)", 'ASC')
+                .getRawMany()
+        );
     }
 
     async getBillingDashboard(clubId: string, year: number, month?: number): Promise<any> {
+        return this.tenant.run(clubId, async () => {
         const dateFilter = month
             ? `EXTRACT(YEAR FROM r."date"::date) = ${year} AND EXTRACT(MONTH FROM r."date"::date) = ${month}`
             : `EXTRACT(YEAR FROM r."date"::date) = ${year}`;
@@ -524,9 +553,11 @@ export class CourtsService {
             monthlyTrend,
             paymentMethodStats
         };
+        }); // end tenant.run
     }
 
     async getPlayerBillingHistory(clubId: string, year: number, month?: number): Promise<any> {
+        return this.tenant.run(clubId, async () => {
         const dateFilter = month
             ? `EXTRACT(YEAR FROM r."date"::date) = ${year} AND EXTRACT(MONTH FROM r."date"::date) = ${month}`
             : `EXTRACT(YEAR FROM r."date"::date) = ${year}`;
@@ -632,6 +663,7 @@ export class CourtsService {
             .sort((a, b) => b.gamesPlayed - a.gamesPlayed);
 
         return { players: playerStats };
+        }); // end tenant.run
     }
 
     // ==========================================
@@ -639,6 +671,7 @@ export class CourtsService {
     // ==========================================
 
     async getAvailableSlots(clubId: string, date: string) {
+        return this.tenant.run(clubId, async () => {
         const dayOfWeek = new Date(date + 'T12:00:00').getDay();
 
         const courts = await this.tenant.getRepo(Court).find({
@@ -687,6 +720,7 @@ export class CourtsService {
                 slots,
             };
         });
+        }); // end tenant.run
     }
 
     // ==========================================
@@ -878,33 +912,41 @@ export class CourtsService {
     }
 
     async createCourtBlock(dto: CreateCourtBlockDto): Promise<CourtBlock> {
-        const block = this.tenant.getRepo(CourtBlock).create({
-            ...dto,
-            courtIds: dto.courtIds && dto.courtIds.length > 0 ? dto.courtIds : null,
+        return this.tenant.runInContext(async (em) => {
+            const block = em.getRepository(CourtBlock).create({
+                ...dto,
+                courtIds: dto.courtIds && dto.courtIds.length > 0 ? dto.courtIds : null,
+            });
+            return em.getRepository(CourtBlock).save(block);
         });
-        return this.tenant.getRepo(CourtBlock).save(block);
     }
 
     async getCourtBlocks(clubId: string): Promise<CourtBlock[]> {
-        return this.tenant.getRepo(CourtBlock).find({
-            where: { clubId, isActive: true },
-            order: { startDate: 'ASC' },
-        });
+        return this.tenant.run(clubId, em =>
+            em.getRepository(CourtBlock).find({
+                where: { clubId, isActive: true },
+                order: { startDate: 'ASC' },
+            })
+        );
     }
 
     async deleteCourtBlock(id: string): Promise<void> {
-        await this.tenant.getRepo(CourtBlock).delete(id);
+        return this.tenant.runInContext(async (em) => {
+            await em.getRepository(CourtBlock).delete(id);
+        });
     }
 
     async getActiveBlocksForDate(clubId: string, date: string): Promise<CourtBlock[]> {
-        return this.tenant.getRepo(CourtBlock).find({
-            where: {
-                clubId,
-                isActive: true,
-                startDate: LessThanOrEqual(date),
-                endDate: MoreThanOrEqual(date),
-            },
-        });
+        return this.tenant.run(clubId, em =>
+            em.getRepository(CourtBlock).find({
+                where: {
+                    clubId,
+                    isActive: true,
+                    startDate: LessThanOrEqual(date),
+                    endDate: MoreThanOrEqual(date),
+                },
+            })
+        );
     }
 
     isSlotBlocked(slotStart: string, slotEnd: string, courtId: string, blocks: CourtBlock[]): { blocked: boolean; reason?: string } {
@@ -927,17 +969,21 @@ export class CourtsService {
     // ==========================================
 
     async getFreePlayMatch(reservationId: string): Promise<FreePlayMatch | null> {
-        return this.tenant.getRepo(FreePlayMatch).findOne({ where: { reservationId } });
+        return this.tenant.runInContext(em =>
+            em.getRepository(FreePlayMatch).findOne({ where: { reservationId } })
+        );
     }
 
     async getFreePlayMatchesByClub(clubId: string, startDate?: string, endDate?: string): Promise<FreePlayMatch[]> {
-        const query = this.tenant.getRepo(FreePlayMatch).createQueryBuilder('fpm')
-            .where('fpm.clubId = :clubId', { clubId });
+        return this.tenant.run(clubId, async (em) => {
+            const query = em.createQueryBuilder(FreePlayMatch, 'fpm')
+                .where('fpm.clubId = :clubId', { clubId });
 
-        if (startDate) query.andWhere('fpm.date >= :startDate', { startDate });
-        if (endDate) query.andWhere('fpm.date <= :endDate', { endDate });
+            if (startDate) query.andWhere('fpm.date >= :startDate', { startDate });
+            if (endDate) query.andWhere('fpm.date <= :endDate', { endDate });
 
-        return query.orderBy('fpm.date', 'DESC').getMany();
+            return query.orderBy('fpm.date', 'DESC').getMany();
+        });
     }
 
     async saveFreePlayMatch(data: {
@@ -952,97 +998,114 @@ export class CourtsService {
         countsForRanking: boolean;
         pointsPerWin: number;
     }): Promise<FreePlayMatch> {
-        // Determine winner from sets
-        let team1Sets = 0;
-        let team2Sets = 0;
-        for (const s of data.sets) {
-            if (s.team1 > s.team2) team1Sets++;
-            else if (s.team2 > s.team1) team2Sets++;
-        }
-        const winner = team1Sets > team2Sets ? 1 : team2Sets > team1Sets ? 2 : null;
-        const status = data.sets.length > 0 ? 'completed' : 'pending';
+        return this.tenant.run(data.clubId, async (em) => {
+            const fpmRepo = em.getRepository(FreePlayMatch);
+            const reservationRepo = em.getRepository(Reservation);
 
-        // Check if match already exists for this reservation
-        let match = await this.tenant.getRepo(FreePlayMatch).findOne({ where: { reservationId: data.reservationId } });
+            // Determine winner from sets
+            let team1Sets = 0;
+            let team2Sets = 0;
+            for (const s of data.sets) {
+                if (s.team1 > s.team2) team1Sets++;
+                else if (s.team2 > s.team1) team2Sets++;
+            }
+            const winner = team1Sets > team2Sets ? 1 : team2Sets > team1Sets ? 2 : null;
+            const status = data.sets.length > 0 ? 'completed' : 'pending';
 
-        if (match) {
-            // Update existing
-            const updateFields = {
-                team1PlayerIds: data.team1PlayerIds,
-                team2PlayerIds: data.team2PlayerIds,
-                team1Names: data.team1Names,
-                team2Names: data.team2Names,
-                sets: data.sets,
-                winner,
-                status,
-                countsForRanking: data.countsForRanking,
-                pointsPerWin: data.pointsPerWin,
-            };
-            await this.tenant.getRepo(FreePlayMatch).update(match.id, updateFields as any);
-            Object.assign(match, updateFields);
-        } else {
-            // Create new
-            const insertData = {
-                ...data,
-                winner,
-                status,
-            };
-            const result = await this.tenant.getRepo(FreePlayMatch).insert(insertData as any);
-            match = { ...insertData, id: result.identifiers[0].id } as FreePlayMatch;
-        }
+            // Check if match already exists for this reservation
+            let match = await fpmRepo.findOne({ where: { reservationId: data.reservationId } });
 
-        // Also update reservation countsForRanking flag
-        await this.tenant.getRepo(Reservation).update(data.reservationId, { countsForRanking: data.countsForRanking });
+            if (match) {
+                // Update existing
+                const updateFields = {
+                    team1PlayerIds: data.team1PlayerIds,
+                    team2PlayerIds: data.team2PlayerIds,
+                    team1Names: data.team1Names,
+                    team2Names: data.team2Names,
+                    sets: data.sets,
+                    winner,
+                    status,
+                    countsForRanking: data.countsForRanking,
+                    pointsPerWin: data.pointsPerWin,
+                };
+                await fpmRepo.update(match.id, updateFields as any);
+                Object.assign(match, updateFields);
+            } else {
+                // Create new
+                const insertData = {
+                    ...data,
+                    winner,
+                    status,
+                };
+                const result = await fpmRepo.insert(insertData as any);
+                match = { ...insertData, id: result.identifiers[0].id } as FreePlayMatch;
+            }
 
-        return match;
+            // Also update reservation countsForRanking flag
+            await reservationRepo.update(data.reservationId, { countsForRanking: data.countsForRanking });
+
+            return match;
+        });
     }
 
     async deleteFreePlayMatch(reservationId: string): Promise<void> {
-        await this.tenant.getRepo(FreePlayMatch).delete({ reservationId });
-        await this.tenant.getRepo(Reservation).update(reservationId, { countsForRanking: false });
+        return this.tenant.runInContext(async (em) => {
+            await em.getRepository(FreePlayMatch).delete({ reservationId });
+            await em.getRepository(Reservation).update(reservationId, { countsForRanking: false });
+        });
     }
 
     /** Get free-play stats for a player across all completed matches */
     async getFreePlayStatsForPlayer(playerId: string, clubId?: string): Promise<{ matchesWon: number; matchesLost: number; matchesPlayed: number; points: number }> {
-        const query = this.tenant.getRepo(FreePlayMatch).createQueryBuilder('fpm')
-            .where('fpm.status = :status', { status: 'completed' })
-            .andWhere('fpm.countsForRanking = true');
+        const cid = clubId || this.tenant.getCurrentClubId();
+        if (!cid) return { matchesWon: 0, matchesLost: 0, matchesPlayed: 0, points: 0 };
 
-        if (clubId) query.andWhere('fpm.clubId = :clubId', { clubId });
+        return this.tenant.run(cid, async (em) => {
+            const query = em.createQueryBuilder(FreePlayMatch, 'fpm')
+                .where('fpm.status = :status', { status: 'completed' })
+                .andWhere('fpm.countsForRanking = true');
 
-        const matches = await query.getMany();
+            if (clubId) query.andWhere('fpm.clubId = :clubId', { clubId });
 
-        let matchesWon = 0;
-        let matchesLost = 0;
-        let points = 0;
+            const matches = await query.getMany();
 
-        for (const m of matches) {
-            const inTeam1 = (m.team1PlayerIds || []).includes(playerId);
-            const inTeam2 = (m.team2PlayerIds || []).includes(playerId);
-            if (!inTeam1 && !inTeam2) continue;
+            let matchesWon = 0;
+            let matchesLost = 0;
+            let points = 0;
 
-            if (m.winner === 1 && inTeam1) {
-                matchesWon++;
-                points += m.pointsPerWin;
-            } else if (m.winner === 2 && inTeam2) {
-                matchesWon++;
-                points += m.pointsPerWin;
-            } else if (m.winner !== null) {
-                matchesLost++;
+            for (const m of matches) {
+                const inTeam1 = (m.team1PlayerIds || []).includes(playerId);
+                const inTeam2 = (m.team2PlayerIds || []).includes(playerId);
+                if (!inTeam1 && !inTeam2) continue;
+
+                if (m.winner === 1 && inTeam1) {
+                    matchesWon++;
+                    points += m.pointsPerWin;
+                } else if (m.winner === 2 && inTeam2) {
+                    matchesWon++;
+                    points += m.pointsPerWin;
+                } else if (m.winner !== null) {
+                    matchesLost++;
+                }
             }
-        }
 
-        return { matchesWon, matchesLost, matchesPlayed: matchesWon + matchesLost, points };
+            return { matchesWon, matchesLost, matchesPlayed: matchesWon + matchesLost, points };
+        });
     }
 
     /** Get all free-play matches for bulk stats computation */
     async getAllFreePlayMatches(clubId?: string): Promise<FreePlayMatch[]> {
-        const query = this.tenant.getRepo(FreePlayMatch).createQueryBuilder('fpm')
-            .where('fpm.status = :status', { status: 'completed' })
-            .andWhere('fpm.countsForRanking = true');
+        const cid = clubId || this.tenant.getCurrentClubId();
+        if (!cid) return [];
 
-        if (clubId) query.andWhere('fpm.clubId = :clubId', { clubId });
+        return this.tenant.run(cid, async (em) => {
+            const query = em.createQueryBuilder(FreePlayMatch, 'fpm')
+                .where('fpm.status = :status', { status: 'completed' })
+                .andWhere('fpm.countsForRanking = true');
 
-        return query.getMany();
+            if (clubId) query.andWhere('fpm.clubId = :clubId', { clubId });
+
+            return query.getMany();
+        });
     }
 }

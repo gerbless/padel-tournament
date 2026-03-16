@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { Tournament, TournamentType, TournamentStatus, DurationMode } from './entities/tournament.entity';
 import { Team } from '../teams/entities/team.entity';
 import { Match, MatchStatus, MatchPhase } from '../matches/entities/match.entity';
@@ -275,57 +275,62 @@ export class TournamentsService {
     }
 
     async findAll(clubId?: string, pagination?: PaginationQueryDto, month?: number, year?: number): Promise<PaginatedResult<Tournament>> {
-        const page = pagination?.page || 1;
-        const limit = pagination?.limit || 20;
-        const skip = (page - 1) * limit;
+        const fn = async (em: EntityManager) => {
+            const page = pagination?.page || 1;
+            const limit = pagination?.limit || 20;
+            const skip = (page - 1) * limit;
 
-        const qb = this.tenant.getRepo(Tournament).createQueryBuilder('t')
-            .leftJoinAndSelect('t.teams', 'team')
-            .leftJoinAndSelect('team.player1', 'p1')
-            .leftJoinAndSelect('team.player2', 'p2')
-            .leftJoinAndSelect('t.matches', 'match')
-            .leftJoinAndSelect('t.club', 'club')
-            .orderBy('t.createdAt', 'DESC')
-            .skip(skip)
-            .take(limit);
+            const qb = em.getRepository(Tournament).createQueryBuilder('t')
+                .leftJoinAndSelect('t.teams', 'team')
+                .leftJoinAndSelect('team.player1', 'p1')
+                .leftJoinAndSelect('team.player2', 'p2')
+                .leftJoinAndSelect('t.matches', 'match')
+                .leftJoinAndSelect('t.club', 'club')
+                .orderBy('t.createdAt', 'DESC')
+                .skip(skip)
+                .take(limit);
 
-        if (clubId) {
-            qb.andWhere('t."clubId" = :clubId', { clubId });
-        }
-        if (month) {
-            qb.andWhere('EXTRACT(MONTH FROM t."createdAt") = :month', { month });
-        }
-        if (year) {
-            qb.andWhere('EXTRACT(YEAR FROM t."createdAt") = :year', { year });
-        }
+            if (clubId) {
+                qb.andWhere('t."clubId" = :clubId', { clubId });
+            }
+            if (month) {
+                qb.andWhere('EXTRACT(MONTH FROM t."createdAt") = :month', { month });
+            }
+            if (year) {
+                qb.andWhere('EXTRACT(YEAR FROM t."createdAt") = :year', { year });
+            }
 
-        const [data, total] = await qb.getManyAndCount();
-        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+            const [data, total] = await qb.getManyAndCount();
+            return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+        };
+        return clubId ? this.tenant.run(clubId, fn) : this.tenant.runInContext(fn);
     }
 
     async findOne(id: string): Promise<Tournament> {
-        const tournament = await this.tenant.getRepo(Tournament).findOne({
-            where: { id },
-            relations: [
-                'teams',
-                'teams.player1',
-                'teams.player2',
-                'matches',
-                'matches.team1',
-                'matches.team1.player1',
-                'matches.team1.player2',
-                'matches.team2',
-                'matches.team2.player1',
-                'matches.team2.player2',
-                'matches.winner'
-            ],
+        return this.tenant.runInContext(async (em) => {
+            const tournament = await em.getRepository(Tournament).findOne({
+                where: { id },
+                relations: [
+                    'teams',
+                    'teams.player1',
+                    'teams.player2',
+                    'matches',
+                    'matches.team1',
+                    'matches.team1.player1',
+                    'matches.team1.player2',
+                    'matches.team2',
+                    'matches.team2.player1',
+                    'matches.team2.player2',
+                    'matches.winner'
+                ],
+            });
+
+            if (!tournament) {
+                throw new NotFoundException(`Tournament with ID ${id} not found`);
+            }
+
+            return tournament;
         });
-
-        if (!tournament) {
-            throw new NotFoundException(`Tournament with ID ${id} not found`);
-        }
-
-        return tournament;
     }
 
     async getStandings(tournamentId: string, groupNumber?: number, phaseFilter?: string): Promise<Standing[]> {
@@ -666,7 +671,8 @@ export class TournamentsService {
 
     // ===================== MONTHLY STATS =====================
     async getMonthlyStats(month: number, year: number, clubId?: string) {
-        const tournamentQb = this.tenant.getRepo(Tournament).createQueryBuilder('t')
+      const fn = async (em: EntityManager) => {
+        const tournamentQb = em.getRepository(Tournament).createQueryBuilder('t')
             .leftJoinAndSelect('t.matches', 'match')
             .leftJoinAndSelect('match.team1', 'mt1')
             .leftJoinAndSelect('mt1.player1', 'mt1p1')
@@ -683,7 +689,7 @@ export class TournamentsService {
 
         const tournaments = await tournamentQb.getMany();
 
-        const leagueQb = this.tenant.getRepo(League).createQueryBuilder('l')
+        const leagueQb = em.getRepository(League).createQueryBuilder('l')
             .leftJoinAndSelect('l.matches', 'lm')
             .leftJoinAndSelect('lm.team1', 'lt1')
             .leftJoinAndSelect('lt1.player1', 'lt1p1')
@@ -800,5 +806,7 @@ export class TournamentsService {
             topPlayers,
             topPairs,
         };
+      };
+      return clubId ? this.tenant.run(clubId, fn) : this.tenant.runInContext(fn);
     }
 }
