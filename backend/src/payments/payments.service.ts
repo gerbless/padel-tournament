@@ -1,5 +1,6 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual, Not, QueryRunner } from 'typeorm';
 import { MercadoPagoPayment, MercadoPagoPaymentStatus } from './entities/mercadopago-payment.entity';
@@ -13,12 +14,11 @@ import { Club } from '../clubs/entities/club.entity';
 import { TenantService } from '../tenant/tenant.service';
 
 @Injectable()
-export class PaymentsService implements OnModuleInit, OnModuleDestroy {
+export class PaymentsService {
     private readonly logger = new Logger(PaymentsService.name);
     private mpClient: MercadoPagoConfig | null = null;
     private preferenceClient: Preference | null = null;
     private paymentClient: Payment | null = null;
-    private expirationInterval: any;
     private readonly paymentExpiryMs: number;
 
     constructor(
@@ -49,18 +49,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
-    onModuleInit() {
-        // Check for expired payment deadlines every 10 seconds
-        this.expirationInterval = setInterval(() => this.cancelExpiredReservations(), 10_000);
-        this.logger.log('⏰ Payment expiration checker started (every 10s)');
-    }
-
-    onModuleDestroy() {
-        if (this.expirationInterval) {
-            clearInterval(this.expirationInterval);
-        }
-    }
-
     /**
      * Return Mercado Pago clients for a specific club.
      * Falls back to the globally configured client if no per-club credentials exist.
@@ -86,10 +74,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
     /**
      * Cancel reservations whose payment deadline has expired.
-     * Iterates over ALL active clubs since this runs in a background
-     * interval with no HTTP request context.
+     * Runs every 90 seconds via @nestjs/schedule.
+     * Iterates over ALL active clubs since this runs outside HTTP request context.
      */
-    private async cancelExpiredReservations(): Promise<void> {
+    @Cron(CronExpression.EVERY_30_SECONDS)
+    async cancelExpiredReservations(): Promise<void> {
         try {
             // Get all active clubs with schemas
             const clubs: { id: string }[] = await this.clubRepo.query(

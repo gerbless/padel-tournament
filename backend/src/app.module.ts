@@ -16,6 +16,7 @@ import { EmailModule } from './email/email.module';
 import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PhoneVerificationModule } from './phone-verification/phone-verification.module';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TenantModule } from './tenant/tenant.module';
 
 @Module({
@@ -40,6 +41,7 @@ import { TenantModule } from './tenant/tenant.module';
             }),
             inject: [ConfigService],
         }),
+        ScheduleModule.forRoot(),
         TournamentsModule,
         MatchesModule,
         TeamsModule,
