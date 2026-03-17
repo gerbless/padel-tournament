@@ -158,6 +158,9 @@ export class TenantService {
         const qr = this.dataSource.createQueryRunner();
         await qr.connect();
         await qr.query(`SET search_path TO "${schemaName}", public`);
+        this.logger.debug(`---------------------------------------------------`)
+        if (isDev) this.logger.log(`setupSchema OK: club=${clubId} → schema=${schemaName}`);
+        this.logger.debug(`---------------------------------------------------`)
         return qr;
     }
 
@@ -205,8 +208,10 @@ export class TenantService {
             await qr.query(`SET search_path TO "${schemaName}", public`);
 
             if (isDev) {
+                this.logger.debug(`---------------------------------------------------`)
                 const [{ search_path }] = await qr.query('SHOW search_path');
                 this.logger.debug(`run(${clubId}): new QR search_path = ${search_path}`);
+                this.logger.debug(`---------------------------------------------------`)
             }
 
             // Override ALS context so getRepo()/query() use this fresh QR

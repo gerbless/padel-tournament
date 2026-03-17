@@ -152,7 +152,10 @@ export class TenantInterceptor implements NestInterceptor {
         await qr.connect();
         await qr.query(`SET search_path TO "${schemaName}", public`);
 
+        this.logger.debug(`---------------------------------------------------`)
         if (isDev) this.logger.log(`setupSchema OK: club=${clubId} → schema=${schemaName}`);
+        this.logger.debug(`---------------------------------------------------`)
+        
         return qr;
     }
 }
