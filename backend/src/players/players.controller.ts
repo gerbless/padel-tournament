@@ -45,8 +45,8 @@ export class PlayersController {
     }
 
     @Get()
-    findAll(@Query('clubId') clubId?: string, @Query() pagination?: PaginationQueryDto) {
-        return this.playersService.findAll(clubId, pagination);
+    findAll(@Query('clubId') clubId?: string, @Query('search') search?: string, @Query() pagination?: PaginationQueryDto) {
+        return this.playersService.findAll(clubId, pagination, search);
     }
 
     @Get('ranking')

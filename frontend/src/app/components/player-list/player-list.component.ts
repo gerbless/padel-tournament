@@ -1,49 +1,56 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { PlayerService, Player } from '../../services/player.service';
+import { Subject, Subscription } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { PlayerService, Player, PaginatedPlayers } from '../../services/player.service';
 import { CategoryService } from '../../modules/categories/services/category.service';
 import { ClubService } from '../../services/club.service';
 import { Club } from '../../models/club.model';
 import { PlayerCreateModalComponent } from '../player-create-modal/player-create-modal.component';
-
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 
 @Component({
     selector: 'app-player-list',
     standalone: true,
-    imports: [CommonModule, ReactiveFormsModule, RouterLink, FormsModule, PlayerCreateModalComponent],
+    imports: [CommonModule, RouterLink, FormsModule, PlayerCreateModalComponent],
     templateUrl: './player-list.component.html',
     styleUrls: ['./player-list.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class PlayerListComponent implements OnInit {
+export class PlayerListComponent implements OnInit, OnDestroy {
     players: Player[] = [];
     loading = true;
     categories: any[] = [];
-    clubs: Club[] = []; // Available clubs
+    clubs: Club[] = [];
     isLoggedIn = false;
     canEdit = false;
     canAdmin = false;
 
-    // Inline editing state
-    editingPlayerId: string | null = null;
-    editingCategory: string = '';
-    editingPosition: string = '';
-    editingIdentification: string = '';
-    editingEmail: string = '';
-    editingClubIds: string[] = []; // For editing clubs
-    saving = false;
+    // Pagination
+    page = 1;
+    limit = 10;
+    total = 0;
+    totalPages = 0;
 
-    // Club Selection State
-    clubSearchText: string = '';
-    activeDropdownPlayerId: string | null = null; // For Inline Editing
-    activeDropdownMode: 'FORM' | 'EDIT' | null = null;
+    // Search
+    search = '';
+    private searchSubject = new Subject<string>();
+    private searchSub!: Subscription;
 
-    // Modal State
+    // Club filter
+    clubFilter: 'mine' | 'all' = 'mine';
+    currentClubId = '';
+    currentClubName = '';
+
+    // Modal state
     showCreateModal = false;
+    editingPlayer: Player | null = null;
+
+    // Delete confirmation
+    playerToDelete: Player | null = null;
 
     constructor(
         private playerService: PlayerService,
@@ -58,12 +65,27 @@ export class PlayerListComponent implements OnInit {
         this.isLoggedIn = this.authService.isAuthenticated();
         const club = this.clubService.getSelectedClub();
         if (club) {
+            this.currentClubId = club.id;
+            this.currentClubName = club.name;
             this.canEdit = this.authService.hasClubRole(club.id, 'editor');
             this.canAdmin = this.authService.hasClubRole(club.id, 'admin');
         }
+
+        this.searchSub = this.searchSubject.pipe(
+            debounceTime(400),
+            distinctUntilChanged()
+        ).subscribe(() => {
+            this.page = 1;
+            this.loadPlayers();
+        });
+
         this.loadPlayers();
         this.loadCategories();
         this.loadClubs();
+    }
+
+    ngOnDestroy() {
+        this.searchSub?.unsubscribe();
     }
 
     loadClubs() {
@@ -71,50 +93,6 @@ export class PlayerListComponent implements OnInit {
             this.clubs = clubs;
             this.cdr.markForCheck();
         });
-    }
-
-    // Open/Close Global Modal
-    closeDropdown() {
-        this.activeDropdownMode = null;
-        this.activeDropdownPlayerId = null;
-        this.clubSearchText = '';
-    }
-
-    toggleEditDropdown(playerId: string) {
-        if (this.activeDropdownMode === 'EDIT' && this.activeDropdownPlayerId === playerId) {
-            this.closeDropdown();
-        } else {
-            this.activeDropdownMode = 'EDIT';
-            this.activeDropdownPlayerId = playerId;
-            this.clubSearchText = '';
-        }
-    }
-
-    get filteredClubs(): Club[] {
-        if (!this.clubSearchText) {
-            return this.clubs;
-        }
-        const search = this.clubSearchText.toLowerCase();
-        return this.clubs.filter(c => c.name.toLowerCase().includes(search));
-    }
-
-    // Unified toggle selection based on mode
-    toggleClubSelection(clubId: string) {
-        if (this.activeDropdownMode === 'EDIT' && this.activeDropdownPlayerId) {
-            const index = this.editingClubIds.indexOf(clubId);
-            if (index > -1) {
-                this.editingClubIds = this.editingClubIds.filter(id => id !== clubId);
-            } else {
-                this.editingClubIds = [...this.editingClubIds, clubId];
-            }
-        }
-    }
-
-    isClubSelected(clubId: string): boolean {
-        if (this.activeDropdownMode === 'EDIT') {
-            return this.editingClubIds.includes(clubId);
-        }
-        return false;
     }
 
     loadCategories() {
@@ -126,30 +104,88 @@ export class PlayerListComponent implements OnInit {
 
     loadPlayers() {
         this.loading = true;
-        this.playerService.findAll().subscribe({
-            next: (players) => {
-                this.players = players;
+        this.cdr.markForCheck();
+
+        const clubId = this.clubFilter === 'mine' ? this.currentClubId : undefined;
+
+        this.playerService.findAllPaginated({
+            clubId,
+            page: this.page,
+            limit: this.limit,
+            search: this.search || undefined,
+        }).subscribe({
+            next: (res: PaginatedPlayers) => {
+                this.players = res.data;
+                this.total = res.total;
+                this.totalPages = res.totalPages;
+                this.page = res.page;
                 this.loading = false;
                 this.cdr.markForCheck();
             },
-            error: (error: any) => {
-                console.error('Error loading players:', error);
+            error: () => {
                 this.loading = false;
+                this.toast.error('Error al cargar jugadores');
                 this.cdr.markForCheck();
             }
         });
     }
 
-    openCreateModal() {
-        this.showCreateModal = true;
+    onSearchChange(term: string) {
+        this.search = term;
+        this.searchSubject.next(term);
     }
 
-    onPlayerCreated() {
-        this.showCreateModal = false;
+    setClubFilter(filter: 'mine' | 'all') {
+        if (this.clubFilter === filter) return;
+        this.clubFilter = filter;
+        this.page = 1;
         this.loadPlayers();
     }
 
-    playerToDelete: Player | null = null;
+    setLimit(newLimit: number) {
+        this.limit = newLimit;
+        this.page = 1;
+        this.loadPlayers();
+    }
+
+    goToPage(p: number) {
+        if (p < 1 || p > this.totalPages || p === this.page) return;
+        this.page = p;
+        this.loadPlayers();
+    }
+
+    get visiblePages(): number[] {
+        const pages: number[] = [];
+        const start = Math.max(1, this.page - 2);
+        const end = Math.min(this.totalPages, this.page + 2);
+        for (let i = start; i <= end; i++) pages.push(i);
+        return pages;
+    }
+
+    // ── Create / Edit Modal ──
+
+    openCreateModal() {
+        this.editingPlayer = null;
+        this.showCreateModal = true;
+    }
+
+    openEditModal(player: Player) {
+        this.editingPlayer = player;
+        this.showCreateModal = true;
+    }
+
+    onModalClosed() {
+        this.showCreateModal = false;
+        this.editingPlayer = null;
+    }
+
+    onPlayerSaved() {
+        this.showCreateModal = false;
+        this.editingPlayer = null;
+        this.loadPlayers();
+    }
+
+    // ── Delete ──
 
     deletePlayer(player: Player) {
         this.playerToDelete = player;
@@ -161,13 +197,11 @@ export class PlayerListComponent implements OnInit {
 
     confirmDelete() {
         if (!this.playerToDelete) return;
-
         const player = this.playerToDelete;
-
         this.playerService.deletePlayer(player.id).subscribe({
             next: () => {
-                this.loadPlayers();
                 this.playerToDelete = null;
+                this.loadPlayers();
                 this.toast.success('Jugador eliminado');
                 this.cdr.markForCheck();
             },
@@ -179,94 +213,15 @@ export class PlayerListComponent implements OnInit {
         });
     }
 
-    startEditing(player: Player) {
-        this.editingPlayerId = player.id;
-        this.editingCategory = player.category?.id || '';
-        this.editingPosition = player.position || '';
-        this.editingIdentification = player.identification || '';
-        this.editingEmail = player.email || '';
-        this.editingClubIds = player.clubs?.map(c => c.id) || [];
-    }
-
-    saveEdit(player: Player) {
-        this.saving = true;
-        const updates: any = {};
-
-        if (this.editingCategory !== (player.category?.id || '')) {
-            updates.categoryId = this.editingCategory || null;
-        }
-
-        if (this.editingPosition !== (player.position || '')) {
-            updates.position = this.editingPosition || null;
-        }
-
-        if (this.editingIdentification !== (player.identification || '')) {
-            updates.identification = this.editingIdentification || null;
-        }
-
-        if (this.editingEmail !== (player.email || '')) {
-            updates.email = this.editingEmail || null;
-        }
-
-        // Check if clubs changed
-        const currentClubIds = player.clubs?.map(c => c.id) || [];
-        const newClubIds = this.editingClubIds;
-        const isClubChanged = currentClubIds.length !== newClubIds.length ||
-            !currentClubIds.every(id => newClubIds.includes(id));
-
-        if (isClubChanged) {
-            updates.clubIds = this.editingClubIds;
-        }
-
-        this.playerService.updatePlayer(player.id, updates).subscribe({
-            next: () => {
-                this.saving = false;
-                this.editingPlayerId = null;
-                this.loadPlayers();
-                this.toast.success('Jugador actualizado');
-                this.cdr.markForCheck();
-            },
-            error: (error) => {
-                this.toast.error('Error al actualizar: ' + (error.error?.message || 'Error desconocido'));
-                this.saving = false;
-                this.cdr.markForCheck();
-            }
-        });
-    }
-
-    cancelEdit() {
-        this.editingPlayerId = null;
-        this.editingCategory = '';
-        this.editingPosition = '';
-        this.editingIdentification = '';
-        this.editingEmail = '';
-        this.editingClubIds = [];
-    }
-
-    getSelectedClubNamesForEdit(): string {
-        if (this.editingClubIds.length === 0) return 'Seleccionar clubes';
-        const names = this.clubs
-            .filter(c => this.editingClubIds.includes(c.id))
-            .map(c => c.name);
-        return names.join(', ');
-    }
+    // ── Helpers ──
 
     getPositionLabel(position?: string): string {
-        if (!position) return '-';
-        const labels: any = {
-            'reves': 'Revés',
-            'drive': 'Drive',
-            'mixto': 'Mixto'
-        };
-        return labels[position] || position;
+        const labels: any = { 'reves': 'Revés', 'drive': 'Drive', 'mixto': 'Mixto' };
+        return labels[position || ''] || '-';
     }
 
     getPositionColor(position?: string): string {
-        const colors: any = {
-            'reves': '#3b82f6',  // Blue
-            'drive': '#10b981',  // Green
-            'mixto': '#8b5cf6'   // Purple
-        };
+        const colors: any = { 'reves': '#3b82f6', 'drive': '#10b981', 'mixto': '#8b5cf6' };
         return colors[position || ''] || '#6b7280';
     }
 }

@@ -99,45 +99,36 @@ export class PlayersService {
         return this.create({ name });
     }
 
-    async findAll(clubId?: string, pagination?: PaginationQueryDto): Promise<PaginatedResult<Player> | Player[]> {
+    async findAll(clubId?: string, pagination?: PaginationQueryDto, search?: string): Promise<PaginatedResult<Player>> {
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const skip = (page - 1) * limit;
 
-        if (!clubId) {
-            const [data, total] = await this.playerRepository.findAndCount({
-                relations: ['category', 'clubs'],
-                order: { name: 'ASC' },
-                skip,
-                take: limit,
-            });
-            return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+        const qb = this.playerRepository.createQueryBuilder('player')
+            .leftJoinAndSelect('player.category', 'category')
+            .leftJoinAndSelect('player.clubs', 'clubs');
+
+        if (clubId) {
+            // Players explicitly assigned to this club OR players with no club (belong to all)
+            qb.where(
+                `(player.id IN (SELECT pc."player_id" FROM player_clubs pc WHERE pc."club_id" = :clubId)` +
+                ` OR player.id NOT IN (SELECT DISTINCT pc2."player_id" FROM player_clubs pc2))`,
+                { clubId },
+            );
         }
 
-        // When filtering by club:
-        // 1. Get players explicitly assigned to this club
-        // 2. Get players with NO club assignments (they belong to all clubs)
-        const playersInClub = await this.playerRepository.createQueryBuilder('player')
-            .leftJoinAndSelect('player.category', 'category')
-            .leftJoinAndSelect('player.clubs', 'club')
-            .where('club.id = :clubId', { clubId })
-            .orderBy('player.name', 'ASC')
-            .getMany();
+        if (search && search.trim()) {
+            const s = `%${search.trim()}%`;
+            qb.andWhere(
+                '(player.name ILIKE :s OR player.email ILIKE :s OR player.phone ILIKE :s OR player.identification ILIKE :s)',
+                { s },
+            );
+        }
 
-        const playersWithoutClubs = await this.playerRepository.createQueryBuilder('player')
-            .leftJoinAndSelect('player.category', 'category')
-            .leftJoinAndSelect('player.clubs', 'club')
-            .where('club.id IS NULL')
-            .orderBy('player.name', 'ASC')
-            .getMany();
+        qb.orderBy('player.name', 'ASC');
 
-        // Combine and deduplicate
-        const playerMap = new Map();
-        [...playersInClub, ...playersWithoutClubs].forEach(p => playerMap.set(p.id, p));
-        const all = Array.from(playerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-        const total = all.length;
-        const paginated = all.slice(skip, skip + limit);
-        return { data: paginated, total, page, limit, totalPages: Math.ceil(total / limit) };
+        const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
+        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
     }
 
     async findOne(id: string): Promise<Player> {

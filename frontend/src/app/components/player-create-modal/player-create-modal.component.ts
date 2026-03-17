@@ -16,7 +16,7 @@ import { ToastService } from '../../services/toast.service';
     <div class="modal-overlay" (click)="cancel()">
       <div class="modal-content" (click)="$event.stopPropagation()">
         <div class="modal-header">
-          <h3>Crear Nuevo Jugador</h3>
+          <h3>{{ isEditMode ? 'Editar Jugador' : 'Crear Nuevo Jugador' }}</h3>
           <button type="button" class="close-btn" (click)="cancel()">×</button>
         </div>
         
@@ -130,8 +130,8 @@ import { ToastService } from '../../services/toast.service';
 
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" (click)="cancel()">Cancelar</button>
-            <button type="submit" class="btn btn-primary" [disabled]="playerForm.invalid || creating">
-              {{ creating ? 'Guardando...' : 'Guardar' }}
+            <button type="submit" class="btn btn-primary" [disabled]="playerForm.invalid || creating || (isEditMode && !hasChanges)">
+              {{ creating ? 'Guardando...' : (isEditMode ? 'Guardar Cambios' : 'Guardar') }}
             </button>
           </div>
         </form>
@@ -335,13 +335,22 @@ import { ToastService } from '../../services/toast.service';
 export class PlayerCreateModalComponent implements OnInit {
   @Input() initialName: string = '';
   @Input() predefinedClubId: string | null = null;
+  @Input() editPlayer: Player | null = null;
   @Output() close = new EventEmitter<void>();
   @Output() playerCreated = new EventEmitter<Player>();
 
   playerForm: FormGroup;
   categories: any[] = [];
   clubs: Club[] = [];
-  sortedClubs: Club[] = []; // For rendering with current club first
+  sortedClubs: Club[] = [];
+
+  // Edit mode: track original form snapshot for change detection
+  private originalFormValue: any = null;
+  get isEditMode(): boolean { return !!this.editPlayer; }
+  get hasChanges(): boolean {
+    if (!this.originalFormValue) return true;
+    return JSON.stringify(this.playerForm.value) !== JSON.stringify(this.originalFormValue);
+  }
 
   creating = false;
   showClubDropdown = false;
@@ -439,7 +448,20 @@ export class PlayerCreateModalComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.playerForm.patchValue({ name: this.initialName });
+    if (this.editPlayer) {
+      // Edit mode: populate form with existing player data
+      this.playerForm.patchValue({
+        name: this.editPlayer.name || '',
+        identification: this.editPlayer.identification || '',
+        email: this.editPlayer.email || '',
+        phone: (this.editPlayer as any).phone || '',
+        categoryId: this.editPlayer.category?.id || '',
+        position: this.editPlayer.position || '',
+        clubIds: this.editPlayer.clubs?.map(c => c.id) || [],
+      });
+    } else {
+      this.playerForm.patchValue({ name: this.initialName });
+    }
     this.loadMetadata();
   }
 
@@ -451,9 +473,8 @@ export class PlayerCreateModalComponent implements OnInit {
     this.clubService.getClubs().subscribe(clubs => {
       this.clubs = clubs;
 
-      // Pre-select current club
-      if (this.predefinedClubId) {
-        // Ensure type match (string)
+      // Pre-select current club (only for create mode)
+      if (!this.editPlayer && this.predefinedClubId) {
         const targetId = String(this.predefinedClubId);
         const exists = this.clubs.some(c => String(c.id) === targetId);
         if (exists) {
@@ -462,6 +483,12 @@ export class PlayerCreateModalComponent implements OnInit {
       }
 
       this.sortClubs();
+
+      // Snapshot for change detection in edit mode
+      if (this.editPlayer) {
+        this.originalFormValue = JSON.parse(JSON.stringify(this.playerForm.value));
+      }
+
       this.cdr.markForCheck();
     });
   }
@@ -549,32 +576,63 @@ export class PlayerCreateModalComponent implements OnInit {
 
   submit() {
     if (this.playerForm.invalid) return;
+    if (this.isEditMode && !this.hasChanges) return;
 
     this.creating = true;
     const { name, categoryId, position, clubIds, identification, email, phone } = this.playerForm.value;
 
-    this.playerService.createPlayer(
-      name,
-      categoryId || undefined,
-      position || undefined,
-      clubIds,
-      identification || undefined,
-      email || undefined,
-      phone || undefined
-    ).subscribe({
-      next: (player) => {
-        this.creating = false;
-        this.playerCreated.emit(player);
-        this.close.emit();
-        this.toast.success('Jugador creado exitosamente');
-        this.cdr.markForCheck();
-      },
-      error: (err) => {
-        this.creating = false;
-        this.toast.error('Error al crear el jugador: ' + (err.error?.message || 'Error desconocido'));
-        this.cdr.markForCheck();
-      }
-    });
+    if (this.isEditMode && this.editPlayer) {
+      // Build only changed fields
+      const updates: any = {};
+      if (name !== this.originalFormValue.name) updates.name = name;
+      if (categoryId !== this.originalFormValue.categoryId) updates.categoryId = categoryId || null;
+      if (position !== this.originalFormValue.position) updates.position = position || null;
+      if (identification !== this.originalFormValue.identification) updates.identification = identification || null;
+      if (email !== this.originalFormValue.email) updates.email = email || null;
+      if (phone !== this.originalFormValue.phone) updates.phone = phone || null;
+
+      const origClubs = JSON.stringify(this.originalFormValue.clubIds || []);
+      const newClubs = JSON.stringify(clubIds || []);
+      if (origClubs !== newClubs) updates.clubIds = clubIds;
+
+      this.playerService.updatePlayer(this.editPlayer.id, updates).subscribe({
+        next: (player) => {
+          this.creating = false;
+          this.playerCreated.emit(player);
+          this.close.emit();
+          this.toast.success('Jugador actualizado exitosamente');
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          this.creating = false;
+          this.toast.error('Error al actualizar: ' + (err.error?.message || 'Error desconocido'));
+          this.cdr.markForCheck();
+        }
+      });
+    } else {
+      this.playerService.createPlayer(
+        name,
+        categoryId || undefined,
+        position || undefined,
+        clubIds,
+        identification || undefined,
+        email || undefined,
+        phone || undefined
+      ).subscribe({
+        next: (player) => {
+          this.creating = false;
+          this.playerCreated.emit(player);
+          this.close.emit();
+          this.toast.success('Jugador creado exitosamente');
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          this.creating = false;
+          this.toast.error('Error al crear el jugador: ' + (err.error?.message || 'Error desconocido'));
+          this.cdr.markForCheck();
+        }
+      });
+    }
   }
 
   @HostListener('document:click', ['$event'])

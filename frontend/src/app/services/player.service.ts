@@ -19,6 +19,15 @@ export interface Player {
     clubs?: { id: string; name: string; }[];
     identification?: string;
     email?: string;
+    phone?: string;
+}
+
+export interface PaginatedPlayers {
+    data: Player[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
 }
 
 @Injectable({
@@ -35,6 +44,15 @@ export class PlayerService {
         return this.http.get<any>(this.apiUrl, { params }).pipe(
             map(res => Array.isArray(res) ? res : res.data)
         );
+    }
+
+    findAllPaginated(opts: { clubId?: string; page?: number; limit?: number; search?: string }): Observable<PaginatedPlayers> {
+        const params: any = {};
+        if (opts.clubId) params.clubId = opts.clubId;
+        if (opts.page) params.page = opts.page;
+        if (opts.limit) params.limit = opts.limit;
+        if (opts.search) params.search = opts.search;
+        return this.http.get<PaginatedPlayers>(this.apiUrl, { params });
     }
 
     createPlayer(name: string, categoryId?: string, position?: string, clubIds?: string[], identification?: string, email?: string, phone?: string): Observable<Player> {
