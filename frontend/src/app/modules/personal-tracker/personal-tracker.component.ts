@@ -17,6 +17,7 @@ import { ConfirmService } from '../../services/confirm.service';
 export class PersonalTrackerComponent implements OnInit {
     inProgressMatches: PersonalMatch[] = [];
     loading = false;
+    deletingMatchId: string | null = null;
 
     constructor(
         private trackerService: PersonalTrackerService,
@@ -51,6 +52,7 @@ export class PersonalTrackerComponent implements OnInit {
     }
 
     async deleteMatch(matchId: string) {
+        if (this.deletingMatchId) return;
         const ok = await this.confirmService.confirm({
             title: 'Eliminar Partido',
             message: '¿Estás seguro de eliminar este partido?',
@@ -58,9 +60,11 @@ export class PersonalTrackerComponent implements OnInit {
         });
         if (!ok) return;
 
+        this.deletingMatchId = matchId;
+        this.cdr.markForCheck();
         this.trackerService.deleteMatch(matchId).subscribe({
-            next: () => { this.loadInProgressMatches(); this.toast.success('Partido eliminado'); },
-            error: () => this.toast.error('Error al eliminar el partido')
+            next: () => { this.deletingMatchId = null; this.loadInProgressMatches(); this.toast.success('Partido eliminado'); },
+            error: () => { this.deletingMatchId = null; this.toast.error('Error al eliminar el partido'); this.cdr.markForCheck(); }
         });
     }
 

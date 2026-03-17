@@ -30,6 +30,11 @@ export class TournamentDetailComponent implements OnInit {
     canEdit = false;
     canAdmin = false;
 
+    // Action guards
+    generatingElimination = false;
+    savingScore = false;
+    finalizingTournament = false;
+
     // Group/phase view
     activeMainTab: 'matches' | 'bracket' = 'matches';
     activeGroupTab: number = 0; // 0 = All, 1..N = group number
@@ -290,13 +295,17 @@ export class TournamentDetailComponent implements OnInit {
     }
 
     generateElimination() {
-        if (!this.tournament) return;
+        if (!this.tournament || this.generatingElimination) return;
+        this.generatingElimination = true;
+        this.cdr.markForCheck();
         this.tournamentService.generateElimination(this.tournament.id).subscribe({
             next: () => {
+                this.generatingElimination = false;
                 this.toast.success('¡Partidos de eliminación generados!');
                 this.loadTournament(this.tournament!.id);
             },
             error: (err) => {
+                this.generatingElimination = false;
                 const msg = err.error?.message || 'Error al generar eliminación';
                 this.toast.error(msg);
                 this.cdr.markForCheck();
@@ -407,8 +416,11 @@ export class TournamentDetailComponent implements OnInit {
 
         const payload = { sets: processedSets };
 
+        this.savingScore = true;
+        this.cdr.markForCheck();
         this.matchService.updateMatchScore(this.selectedMatch.id, payload).subscribe({
             next: () => {
+                this.savingScore = false;
                 if (this.tournament) {
                     this.loadTournament(this.tournament.id);
                 }
@@ -416,6 +428,7 @@ export class TournamentDetailComponent implements OnInit {
                 this.toast.success('Resultado guardado');
             },
             error: (error) => {
+                this.savingScore = false;
                 this.errorMessage = 'Error al actualizar: ' + (error.error?.message || 'Error desconocido');
                 this.toast.error(this.errorMessage);
                 this.cdr.markForCheck();
@@ -467,9 +480,12 @@ export class TournamentDetailComponent implements OnInit {
     }
 
     finalizeTournament() {
-        if (!this.tournament) return;
+        if (!this.tournament || this.finalizingTournament) return;
+        this.finalizingTournament = true;
+        this.cdr.markForCheck();
         this.tournamentService.closeTournament(this.tournament.id).subscribe({
             next: (updatedTournament) => {
+                this.finalizingTournament = false;
                 this.tournament = updatedTournament;
                 this.errorMessage = null;
                 this.showCloseModal = false;
@@ -477,6 +493,7 @@ export class TournamentDetailComponent implements OnInit {
                 this.cdr.markForCheck();
             },
             error: (error) => {
+                this.finalizingTournament = false;
                 this.errorMessage = 'Error al finalizar el torneo: ' + (error.error?.message || 'Error desconocido');
                 this.toast.error(this.errorMessage);
                 this.cdr.markForCheck();

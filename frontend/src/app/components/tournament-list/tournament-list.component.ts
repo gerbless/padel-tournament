@@ -24,6 +24,7 @@ export class TournamentListComponent implements OnInit, OnDestroy {
     isLoggedIn = false;
     canEdit = false;
     canAdmin = false;
+    deletingTournamentId: string | null = null;
     private clubSubscription?: Subscription;
 
     // Month/year filter
@@ -157,6 +158,7 @@ export class TournamentListComponent implements OnInit, OnDestroy {
     async deleteTournament(id: string, event: Event) {
         event.preventDefault();
         event.stopPropagation();
+        if (this.deletingTournamentId) return;
 
         const ok = await this.confirmService.confirm({
             title: 'Eliminar Torneo',
@@ -165,9 +167,11 @@ export class TournamentListComponent implements OnInit, OnDestroy {
         });
         if (!ok) return;
 
+        this.deletingTournamentId = id;
+        this.cdr.markForCheck();
         this.tournamentService.deleteTournament(id).subscribe({
-            next: () => { this.loadTournaments(); this.toast.success('Torneo eliminado'); },
-            error: () => this.toast.error('Error al eliminar el torneo')
+            next: () => { this.deletingTournamentId = null; this.loadTournaments(); this.toast.success('Torneo eliminado'); },
+            error: () => { this.deletingTournamentId = null; this.toast.error('Error al eliminar el torneo'); this.cdr.markForCheck(); }
         });
     }
 }

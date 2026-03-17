@@ -51,6 +51,7 @@ export class PlayerListComponent implements OnInit, OnDestroy {
 
     // Delete confirmation
     playerToDelete: Player | null = null;
+    deleting = false;
 
     constructor(
         private playerService: PlayerService,
@@ -196,16 +197,20 @@ export class PlayerListComponent implements OnInit, OnDestroy {
     }
 
     confirmDelete() {
-        if (!this.playerToDelete) return;
+        if (!this.playerToDelete || this.deleting) return;
         const player = this.playerToDelete;
+        this.deleting = true;
+        this.cdr.markForCheck();
         this.playerService.deletePlayer(player.id).subscribe({
             next: () => {
+                this.deleting = false;
                 this.playerToDelete = null;
                 this.loadPlayers();
                 this.toast.success('Jugador eliminado');
                 this.cdr.markForCheck();
             },
             error: (error: any) => {
+                this.deleting = false;
                 this.toast.error('No se puede eliminar: ' + (error.error?.message || 'Tiene torneos jugados'));
                 this.playerToDelete = null;
                 this.cdr.markForCheck();

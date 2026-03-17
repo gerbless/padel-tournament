@@ -48,7 +48,7 @@
                     <button class="btn-edit" (click)="editMatch(match.id!)">
                         ✏️ Continuar
                     </button>
-                    <button class="btn-delete" (click)="deleteMatch(match.id!)">
+                    <button class="btn-delete" (click)="deleteMatch(match.id!)" [disabled]="deletingMatchId === match.id">
                         🗑️
                     </button>
                 </div>

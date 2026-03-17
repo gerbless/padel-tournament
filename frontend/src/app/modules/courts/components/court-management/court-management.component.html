@@ -81,7 +81,7 @@
                         </div>
                         <div class="price-actions" *ngIf="canAdmin">
                             <button (click)="openEditPrice(block)" class="btn-icon" title="Editar">✏️</button>
-                            <button (click)="deletePrice(block)" class="btn-icon btn-danger" title="Eliminar">🗑️</button>
+                            <button (click)="deletePrice(block)" class="btn-icon btn-danger" title="Eliminar" [disabled]="deletingPriceId === block.id">🗑️</button>
                         </div>
                         </div>
                     </div>
@@ -97,7 +97,7 @@
                     <button *ngIf="canAdmin" (click)="openEditCourt(court)" class="btn btn-secondary btn-sm">
                         ✏️ Editar
                     </button>
-                    <button *ngIf="canAdmin" (click)="deleteCourt(court)" class="btn btn-danger btn-sm">
+                    <button *ngIf="canAdmin" (click)="deleteCourt(court)" class="btn btn-danger btn-sm" [disabled]="deletingCourtId === court.id">
                         🗑️
                     </button>
                 </div>
@@ -171,7 +171,7 @@
         </div>
         <div class="modal-footer">
             <button (click)="showCourtModal = false" class="btn btn-secondary">Cancelar</button>
-            <button (click)="saveCourt()" class="btn btn-primary">
+            <button (click)="saveCourt()" class="btn btn-primary" [disabled]="savingCourt">
                 {{ editingCourt ? 'Guardar' : 'Crear Cancha' }}
             </button>
         </div>
@@ -262,7 +262,7 @@
         </div>
         <div class="modal-footer">
             <button (click)="showPriceModal = false" class="btn btn-secondary">Cancelar</button>
-            <button (click)="savePrice()" class="btn btn-primary">
+            <button (click)="savePrice()" class="btn btn-primary" [disabled]="savingPrice">
                 {{ editingPriceBlock ? (applyEditToAll && matchingBlocksCount > 0 ? 'Guardar en Todas' : 'Guardar') : 'Crear Bloque' }}
             </button>
         </div>

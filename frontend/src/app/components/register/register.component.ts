@@ -38,6 +38,7 @@ export class RegisterComponent {
     loading = false;
     sendingOtp = false;
     verifyingOtp = false;
+    resendingVerification = false;
     phoneVerified = false;
     phoneVerificationToken = '';
     successMessage = '';
@@ -251,13 +252,17 @@ export class RegisterComponent {
     }
 
     resendVerification() {
-        if (!this.email) return;
+        if (!this.email || this.resendingVerification) return;
+        this.resendingVerification = true;
+        this.cdr.markForCheck();
         this.http.post<any>(`${environment.apiUrl}/auth/resend-verification`, { email: this.email }).subscribe({
             next: (res) => {
+                this.resendingVerification = false;
                 this.toast.success(res.message || 'Email de verificación reenviado');
                 this.cdr.markForCheck();
             },
             error: () => {
+                this.resendingVerification = false;
                 this.toast.error('Error al reenviar el email');
                 this.cdr.markForCheck();
             }

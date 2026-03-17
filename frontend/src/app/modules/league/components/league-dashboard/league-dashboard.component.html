@@ -25,15 +25,15 @@
                 [title]="league.matches && league.matches.length > 0 ? 'El calendario ya ha sido generado' : 'Generar calendario'">
                 📅 Generar Calendario
             </button>
-            <button (click)="suggestNextMatch()" class="btn btn-primary"
+            <button (click)="suggestNextMatch()" class="btn btn-primary" [disabled]="suggestingMatch"
                 *ngIf="league.status !== 'completed' && league.matches && league.matches.length > 0">
                 💡 Sugerir Partido
             </button>
-            <button (click)="generateTieBreaker()" class="btn btn-warning" *ngIf="hasTies">
+            <button (click)="generateTieBreaker()" class="btn btn-warning" *ngIf="hasTies" [disabled]="generatingTieBreaker">
                 ⚖️ Resolución de Empate
             </button>
             <!-- Complete League: Visible only when all matches are completed -->
-            <button (click)="confirmCompleteLeague()" class="btn btn-danger"
+            <button (click)="confirmCompleteLeague()" class="btn btn-danger" [disabled]="completingLeague"
                 *ngIf="league.status !== 'completed' && league.matches && league.matches.length > 0 && completedMatchesCount === league.matches.length">
                 🏁 Finalizar Liga
             </button>
@@ -431,7 +431,7 @@
 
         <div class="modal-footer">
             <button (click)="closeScheduleConfirmationModal()" class="btn btn-secondary">Cancelar</button>
-            <button (click)="confirmGenerateSchedule()" class="btn btn-primary">Generar Calendario</button>
+            <button (click)="confirmGenerateSchedule()" class="btn btn-primary" [disabled]="generatingSchedule">Generar Calendario</button>
         </div>
     </div>
 </div>

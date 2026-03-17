@@ -27,6 +27,10 @@ export class CourtBlocksComponent implements OnInit {
     loading = true;
     canAdmin = false;
 
+    // Action guards
+    savingBlock = false;
+    deletingBlockId: string | null = null;
+
     // Modal
     showModal = false;
     blockForm = {
@@ -218,29 +222,36 @@ export class CourtBlocksComponent implements OnInit {
             payload.customEndTime = this.blockForm.customEndTime;
         }
 
+        this.savingBlock = true;
+        this.cdr.markForCheck();
         this.courtService.createCourtBlock(this.selectedClubId, payload).subscribe({
             next: () => {
+                this.savingBlock = false;
                 this.toast.success('Bloqueo creado');
                 this.closeModal();
                 this.loadBlocks();
             },
-            error: () => this.toast.error('Error al crear bloqueo')
+            error: () => { this.savingBlock = false; this.toast.error('Error al crear bloqueo'); this.cdr.markForCheck(); }
         });
     }
 
     async deleteBlock(block: CourtBlock) {
+        if (this.deletingBlockId) return;
         const ok = await this.confirmService.confirm({
             title: '¿Eliminar bloqueo?',
             message: `Se eliminará el bloqueo "${block.reason || 'Sin motivo'}" del ${this.dateRange(block)}`
         });
         if (!ok) return;
 
+        this.deletingBlockId = block.id;
+        this.cdr.markForCheck();
         this.courtService.deleteCourtBlock(block.id).subscribe({
             next: () => {
+                this.deletingBlockId = null;
                 this.toast.success('Bloqueo eliminado');
                 this.loadBlocks();
             },
-            error: () => this.toast.error('Error al eliminar bloqueo')
+            error: () => { this.deletingBlockId = null; this.toast.error('Error al eliminar bloqueo'); this.cdr.markForCheck(); }
         });
     }
 

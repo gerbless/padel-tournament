@@ -26,6 +26,12 @@ export class LeagueDashboardComponent implements OnInit {
     canEdit = false;
     canAdmin = false;
 
+    // Action guards
+    generatingSchedule = false;
+    suggestingMatch = false;
+    completingLeague = false;
+    generatingTieBreaker = false;
+
     // Match result modal
     showResultModal = false;
     savingResult = false; // New state for loading
@@ -521,16 +527,19 @@ export class LeagueDashboardComponent implements OnInit {
     }
 
     confirmGenerateSchedule() {
-        if (!this.league) return;
+        if (!this.league || this.generatingSchedule) return;
         this.closeScheduleConfirmationModal();
-        this.loading = true; // Show loading indicator
+        this.generatingSchedule = true;
+        this.loading = true;
 
         this.leagueService.generateSchedule(this.league.id).subscribe({
             next: () => {
+                this.generatingSchedule = false;
                 this.loadLeague(this.league!.id);
                 this.toast.success('Calendario generado exitosamente');
             },
             error: (err) => {
+                this.generatingSchedule = false;
                 this.loading = false;
                 this.toast.error('Error al generar calendario');
                 this.cdr.markForCheck();
@@ -543,11 +552,13 @@ export class LeagueDashboardComponent implements OnInit {
     suggestedMatch: any = null;
 
     suggestNextMatch() {
-        if (!this.league) return;
+        if (!this.league || this.suggestingMatch) return;
+        this.suggestingMatch = true;
+        this.cdr.markForCheck();
 
         this.leagueService.suggestNextMatch(this.league.id).subscribe({
             next: (match: any) => {
-                // Normalize backend response to frontend format if needed
+                this.suggestingMatch = false;
                 if (!match.pairA && match.team1) {
                     match.pairA = match.team1;
                     match.pairB = match.team2;
@@ -557,6 +568,7 @@ export class LeagueDashboardComponent implements OnInit {
                 this.cdr.markForCheck();
             },
             error: (err) => {
+                this.suggestingMatch = false;
                 console.error('Error suggesting match:', err);
                 this.toast.warning('No hay partidos pendientes o error al generar sugerencia');
                 this.cdr.markForCheck();
@@ -581,6 +593,7 @@ export class LeagueDashboardComponent implements OnInit {
     }
 
     async confirmCompleteLeague() {
+        if (this.completingLeague) return;
         const ok = await this.confirmService.confirm({
             title: 'Finalizar Liga',
             message: '¿Estás seguro de que deseas finalizar la liga? Esto marcará el torneo como completado y <strong>no se podrán modificar resultados</strong>.',
@@ -589,12 +602,15 @@ export class LeagueDashboardComponent implements OnInit {
         });
         if (!ok || !this.league) return;
 
+        this.completingLeague = true;
+        this.cdr.markForCheck();
         this.leagueService.completeLeague(this.league.id).subscribe({
             next: () => {
+                this.completingLeague = false;
                 this.loadLeague(this.league!.id);
                 this.toast.success('¡Liga finalizada! Felicidades a los campeones 🏆');
             },
-            error: () => this.toast.error('Error al finalizar la liga')
+            error: () => { this.completingLeague = false; this.toast.error('Error al finalizar la liga'); this.cdr.markForCheck(); }
         });
     }
 
@@ -624,6 +640,7 @@ export class LeagueDashboardComponent implements OnInit {
     }
 
     async generateTieBreaker() {
+        if (this.generatingTieBreaker) return;
         const ok = await this.confirmService.confirm({
             title: 'Partidos de Desempate',
             message: 'Se han detectado empates en los primeros lugares. ¿Deseas generar partidos de desempate?',
@@ -632,12 +649,15 @@ export class LeagueDashboardComponent implements OnInit {
         });
         if (!ok) return;
 
+        this.generatingTieBreaker = true;
+        this.cdr.markForCheck();
         this.leagueService.generateTieBreaker(this.league!.id).subscribe({
             next: () => {
+                this.generatingTieBreaker = false;
                 this.loadLeague(this.league!.id);
                 this.toast.success('Partidos de desempate generados. ¡Juégalos para definir posiciones!');
             },
-            error: () => this.toast.error('No se pudieron generar los partidos de desempate')
+            error: () => { this.generatingTieBreaker = false; this.toast.error('No se pudieron generar los partidos de desempate'); this.cdr.markForCheck(); }
         });
     }
 }

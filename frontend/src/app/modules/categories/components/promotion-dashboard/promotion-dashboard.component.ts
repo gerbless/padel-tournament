@@ -20,6 +20,7 @@ export class PromotionDashboardComponent implements OnInit {
     loading = false;
     isLoggedIn = false;
     canAdmin = false;
+    applyingPlayerId: string | null = null;
 
     constructor(
         private categoryService: CategoryService,
@@ -50,6 +51,7 @@ export class PromotionDashboardComponent implements OnInit {
     }
 
     async applyChange(item: any, type: 'promotion' | 'relegation') {
+        if (this.applyingPlayerId) return;
         const ok = await this.confirmService.confirm({
             title: 'Cambio de Categoría',
             message: `¿Aplicar cambio de categoría para <strong>${item.player}</strong>?`,
@@ -63,9 +65,11 @@ export class PromotionDashboardComponent implements OnInit {
             return;
         }
 
+        this.applyingPlayerId = item.playerId;
+        this.cdr.markForCheck();
         this.playerService.updatePlayer(item.playerId, { categoryId: item.suggestedCategoryId }).subscribe({
-            next: () => { this.loadAnalysis(); this.toast.success(`Categoría de ${item.player} actualizada`); },
-            error: () => this.toast.error('Error al aplicar el cambio de categoría')
+            next: () => { this.applyingPlayerId = null; this.loadAnalysis(); this.toast.success(`Categoría de ${item.player} actualizada`); },
+            error: () => { this.applyingPlayerId = null; this.toast.error('Error al aplicar el cambio de categoría'); this.cdr.markForCheck(); }
         });
     }
 }

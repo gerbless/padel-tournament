@@ -22,6 +22,7 @@ export class LoginComponent {
     error = '';
     loading = false;
     showResend = false;
+    resendingVerification = false;
 
     constructor(
         private authService: AuthService,
@@ -63,13 +64,17 @@ export class LoginComponent {
     }
 
     resendVerification() {
-        if (!this.username) return;
+        if (!this.username || this.resendingVerification) return;
+        this.resendingVerification = true;
+        this.cdr.markForCheck();
         this.http.post<any>(`${environment.apiUrl}/auth/resend-verification`, { email: this.username }).subscribe({
             next: (res) => {
+                this.resendingVerification = false;
                 this.toast.success(res.message || 'Email de verificación reenviado');
                 this.cdr.markForCheck();
             },
             error: () => {
+                this.resendingVerification = false;
                 this.toast.error('Error al reenviar el email');
                 this.cdr.markForCheck();
             }

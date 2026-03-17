@@ -77,6 +77,7 @@
                             [class.btn-primary]="c.isActive === false"
                             [class.btn-outline]="c.isActive !== false"
                             (click)="toggleClubActive(c)"
+                            [disabled]="togglingClubId === c.id"
                             style="min-width: 120px;">
                         {{ c.isActive !== false ? '⏸️ Desactivar' : '▶️ Activar' }}
                     </button>
@@ -393,7 +394,7 @@
                     <option value="editor">✏️ Editor</option>
                     <option value="admin">🔑 Administrador</option>
                 </select>
-                <button class="btn btn-primary" (click)="assignRole()" [disabled]="!selectedUserId">
+                <button class="btn btn-primary" (click)="assignRole()" [disabled]="!selectedUserId || assigningRole">
                     + Asignar
                 </button>
             </div>
@@ -427,12 +428,12 @@
                     </div>
                 </div>
                 <div class="user-actions">
-                    <select [ngModel]="ucr.role" (ngModelChange)="changeRole(ucr, $event)" class="role-select-sm">
+                    <select [ngModel]="ucr.role" (ngModelChange)="changeRole(ucr, $event)" class="role-select-sm" [disabled]="changingRoleUserId === ucr.userId">
                         <option value="viewer">👁️ Visualizador</option>
                         <option value="editor">✏️ Editor</option>
                         <option value="admin">🔑 Administrador</option>
                     </select>
-                    <button class="btn-icon btn-danger" (click)="removeUserRole(ucr)" title="Eliminar acceso">
+                    <button class="btn-icon btn-danger" (click)="removeUserRole(ucr)" title="Eliminar acceso" [disabled]="removingRoleUserId === ucr.userId">
                         ✕
                     </button>
                 </div>
@@ -444,7 +445,7 @@
                             {{ p.name }}{{ p.category ? ' (' + p.category.name + ')' : '' }}
                         </option>
                     </select>
-                    <button class="btn btn-sm btn-primary" (click)="linkPlayer(ucr.userId)" [disabled]="!selectedPlayerId">
+                    <button class="btn btn-sm btn-primary" (click)="linkPlayer(ucr.userId)" [disabled]="!selectedPlayerId || savingLinkPlayer">
                         Vincular
                     </button>
                     <button class="btn btn-sm btn-outline" (click)="linkingPlayerId = null">Cancelar</button>

@@ -303,7 +303,7 @@
         </div>
 
         <div class="modal-footer">
-            <button *ngIf="editingReservation && reservationForm.paymentStatus !== 'paid'" (click)="cancelReservation()" class="btn btn-danger">
+            <button *ngIf="editingReservation && reservationForm.paymentStatus !== 'paid'" (click)="cancelReservation()" class="btn btn-danger" [disabled]="cancellingReservation">
                 🗑️ Cancelar
             </button>
             <button *ngIf="allPlayersRegistered"
@@ -318,7 +318,7 @@
             <div class="spacer"></div>
             <button (click)="showModal = false" class="btn btn-secondary">Cerrar</button>
             <button *ngIf="!isFullyPaid || hasFormChanged" (click)="saveReservation()" class="btn btn-primary"
-                [disabled]="editingReservation && !hasFormChanged">
+                [disabled]="savingReservation || (editingReservation && !hasFormChanged)">
                 {{ editingReservation ? 'Guardar' : 'Crear Reserva' }}
             </button>
         </div>

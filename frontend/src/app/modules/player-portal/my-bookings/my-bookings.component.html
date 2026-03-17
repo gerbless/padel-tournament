@@ -37,7 +37,7 @@
                     <span *ngIf="(pendingConfirmationId === booking.id || booking.mpStatusDetail === 'pending_contingency') && payingBookingId !== booking.id">⏳ Pendiente</span>
                     <span *ngIf="payingBookingId !== booking.id && pendingConfirmationId !== booking.id && booking.mpStatusDetail !== 'pending_contingency'">💳 Pagar</span>
                 </button>
-                <button *ngIf="booking.paymentStatus !== 'paid' && pendingConfirmationId !== booking.id && booking.mpStatusDetail !== 'pending_contingency'" class="btn-cancel" (click)="cancelBooking(booking)">✕</button>
+                <button *ngIf="booking.paymentStatus !== 'paid' && pendingConfirmationId !== booking.id && booking.mpStatusDetail !== 'pending_contingency'" class="btn-cancel" (click)="cancelBooking(booking)" [disabled]="cancellingBookingId === booking.id">✕</button>
             </div>
         </div>
     </div>

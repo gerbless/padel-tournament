@@ -71,7 +71,7 @@
               Ver Torneo
             </a>
             <button *ngIf="tournament.status !== 'completed' && canAdmin"
-              (click)="deleteTournament(tournament.id, $event)" class="btn btn-danger">
+              (click)="deleteTournament(tournament.id, $event)" class="btn btn-danger" [disabled]="deletingTournamentId === tournament.id">
               🗑️
             </button>
           </div>
@@ -109,7 +109,7 @@
           Ver Torneo
         </a>
         <button *ngIf="tournament.status !== 'completed' && canAdmin"
-          (click)="deleteTournament(tournament.id, $event)" class="btn btn-danger">
+          (click)="deleteTournament(tournament.id, $event)" class="btn btn-danger" [disabled]="deletingTournamentId === tournament.id">
           🗑️
         </button>
       </div>

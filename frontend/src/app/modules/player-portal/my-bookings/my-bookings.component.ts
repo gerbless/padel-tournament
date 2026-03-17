@@ -40,6 +40,7 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
     clubName = '';
     mpConfigured = false;
     payingBookingId: string | null = null;
+    cancellingBookingId: string | null = null;
     pendingConfirmationId: string | null = null;
 
     // Poll interval to reload bookings (catches webhook-driven deletions)
@@ -151,6 +152,7 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
     }
 
     async cancelBooking(booking: Booking) {
+        if (this.cancellingBookingId) return;
         const ok = await this.confirmService.confirm({
             title: 'Cancelar Reserva',
             message: `¿Cancelar la reserva del <strong>${this.formatDate(booking.date)}</strong> de <strong>${booking.startTime} a ${booking.endTime}</strong>?`,
@@ -160,12 +162,16 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
 
         if (!ok) return;
 
+        this.cancellingBookingId = booking.id;
+        this.cdr.markForCheck();
         this.http.delete(`${environment.apiUrl}/courts/player-bookings/${booking.id}`).subscribe({
             next: () => {
+                this.cancellingBookingId = null;
                 this.toast.success('Reserva cancelada');
                 this.loadBookings();
             },
             error: (err) => {
+                this.cancellingBookingId = null;
                 this.toast.error(err.error?.message || 'Error al cancelar');
                 this.cdr.markForCheck();
             }

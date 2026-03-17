@@ -41,7 +41,7 @@
                         <div class="block-courts">🏟️ {{ courtNames(block) }}</div>
                     </div>
                     <div class="block-actions">
-                        <button *ngIf="canAdmin" (click)="deleteBlock(block)" class="btn btn-danger btn-sm">
+                        <button *ngIf="canAdmin" (click)="deleteBlock(block)" class="btn btn-danger btn-sm" [disabled]="deletingBlockId === block.id">
                             🗑️ Eliminar
                         </button>
                     </div>
@@ -65,7 +65,7 @@
                             <div class="block-courts">🏟️ {{ courtNames(block) }}</div>
                         </div>
                         <div class="block-actions">
-                            <button *ngIf="canAdmin" (click)="deleteBlock(block)" class="btn btn-danger btn-sm">
+                            <button *ngIf="canAdmin" (click)="deleteBlock(block)" class="btn btn-danger btn-sm" [disabled]="deletingBlockId === block.id">
                                 🗑️ Eliminar
                             </button>
                         </div>
@@ -155,7 +155,7 @@
         </div>
         <div class="modal-footer">
             <button (click)="closeModal()" class="btn btn-secondary">Cancelar</button>
-            <button (click)="saveBlock()" class="btn btn-primary">Crear Bloqueo</button>
+            <button (click)="saveBlock()" class="btn btn-primary" [disabled]="savingBlock">Crear Bloqueo</button>
         </div>
     </div>
 </div>

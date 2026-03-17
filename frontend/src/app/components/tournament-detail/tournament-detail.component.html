@@ -30,11 +30,11 @@
             <div class="flex gap-2">
                 <!-- Generate Elimination (free mode only) -->
                 <button *ngIf="canEdit && isFreeModeWithGroups && allGroupMatchesCompleted && !hasEliminationMatches && tournament.status !== 'completed'"
-                    (click)="generateElimination()" class="btn btn-info">
+                    (click)="generateElimination()" class="btn btn-info" [disabled]="generatingElimination">
                     ⚔️ Generar Semifinales
                 </button>
                 <button *ngIf="canEdit && canGenerateFinal"
-                    (click)="generateElimination()" class="btn btn-warning">
+                    (click)="generateElimination()" class="btn btn-warning" [disabled]="generatingElimination">
                     🏆 Generar Final
                 </button>
                 <button *ngIf="canCloseTournament() && canAdmin" (click)="confirmCloseTournament()" class="btn btn-success">
@@ -174,7 +174,7 @@
                 <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
                     Genera las semifinales entre los 4 mejores clasificados.
                 </p>
-                <button (click)="generateElimination()" class="btn btn-primary btn-lg">
+                <button (click)="generateElimination()" class="btn btn-primary btn-lg" [disabled]="generatingElimination">
                     ⚔️ Generar Semifinales
                 </button>
             </div>
@@ -188,7 +188,7 @@
                 <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
                     Genera la gran final entre los ganadores de las semifinales.
                 </p>
-                <button (click)="generateElimination()" class="btn btn-warning btn-lg">
+                <button (click)="generateElimination()" class="btn btn-warning btn-lg" [disabled]="generatingElimination">
                     🏆 Generar la Final
                 </button>
             </div>
@@ -397,7 +397,7 @@
             </button>
 
             <div class="flex gap-2 mt-4">
-                <button type="submit" class="btn btn-primary" style="flex: 1;">💾 Guardar Resultado</button>
+                <button type="submit" class="btn btn-primary" style="flex: 1;" [disabled]="savingScore">💾 Guardar Resultado</button>
                 <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancelar</button>
             </div>
         </form>
@@ -420,7 +420,7 @@
         </div>
 
         <div class="flex gap-2 mt-4">
-            <button class="btn btn-success" style="flex: 1;" (click)="finalizeTournament()">🏆 Finalizar</button>
+            <button class="btn btn-success" style="flex: 1;" (click)="finalizeTournament()" [disabled]="finalizingTournament">🏆 Finalizar</button>
             <button class="btn btn-secondary" (click)="cancelCloseTournament()">Cancelar</button>
         </div>
     </div>

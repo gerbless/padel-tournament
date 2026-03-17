@@ -10,7 +10,7 @@
             <h2>¡Revisa tu email!</h2>
             <p class="success-msg">{{ successMessage }}</p>
             <p class="hint">Si no lo ves, revisa tu carpeta de spam.</p>
-            <button class="btn btn-secondary btn-block" (click)="resendVerification()">
+            <button class="btn btn-secondary btn-block" (click)="resendVerification()" [disabled]="resendingVerification">
                 Reenviar email de verificación
             </button>
             <div class="login-link">

@@ -180,7 +180,7 @@
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" (click)="cancelDelete()">Cancelar</button>
-            <button type="button" class="btn btn-danger" (click)="confirmDelete()">Eliminar</button>
+            <button type="button" class="btn btn-danger" (click)="confirmDelete()" [disabled]="deleting">Eliminar</button>
         </div>
     </div>
 </div>

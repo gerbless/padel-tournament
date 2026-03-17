@@ -55,6 +55,12 @@ export class CourtManagementComponent implements OnInit {
     // Pricing toggle
     enablePricing = false;
 
+    // Action guards
+    savingCourt = false;
+    deletingCourtId: string | null = null;
+    savingPrice = false;
+    deletingPriceId: string | null = null;
+
     dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
     constructor(
@@ -156,14 +162,18 @@ export class CourtManagementComponent implements OnInit {
     }
 
     saveCourt() {
+        if (this.savingCourt) return;
+        this.savingCourt = true;
+        this.cdr.markForCheck();
         if (this.editingCourt) {
             this.courtService.updateCourt(this.editingCourt.id, this.courtForm).subscribe({
                 next: () => {
+                    this.savingCourt = false;
                     this.showCourtModal = false;
                     this.loadCourts();
                     this.toast.success('Cancha actualizada');
                 },
-                error: () => this.toast.error('Error al actualizar cancha')
+                error: () => { this.savingCourt = false; this.toast.error('Error al actualizar cancha'); this.cdr.markForCheck(); }
             });
         } else {
             this.courtService.createCourt({
@@ -171,6 +181,7 @@ export class CourtManagementComponent implements OnInit {
                 clubId: this.selectedClubId
             } as any).subscribe({
                 next: (newCourt: Court) => {
+                    this.savingCourt = false;
                     this.showCourtModal = false;
                     if (this.copyFromCourtId && newCourt.id) {
                         this.courtService.copyPriceBlocks(newCourt.id, this.copyFromCourtId).subscribe({
@@ -188,24 +199,28 @@ export class CourtManagementComponent implements OnInit {
                         this.toast.success('Cancha creada');
                     }
                 },
-                error: () => this.toast.error('Error al crear cancha')
+                error: () => { this.savingCourt = false; this.toast.error('Error al crear cancha'); this.cdr.markForCheck(); }
             });
         }
     }
 
     async deleteCourt(court: Court) {
+        if (this.deletingCourtId) return;
         const ok = await this.confirmService.confirm({
             title: 'Eliminar Cancha',
             message: `¿Eliminar <strong>${court.name}</strong>? Esto eliminará todas las reservas asociadas.`,
             confirmText: 'Eliminar'
         });
         if (!ok) return;
+        this.deletingCourtId = court.id;
+        this.cdr.markForCheck();
         this.courtService.deleteCourt(court.id).subscribe({
             next: () => {
+                this.deletingCourtId = null;
                 this.loadCourts();
                 this.toast.success('Cancha eliminada');
             },
-            error: () => this.toast.error('Error al eliminar cancha')
+            error: () => { this.deletingCourtId = null; this.toast.error('Error al eliminar cancha'); this.cdr.markForCheck(); }
         });
     }
 
@@ -279,9 +294,11 @@ export class CourtManagementComponent implements OnInit {
     }
 
     savePrice() {
+        if (this.savingPrice) return;
+        this.savingPrice = true;
+        this.cdr.markForCheck();
         if (this.editingPriceBlock && this.editingPriceBlock.id) {
             if (this.applyEditToAll && this.matchingBlocksCount > 0) {
-                // Bulk update all matching blocks across all courts
                 const matchCriteria = {
                     startTime: this.editingPriceBlock.startTime,
                     endTime: this.editingPriceBlock.endTime,
@@ -296,57 +313,64 @@ export class CourtManagementComponent implements OnInit {
                 };
                 this.courtService.bulkUpdatePriceBlocks(this.selectedClubId, matchCriteria, newValues).subscribe({
                     next: (result) => {
+                        this.savingPrice = false;
                         this.showPriceModal = false;
                         this.loadCourts();
                         this.toast.success(`${result.updated} bloques actualizados en todas las canchas`);
                     },
-                    error: () => this.toast.error('Error al actualizar precios')
+                    error: () => { this.savingPrice = false; this.toast.error('Error al actualizar precios'); this.cdr.markForCheck(); }
                 });
             } else {
                 this.courtService.updatePriceBlock(this.editingPriceBlock.id, this.priceForm).subscribe({
                     next: () => {
+                        this.savingPrice = false;
                         this.showPriceModal = false;
                         this.loadCourts();
                         this.toast.success('Bloque de precio actualizado');
                     },
-                    error: () => this.toast.error('Error al actualizar precio')
+                    error: () => { this.savingPrice = false; this.toast.error('Error al actualizar precio'); this.cdr.markForCheck(); }
                 });
             }
         } else if (this.applyPriceToAll) {
             this.courtService.createPriceBlockForAllCourts(this.selectedClubId, this.priceForm).subscribe({
                 next: (blocks) => {
+                    this.savingPrice = false;
                     this.showPriceModal = false;
                     this.loadCourts();
                     this.toast.success(`Precio aplicado a ${blocks.length} canchas`);
                 },
-                error: () => this.toast.error('Error al crear precios')
+                error: () => { this.savingPrice = false; this.toast.error('Error al crear precios'); this.cdr.markForCheck(); }
             });
         } else {
             this.courtService.createPriceBlock(this.priceCourtId, this.priceForm).subscribe({
                 next: () => {
+                    this.savingPrice = false;
                     this.showPriceModal = false;
                     this.loadCourts();
                     this.toast.success('Bloque de precio creado');
                 },
-                error: () => this.toast.error('Error al crear precio')
+                error: () => { this.savingPrice = false; this.toast.error('Error al crear precio'); this.cdr.markForCheck(); }
             });
         }
     }
 
     async deletePrice(block: CourtPriceBlock) {
-        if (!block.id) return;
+        if (!block.id || this.deletingPriceId) return;
         const ok = await this.confirmService.confirm({
             title: 'Eliminar Precio',
             message: '¿Eliminar este bloque de precio?',
             confirmText: 'Eliminar'
         });
         if (!ok) return;
+        this.deletingPriceId = block.id;
+        this.cdr.markForCheck();
         this.courtService.deletePriceBlock(block.id).subscribe({
             next: () => {
+                this.deletingPriceId = null;
                 this.loadCourts();
                 this.toast.success('Bloque de precio eliminado');
             },
-            error: () => this.toast.error('Error al eliminar precio')
+            error: () => { this.deletingPriceId = null; this.toast.error('Error al eliminar precio'); this.cdr.markForCheck(); }
         });
     }
 

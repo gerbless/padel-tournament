@@ -72,6 +72,9 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
     // Role assignment form
     selectedUserId = '';
     selectedRole = 'viewer';
+    assigningRole = false;
+    changingRoleUserId: string | null = null;
+    removingRoleUserId: string | null = null;
 
     // User creation form
     showCreateUser = false;
@@ -86,6 +89,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
     allPlayers: any[] = [];
     linkingPlayerId: string | null = null;
     selectedPlayerId = '';
+    savingLinkPlayer = false;
 
     // Club management (super_admin)
     allClubs: Club[] = [];
@@ -95,6 +99,7 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
     creatingClub = false;
     createClubError = '';
     createClubSuccess = '';
+    togglingClubId: string | null = null;
 
     private subs: Subscription[] = [];
     private cdr = inject(ChangeDetectorRef);
@@ -377,41 +382,50 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
     }
 
     assignRole() {
-        if (!this.club || !this.selectedUserId || !this.selectedRole) return;
+        if (!this.club || !this.selectedUserId || !this.selectedRole || this.assigningRole) return;
+        this.assigningRole = true;
+        this.cdr.markForCheck();
         this.http.post(
             `${environment.apiUrl}/users/${this.selectedUserId}/club-roles`,
             { clubId: this.club.id, role: this.selectedRole }
         ).subscribe({
             next: () => {
+                this.assigningRole = false;
                 this.selectedUserId = '';
                 this.loadClubUsers();
             },
-            error: (err) => console.error('Error assigning role', err)
+            error: (err) => { this.assigningRole = false; console.error('Error assigning role', err); this.cdr.markForCheck(); }
         });
     }
 
     changeRole(ucr: ClubUser, newRole: string) {
+        if (this.changingRoleUserId) return;
+        this.changingRoleUserId = ucr.userId;
+        this.cdr.markForCheck();
         this.http.post(
             `${environment.apiUrl}/users/${ucr.userId}/club-roles`,
             { clubId: ucr.clubId, role: newRole }
         ).subscribe({
-            next: () => this.loadClubUsers(),
-            error: (err) => console.error('Error changing role', err)
+            next: () => { this.changingRoleUserId = null; this.loadClubUsers(); },
+            error: (err) => { this.changingRoleUserId = null; console.error('Error changing role', err); this.cdr.markForCheck(); }
         });
     }
 
     async removeUserRole(ucr: ClubUser) {
+        if (this.removingRoleUserId) return;
         const ok = await this.confirmService.confirm({
             title: 'Eliminar Acceso',
             message: `¿Eliminar el acceso de <strong>${ucr.user.email}</strong> a este club?`,
             confirmText: 'Eliminar'
         });
         if (!ok) return;
+        this.removingRoleUserId = ucr.userId;
+        this.cdr.markForCheck();
         this.http.delete(
             `${environment.apiUrl}/users/${ucr.userId}/club-roles/${ucr.clubId}`
         ).subscribe({
-            next: () => this.loadClubUsers(),
-            error: (err) => console.error('Error removing role', err)
+            next: () => { this.removingRoleUserId = null; this.loadClubUsers(); },
+            error: (err) => { this.removingRoleUserId = null; console.error('Error removing role', err); this.cdr.markForCheck(); }
         });
     }
 
@@ -512,19 +526,22 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
     }
 
     linkPlayer(userId: string) {
-        if (!this.selectedPlayerId) return;
+        if (!this.selectedPlayerId || this.savingLinkPlayer) return;
+        this.savingLinkPlayer = true;
+        this.cdr.markForCheck();
         this.http.post(
             `${environment.apiUrl}/users/${userId}/link-player`,
             { playerId: this.selectedPlayerId }
         ).subscribe({
             next: () => {
+                this.savingLinkPlayer = false;
                 this.linkingPlayerId = null;
                 this.selectedPlayerId = '';
                 this.loadClubUsers();
                 this.loadAllUsers();
                 this.cdr.markForCheck();
             },
-            error: (err) => console.error('Error linking player', err)
+            error: (err) => { this.savingLinkPlayer = false; console.error('Error linking player', err); this.cdr.markForCheck(); }
         });
     }
 
@@ -583,19 +600,21 @@ export class ClubSettingsComponent implements OnInit, OnDestroy {
     }
 
     toggleClubActive(club: Club) {
+        if (this.togglingClubId) return;
+        this.togglingClubId = club.id;
+        this.cdr.markForCheck();
         const newState = club.isActive === false ? true : false;
         this.clubService.toggleActive(club.id, newState).subscribe({
             next: (updated) => {
-                // Update in the list
+                this.togglingClubId = null;
                 const idx = this.allClubs.findIndex(c => c.id === club.id);
                 if (idx >= 0) this.allClubs[idx] = { ...this.allClubs[idx], isActive: updated.isActive };
-                // If this is the selected club, update it too
                 if (this.club?.id === club.id) {
                     this.clubService.selectClub({ ...this.club, isActive: updated.isActive });
                 }
                 this.cdr.markForCheck();
             },
-            error: (err) => console.error('Error toggling club active state', err),
+            error: (err) => { this.togglingClubId = null; console.error('Error toggling club active state', err); this.cdr.markForCheck(); },
         });
     }
 

@@ -24,6 +24,10 @@ export class CategoryListComponent implements OnInit {
     canEdit = false;
     canAdmin = false;
 
+    // Action guards
+    savingCategory = false;
+    deletingCategoryId: string | null = null;
+
     constructor(
         private categoryService: CategoryService,
         private fb: FormBuilder,
@@ -59,18 +63,20 @@ export class CategoryListComponent implements OnInit {
     }
 
     onSubmit() {
-        if (this.categoryForm.valid) {
+        if (this.categoryForm.valid && !this.savingCategory) {
             const categoryData = this.categoryForm.value;
+            this.savingCategory = true;
+            this.cdr.markForCheck();
 
             if (this.editingId) {
                 this.categoryService.update(this.editingId, categoryData).subscribe({
-                    next: () => { this.loadCategories(); this.resetForm(); this.toast.success('Categoría actualizada'); },
-                    error: () => this.toast.error('Error al actualizar la categoría')
+                    next: () => { this.savingCategory = false; this.loadCategories(); this.resetForm(); this.toast.success('Categoría actualizada'); },
+                    error: () => { this.savingCategory = false; this.toast.error('Error al actualizar la categoría'); this.cdr.markForCheck(); }
                 });
             } else {
                 this.categoryService.create(categoryData).subscribe({
-                    next: () => { this.loadCategories(); this.resetForm(); this.toast.success('Categoría creada'); },
-                    error: () => this.toast.error('Error al crear la categoría')
+                    next: () => { this.savingCategory = false; this.loadCategories(); this.resetForm(); this.toast.success('Categoría creada'); },
+                    error: () => { this.savingCategory = false; this.toast.error('Error al crear la categoría'); this.cdr.markForCheck(); }
                 });
             }
         }
@@ -82,6 +88,7 @@ export class CategoryListComponent implements OnInit {
     }
 
     async delete(id: string) {
+        if (this.deletingCategoryId) return;
         const ok = await this.confirmService.confirm({
             title: 'Eliminar Categoría',
             message: '¿Seguro que deseas eliminar esta categoría?',
@@ -89,9 +96,11 @@ export class CategoryListComponent implements OnInit {
         });
         if (!ok) return;
 
+        this.deletingCategoryId = id;
+        this.cdr.markForCheck();
         this.categoryService.delete(id).subscribe({
-            next: () => { this.loadCategories(); this.toast.success('Categoría eliminada'); },
-            error: () => this.toast.error('Error al eliminar la categoría')
+            next: () => { this.deletingCategoryId = null; this.loadCategories(); this.toast.success('Categoría eliminada'); },
+            error: () => { this.deletingCategoryId = null; this.toast.error('Error al eliminar la categoría'); this.cdr.markForCheck(); }
         });
     }
 

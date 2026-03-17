@@ -34,6 +34,10 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
     enablePricing = false;
     freePlayPointsPerWin = 3;
 
+    // Action guards
+    savingReservation = false;
+    cancellingReservation = false;
+
     // Auto-refresh
     private refreshInterval: any = null;
     private readonly REFRESH_MS = 15_000;
@@ -691,11 +695,13 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
     }
 
     saveReservation() {
-        if (!this.court) return;
+        if (!this.court || this.savingReservation) return;
         if (!this.editingReservation && this.isTimeSlotPast(this.reservationForm.startTime)) {
             this.toast.error('No se puede reservar un horario que ya pasó');
             return;
         }
+        this.savingReservation = true;
+        this.cdr.markForCheck();
         const players = this.reservationForm.players.filter(p => p.trim());
         const data: any = {
             courtId: this.court.id,
@@ -717,26 +723,28 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
         if (this.editingReservation) {
             this.courtService.updateReservation(this.editingReservation.id, data).subscribe({
                 next: () => {
+                    this.savingReservation = false;
                     this.showModal = false;
                     this.loadReservations();
                     this.toast.success('Reserva actualizada');
                 },
-                error: (err) => this.toast.error(err.error?.message || 'Error al actualizar reserva')
+                error: (err) => { this.savingReservation = false; this.toast.error(err.error?.message || 'Error al actualizar reserva'); this.cdr.markForCheck(); }
             });
         } else {
             this.courtService.createReservation(data).subscribe({
                 next: () => {
+                    this.savingReservation = false;
                     this.showModal = false;
                     this.loadReservations();
                     this.toast.success('Reserva creada');
                 },
-                error: (err) => this.toast.error(err.error?.message || 'Error al crear reserva')
+                error: (err) => { this.savingReservation = false; this.toast.error(err.error?.message || 'Error al crear reserva'); this.cdr.markForCheck(); }
             });
         }
     }
 
     async cancelReservation() {
-        if (!this.editingReservation) return;
+        if (!this.editingReservation || this.cancellingReservation) return;
         const ok = await this.confirmService.confirm({
             title: 'Cancelar Reserva',
             message: '¿Cancelar esta reserva?',
@@ -744,13 +752,16 @@ export class CourtCalendarComponent implements OnInit, OnDestroy {
             confirmClass: 'btn-warning'
         });
         if (!ok) return;
+        this.cancellingReservation = true;
+        this.cdr.markForCheck();
         this.courtService.cancelReservation(this.editingReservation.id).subscribe({
             next: () => {
+                this.cancellingReservation = false;
                 this.showModal = false;
                 this.loadReservations();
                 this.toast.success('Reserva cancelada');
             },
-            error: () => this.toast.error('Error al cancelar reserva')
+            error: () => { this.cancellingReservation = false; this.toast.error('Error al cancelar reserva'); this.cdr.markForCheck(); }
         });
     }
 
